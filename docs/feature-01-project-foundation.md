@@ -27,8 +27,8 @@ Create the base repo structure for frontend, backend, docs, and AI-ready project
 - [ ] Create Next.js app inside `frontend`.
 - [ ] Create FastAPI app inside `backend`.
 - [ ] Create backend `.venv`.
-- [ ] Add `.gitignore`.
-- [ ] Add root `README.md`.
+- [ ] Update `.gitignore`.
+- [ ] Update root `README.md`.
 - [ ] Add `.env.example` files.
 - [ ] Add docs and `.claude` specs.
 

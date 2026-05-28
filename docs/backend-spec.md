@@ -100,7 +100,7 @@ httpx
 ```bash
 cd backend
 source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 4001
 ```
 
 ## 6. Backend Rules

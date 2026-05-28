@@ -125,7 +125,7 @@ Frontend:
 
 ```txt
 frontend/.env.local
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4001/api
 ```
 
 Backend:
