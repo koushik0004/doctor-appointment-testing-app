@@ -85,9 +85,10 @@ SQLite is configured with `check_same_thread=False` when the database URL starts
 
 ```bash
 cd backend
-source .venv/bin/activate
-uvicorn app.main:app --reload --port 4001
+make dev
 ```
+
+Use `make setup` first if you want to prepare the virtual environment explicitly.
 
 ## 10. API Documentation URLs
 
@@ -101,15 +102,15 @@ When the server is running on port `4001`:
 
 ```bash
 cd backend
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 4001
+make help
+make setup
+make dev
+make run
 ```
 
 ## 12. Troubleshooting Notes
 
-- If `uvicorn` is not found, activate `.venv` first.
+- If `python3.12` is not available on your machine, run `make BOOTSTRAP_PYTHON=python3 setup`.
 - If the app cannot open the database, confirm `DATABASE_URL` points to a valid SQLite file path.
 - If the schema looks stale, delete the local `app.db` file and restart the server so the tables are recreated.
 - If imports fail, make sure commands are run from the `backend/` directory.
