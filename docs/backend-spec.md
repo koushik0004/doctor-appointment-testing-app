@@ -52,7 +52,7 @@ backend/
 ├── scripts/
 │   └── seed_db.py
 ├── tests/
-├── requirements.txt
+├── pyproject.toml
 └── README.md
 ```
 
@@ -78,21 +78,21 @@ cd backend
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
-Minimal `requirements.txt`:
+Minimal `pyproject.toml`:
 
-```txt
-fastapi
-uvicorn[standard]
-sqlalchemy
-pydantic
-pydantic-settings
-python-dotenv
-email-validator
-pytest
-httpx
+```toml
+[project]
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "sqlalchemy",
+  "pydantic",
+  "pydantic-settings",
+  "python-dotenv",
+]
 ```
 
 ## 5. Local Run Command
@@ -142,4 +142,3 @@ smtp    → send using SMTP config
 ```
 
 Start with console mode for local development.
-

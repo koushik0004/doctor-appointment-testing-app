@@ -28,7 +28,7 @@ backend/
 │       ├── __init__.py
 │       └── doctor.py
 ├── README.md
-├── requirements.txt
+├── pyproject.toml
 └── AGENTS.md
 ```
 

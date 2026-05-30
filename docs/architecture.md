@@ -54,7 +54,7 @@ doctor-appointment-ai/
 │   │   └── main.py
 │   ├── scripts/
 │   ├── tests/
-│   ├── requirements.txt
+│   ├── pyproject.toml
 │   └── README.md
 │
 ├── ai-agent/
@@ -141,4 +141,3 @@ SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM=no-reply@carenow.local
 ```
-

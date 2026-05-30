@@ -28,7 +28,7 @@ upgrade-pip: venv
 	$(PYTHON) -m pip install --upgrade pip
 
 install: venv
-	$(PIP) install -r requirements.txt
+	$(PIP) install -e ".[dev]"
 
 setup: upgrade-pip install
 

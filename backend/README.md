@@ -34,7 +34,7 @@ backend/
 │   │   └── doctor.py
 │   └── schemas/
 │       └── doctor.py
-├── requirements.txt
+├── pyproject.toml
 └── README.md
 ```
 
@@ -56,7 +56,7 @@ source .venv/bin/activate
 cd backend
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ## 7. Environment Variables
