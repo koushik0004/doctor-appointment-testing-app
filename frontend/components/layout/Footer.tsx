@@ -1,11 +1,11 @@
 export function Footer() {
   return (
-    <footer className="mt-16 border-t border-slate-200 bg-white">
-      <div className="mx-auto w-full max-w-[1320px] px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr]">
+    <footer className="border-t border-slate-200 bg-white">
+      <div className="mx-auto w-full max-w-[1600px] px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
+        <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr_0.85fr_0.7fr]">
           <div className="max-w-xs">
-            <div className="flex items-center gap-3 text-2xl font-semibold tracking-tight text-cyan-500">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-50 text-cyan-500 ring-1 ring-cyan-100">
+            <div className="flex items-center gap-3 text-[2rem] font-semibold tracking-[-0.05em] text-sky-400">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-400 ring-1 ring-sky-100">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -47,21 +47,15 @@ export function Footer() {
 
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Connect</h2>
-            <div className="mt-5 flex items-center gap-4 text-slate-500">
-              <span className="rounded-full border border-slate-200 px-3 py-2 text-sm">
-                f
-              </span>
-              <span className="rounded-full border border-slate-200 px-3 py-2 text-sm">
-                t
-              </span>
-              <span className="rounded-full border border-slate-200 px-3 py-2 text-sm">
-                ig
-              </span>
+            <div className="mt-5 flex items-center gap-6 text-slate-500">
+              <span className="text-lg">f</span>
+              <span className="text-lg">t</span>
+              <span className="text-lg">ig</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-3 border-t border-slate-200 pt-6 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
+        <div className="mt-14 flex flex-col gap-3 border-t border-slate-200 pt-6 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
           <p>© 2024 CareNow Inc. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <p>Terms of Service</p>

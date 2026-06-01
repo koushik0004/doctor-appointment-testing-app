@@ -7,15 +7,15 @@ const navigation = [
 
 export function Header() {
   return (
-    <header className="border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[1320px] items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
+    <header className="border-b border-slate-200 bg-white">
+      <div className="mx-auto grid w-full max-w-[1600px] grid-cols-[1fr_auto_1fr] items-center px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
         <nav aria-label="Primary navigation">
-          <ul className="flex items-center gap-2 sm:gap-4">
+          <ul className="flex items-center gap-5">
             {navigation.map((item) => (
               <li key={item.label}>
                 <Link
                   href={item.href}
-                  className="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+                  className="px-2 py-2 text-sm font-semibold text-slate-700 transition hover:text-slate-950"
                 >
                   {item.label}
                 </Link>
@@ -26,9 +26,9 @@ export function Header() {
 
         <Link
           href="/"
-          className="flex items-center gap-3 text-xl font-semibold tracking-tight text-cyan-500"
+          className="flex items-center justify-center gap-3 text-[2rem] font-semibold tracking-[-0.05em] text-sky-400"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-50 text-cyan-500 ring-1 ring-cyan-100">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-400 ring-1 ring-sky-100">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -45,16 +45,16 @@ export function Header() {
           CareNow
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3">
           <Link
             href="#"
-            className="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="px-4 py-2 text-sm font-semibold text-slate-700 transition hover:text-slate-950"
           >
             Sign In
           </Link>
           <Link
             href="/doctors"
-            className="rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-cyan-600"
+            className="rounded-[12px] bg-sky-400 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-500"
           >
             Join CareNow
           </Link>

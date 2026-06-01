@@ -42,7 +42,7 @@ export function DoctorFilters({
   onSelectAppointmentType,
 }: DoctorFiltersProps) {
   return (
-    <aside className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-soft">
+    <aside className="rounded-none border-r border-slate-200 bg-slate-50 px-6 py-8">
       <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
         <FilterIcon />
         <span>Filters</span>
@@ -50,7 +50,7 @@ export function DoctorFilters({
 
       <div className="mt-8">
         <FilterGroupLabel>Specialty</FilterGroupLabel>
-        <div className="mt-4 flex flex-col gap-2">
+        <nav className="mt-4 flex flex-col gap-1" aria-label="Specialty filters">
           {specialtyOptions.map((specialty) => {
             const isActive = specialty === selectedSpecialty;
 
@@ -59,10 +59,10 @@ export function DoctorFilters({
                 key={specialty}
                 type="button"
                 onClick={() => onSelectSpecialty(specialty)}
-                className={`rounded-2xl px-4 py-3 text-left text-sm transition ${
+                className={`rounded-lg px-2 py-2 text-left text-[0.98rem] transition ${
                   isActive
-                    ? "bg-cyan-50 font-semibold text-cyan-800 ring-1 ring-cyan-200"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    ? "font-semibold text-slate-900"
+                    : "text-slate-700 hover:text-slate-900"
                 }`}
                 aria-pressed={isActive}
               >
@@ -70,12 +70,12 @@ export function DoctorFilters({
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
 
       <div className="mt-8">
         <FilterGroupLabel>Appointment Type</FilterGroupLabel>
-        <div className="mt-4 flex flex-col gap-2">
+        <nav className="mt-4 flex flex-col gap-1" aria-label="Appointment type filters">
           {appointmentTypeOptions.map((option) => {
             const isActive = option.value === selectedAppointmentType;
 
@@ -84,10 +84,10 @@ export function DoctorFilters({
                 key={option.value}
                 type="button"
                 onClick={() => onSelectAppointmentType(option.value)}
-                className={`rounded-2xl px-4 py-3 text-left text-sm transition ${
+                className={`rounded-lg px-2 py-2 text-left text-[0.98rem] transition ${
                   isActive
-                    ? "bg-cyan-50 font-semibold text-cyan-800 ring-1 ring-cyan-200"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    ? "font-semibold text-slate-900"
+                    : "text-slate-700 hover:text-slate-900"
                 }`}
                 aria-pressed={isActive}
               >
@@ -95,7 +95,7 @@ export function DoctorFilters({
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
     </aside>
   );

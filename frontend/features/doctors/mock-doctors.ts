@@ -33,8 +33,8 @@ export const doctors: Doctor[] = [
     consultationFee: 120,
     durationMinutes: 30,
     avatar: {
-      initials: "SJ",
-      accentClassName: "from-cyan-100 via-sky-50 to-white",
+      imageSrc: "/avatars/doctor-sarah.svg",
+      imageAlt: "Portrait placeholder for Dr. Sarah Jenkins",
     },
   },
   {
@@ -54,8 +54,8 @@ export const doctors: Doctor[] = [
     consultationFee: 80,
     durationMinutes: 30,
     avatar: {
-      initials: "MC",
-      accentClassName: "from-sky-100 via-cyan-50 to-white",
+      imageSrc: "/avatars/doctor-marcus.svg",
+      imageAlt: "Portrait placeholder for Dr. Marcus Chen",
     },
   },
   {
@@ -75,8 +75,8 @@ export const doctors: Doctor[] = [
     consultationFee: 150,
     durationMinutes: 45,
     avatar: {
-      initials: "ER",
-      accentClassName: "from-teal-100 via-cyan-50 to-white",
+      imageSrc: "/avatars/doctor-elena.svg",
+      imageAlt: "Portrait placeholder for Dr. Elena Rodriguez",
     },
   },
   {
@@ -96,8 +96,8 @@ export const doctors: Doctor[] = [
     consultationFee: 100,
     durationMinutes: 30,
     avatar: {
-      initials: "JW",
-      accentClassName: "from-cyan-100 via-slate-50 to-white",
+      imageSrc: "/avatars/doctor-james.svg",
+      imageAlt: "Portrait placeholder for Dr. James Wilson",
     },
   },
   {
@@ -117,8 +117,8 @@ export const doctors: Doctor[] = [
     consultationFee: 70,
     durationMinutes: 20,
     avatar: {
-      initials: "AK",
-      accentClassName: "from-sky-100 via-white to-cyan-50",
+      imageSrc: "/avatars/doctor-sarah.svg",
+      imageAlt: "Portrait placeholder for Dr. Aisha Khan",
     },
   },
   {
@@ -138,8 +138,8 @@ export const doctors: Doctor[] = [
     consultationFee: 130,
     durationMinutes: 30,
     avatar: {
-      initials: "DP",
-      accentClassName: "from-cyan-100 via-blue-50 to-white",
+      imageSrc: "/avatars/doctor-james.svg",
+      imageAlt: "Portrait placeholder for Dr. Daniel Park",
     },
   },
   {
@@ -159,8 +159,8 @@ export const doctors: Doctor[] = [
     consultationFee: 90,
     durationMinutes: 25,
     avatar: {
-      initials: "LB",
-      accentClassName: "from-cyan-50 via-slate-50 to-white",
+      imageSrc: "/avatars/doctor-elena.svg",
+      imageAlt: "Portrait placeholder for Dr. Lucy Bennett",
     },
   },
   {
@@ -180,8 +180,8 @@ export const doctors: Doctor[] = [
     consultationFee: 110,
     durationMinutes: 35,
     avatar: {
-      initials: "NT",
-      accentClassName: "from-teal-100 via-cyan-50 to-white",
+      imageSrc: "/avatars/doctor-marcus.svg",
+      imageAlt: "Portrait placeholder for Dr. Noah Turner",
     },
   },
 ];

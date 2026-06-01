@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Doctor } from "@/features/doctors/types";
 
@@ -26,11 +27,11 @@ function CalendarIcon() {
 export function BookingSummary({ doctor }: BookingSummaryProps) {
   if (!doctor) {
     return (
-      <aside className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-soft">
+      <aside className="rounded-[16px] border border-slate-200 bg-white p-6">
         <div className="flex items-start gap-3">
           <CalendarIcon />
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+            <h2 className="text-[2rem] font-semibold tracking-[-0.04em] text-slate-900">
               Booking Summary
             </h2>
             <p className="mt-2 text-sm text-slate-500">
@@ -44,11 +45,11 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
 
   return (
     <div className="space-y-5">
-      <aside className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-soft">
+      <aside className="rounded-[16px] border border-slate-200 bg-white p-6">
         <div className="flex items-start gap-3">
           <CalendarIcon />
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+            <h2 className="text-[2rem] font-semibold tracking-[-0.04em] text-slate-900">
               Booking Summary
             </h2>
             <p className="mt-2 text-sm text-slate-500">
@@ -57,16 +58,19 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
           </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-4 rounded-3xl bg-slate-50 p-4">
-          <div
-            className={`flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br ${doctor.avatar.accentClassName} text-lg font-semibold text-cyan-700`}
-            aria-hidden="true"
-          >
-            {doctor.avatar.initials}
+        <div className="mt-6 flex items-center gap-3 rounded-[14px] border border-slate-200 bg-slate-50 px-3 py-3">
+          <div className="relative h-11 w-11 overflow-hidden rounded-full bg-sky-50 ring-1 ring-slate-200">
+            <Image
+              src={doctor.avatar.imageSrc}
+              alt={doctor.avatar.imageAlt}
+              fill
+              className="object-cover"
+              sizes="44px"
+            />
           </div>
           <div>
             <p className="font-semibold text-slate-900">{doctor.name}</p>
-            <p className="text-sm text-slate-500">{doctor.specialty}</p>
+            <p className="text-sm text-slate-500">Senior {doctor.specialty}</p>
           </div>
         </div>
 
@@ -95,7 +99,7 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
 
         <Link
           href="/appointments"
-          className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-cyan-500 px-5 py-4 text-sm font-semibold text-white transition hover:bg-cyan-600"
+          className="mt-6 inline-flex w-full items-center justify-center rounded-[12px] bg-sky-400 px-5 py-4 text-sm font-semibold text-white transition hover:bg-sky-500"
         >
           Proceed to Booking
         </Link>
@@ -105,8 +109,8 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
         </p>
       </aside>
 
-      <aside className="rounded-[28px] border border-cyan-100 bg-cyan-50 p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-500">
+      <aside className="rounded-[16px] border border-sky-100 bg-sky-50/70 p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-500">
           CareNow Guarantee
         </p>
         <p className="mt-4 text-sm leading-7 text-slate-600">

@@ -19,8 +19,8 @@ export type Doctor = {
   consultationFee: number;
   durationMinutes: number;
   avatar: {
-    initials: string;
-    accentClassName: string;
+    imageSrc: string;
+    imageAlt: string;
   };
 };
 
