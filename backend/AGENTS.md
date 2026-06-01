@@ -3,7 +3,7 @@
 ## Python Environment
 
 * Always create venv before install
-* Store dependencies in requirements.txt
+* Store dependencies in pyproject.toml
 
 ## FastAPI Structure
 
