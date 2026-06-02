@@ -1,20 +1,37 @@
+"use client";
+
+import { addMonths, format, startOfMonth } from "date-fns";
+import { useState } from "react";
+
+import { AppointmentCalendar } from "@/features/appointments/components/AppointmentCalendar";
 import { DoctorSummaryCard } from "@/features/appointments/components/DoctorSummaryCard";
 import { doctors } from "@/features/doctors/mock-doctors";
-
-const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-const calendarWeeks = [
-  [null, null, 1, 2, 3, 4, 5],
-  [6, 7, 8, 9, 10, 11, 12],
-  [13, 14, 15, 16, 17, 18, 19],
-  [20, 21, 22, 23, 24, 25, 26],
-  [27, 28, 29, 30, 31, null, null],
-];
 
 const morningSlots = ["09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM"];
 const afternoonSlots = ["02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM"];
 
 export default function AppointmentsPage() {
   const doctor = doctors[0];
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    new Date(2024, 9, 24),
+  );
+  const [visibleMonth, setVisibleMonth] = useState<Date>(
+    startOfMonth(new Date(2024, 9, 1)),
+  );
+  const availableDates = [
+    new Date(2024, 9, 20),
+    new Date(2024, 9, 21),
+    new Date(2024, 9, 22),
+    new Date(2024, 9, 23),
+    new Date(2024, 9, 24),
+    new Date(2024, 9, 25),
+    new Date(2024, 9, 26),
+    new Date(2024, 9, 27),
+    new Date(2024, 9, 28),
+    new Date(2024, 9, 29),
+    new Date(2024, 9, 30),
+    new Date(2024, 9, 31),
+  ];
 
   return (
     <section className="py-10 lg:py-14">
@@ -54,65 +71,62 @@ export default function AppointmentsPage() {
                   </h2>
                 </div>
 
-                <div className="flex items-center gap-5 text-slate-700">
+                <div className="flex items-center gap-4 text-slate-700">
                   <button
                     type="button"
-                    className="text-3xl leading-none transition hover:text-slate-950"
+                    onClick={() =>
+                      setVisibleMonth((current) => addMonths(current, -1))
+                    }
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-brand-200 hover:text-brand-500"
                     aria-label="Previous month"
                   >
-                    &lsaquo;
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M15 18 9 12l6-6" />
+                    </svg>
                   </button>
-                  <span className="text-base font-semibold tracking-[0.14em]">
-                    OCTOBER 2024
+                  <span className="min-w-[160px] text-center text-base font-semibold tracking-[0.14em] text-slate-700">
+                    {format(visibleMonth, "MMMM yyyy").toUpperCase()}
                   </span>
                   <button
                     type="button"
-                    className="text-3xl leading-none transition hover:text-slate-950"
+                    onClick={() =>
+                      setVisibleMonth((current) => addMonths(current, 1))
+                    }
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-brand-200 hover:text-brand-500"
                     aria-label="Next month"
                   >
-                    &rsaquo;
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-[20px] border border-slate-200 bg-white p-6 shadow-soft">
-                <div className="grid grid-cols-7 gap-y-5 text-center text-sm font-semibold text-slate-500">
-                  {weekdays.map((weekday) => (
-                    <div key={weekday}>{weekday}</div>
-                  ))}
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {calendarWeeks.map((week, weekIndex) => (
-                    <div key={weekIndex} className="grid grid-cols-7 gap-3">
-                      {week.map((day, dayIndex) => {
-                        const isSelected = day === 24;
-                        const isMuted = day !== null && day < 20;
-
-                        return (
-                          <button
-                            key={`${weekIndex}-${dayIndex}`}
-                            type="button"
-                            className={[
-                              "flex h-12 items-center justify-center rounded-[14px] text-base font-medium transition",
-                              day === null
-                                ? "pointer-events-none bg-transparent text-transparent"
-                                : isSelected
-                                  ? "bg-brand-500 text-white shadow-[0_12px_24px_rgba(6,182,212,0.32)]"
-                                  : isMuted
-                                    ? "text-slate-300"
-                                    : "text-slate-800 hover:bg-slate-50",
-                            ].join(" ")}
-                            aria-pressed={isSelected}
-                          >
-                            {day ?? ""}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <AppointmentCalendar
+                selectedDate={selectedDate}
+                availableDates={availableDates}
+                onDateSelect={setSelectedDate}
+                month={visibleMonth}
+                onMonthChange={setVisibleMonth}
+              />
             </section>
 
             <section className="space-y-8">
