@@ -1,3 +1,6 @@
+import { DoctorSummaryCard } from "@/features/appointments/components/DoctorSummaryCard";
+import { doctors } from "@/features/doctors/mock-doctors";
+
 const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const calendarWeeks = [
   [null, null, 1, 2, 3, 4, 5],
@@ -11,6 +14,8 @@ const morningSlots = ["09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM"
 const afternoonSlots = ["02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM"];
 
 export default function AppointmentsPage() {
+  const doctor = doctors[0];
+
   return (
     <section className="py-10 lg:py-14">
       <div className="mx-auto max-w-7xl">
@@ -158,71 +163,7 @@ export default function AppointmentsPage() {
           </div>
 
           <div className="space-y-6">
-            <aside className="rounded-[20px] border border-slate-100 bg-slate-50/80 p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative h-14 w-14 overflow-hidden rounded-full bg-slate-200 ring-1 ring-slate-200">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.85),_rgba(255,255,255,0.35)_45%,_rgba(226,232,240,0.1)_100%)]" />
-                    <div className="absolute inset-x-4 bottom-2 h-5 rounded-full bg-slate-400/40" />
-                    <div className="absolute left-1/2 top-3 h-5 w-5 -translate-x-1/2 rounded-full bg-slate-500/40" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-                      Dr. Sarah Jenkins
-                    </h2>
-                    <p className="mt-1 text-base text-slate-600">
-                      Cardiology Specialist
-                    </p>
-                  </div>
-                </div>
-
-                <span className="rounded-full bg-brand-100 px-3 py-1 text-sm font-semibold text-brand-600">
-                  Highly Rated
-                </span>
-              </div>
-
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[14px] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-                  <div className="flex items-start gap-2 text-slate-600">
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="mt-0.5 h-4 w-4 text-brand-500"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 21s7-4.35 7-10a7 7 0 1 0-14 0c0 5.65 7 10 7 10Z" />
-                      <circle cx="12" cy="11" r="2.5" />
-                    </svg>
-                    <p className="text-sm leading-6">
-                      St. Mary&apos;s Medical Center
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-[14px] bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
-                  <div className="flex items-start gap-2 text-slate-600">
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="mt-0.5 h-4 w-4 text-brand-500"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="8" />
-                      <path d="M12 8v4l3 2" />
-                    </svg>
-                    <p className="text-sm leading-6">15 min avg. wait</p>
-                  </div>
-                </div>
-              </div>
-            </aside>
+            <DoctorSummaryCard doctor={doctor} />
 
             <aside className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-soft">
               <div className="flex items-start gap-3">
