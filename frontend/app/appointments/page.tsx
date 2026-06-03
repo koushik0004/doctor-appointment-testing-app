@@ -3,18 +3,32 @@
 import { addMonths, format, startOfMonth } from "date-fns";
 import { useState } from "react";
 
+import { AppointmentAvailability } from "@/features/appointments/components/AppointmentAvailability";
 import { AppointmentCalendar } from "@/features/appointments/components/AppointmentCalendar";
 import { DoctorSummaryCard } from "@/features/appointments/components/DoctorSummaryCard";
+import type { AppointmentSlot } from "@/features/appointments/types";
 import { doctors } from "@/features/doctors/mock-doctors";
 
-const morningSlots = ["09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM"];
-const afternoonSlots = ["02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM"];
+const availableSlots: AppointmentSlot[] = [
+  { time: "09:00 AM", available: true },
+  { time: "09:30 AM", available: true },
+  { time: "10:00 AM", available: true },
+  { time: "10:30 AM", available: true },
+  { time: "11:00 AM", available: true },
+  { time: "11:30 AM", available: true },
+  { time: "02:00 PM", available: true },
+  { time: "02:30 PM", available: true },
+  { time: "03:00 PM", available: true },
+  { time: "03:30 PM", available: true },
+  { time: "04:00 PM", available: true },
+];
 
 export default function AppointmentsPage() {
   const doctor = doctors[0];
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date(2024, 9, 24),
   );
+  const [selectedSlot, setSelectedSlot] = useState<string | null>("10:30 AM");
   const [visibleMonth, setVisibleMonth] = useState<Date>(
     startOfMonth(new Date(2024, 9, 1)),
   );
@@ -129,51 +143,12 @@ export default function AppointmentsPage() {
               />
             </section>
 
-            <section className="space-y-8">
-              <div>
-                <h3 className="mb-4 text-lg font-semibold tracking-[-0.03em] text-slate-600">
-                  MORNING
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {morningSlots.map((slot) => {
-                    const isSelected = slot === "10:30 AM";
-
-                    return (
-                      <button
-                        key={slot}
-                        type="button"
-                        className={[
-                          "h-12 rounded-[12px] border px-4 text-base font-semibold transition",
-                          isSelected
-                            ? "border-brand-500 bg-brand-500 text-white shadow-[0_10px_22px_rgba(6,182,212,0.24)]"
-                            : "border-slate-200 bg-white text-slate-900 hover:border-brand-100 hover:bg-brand-50/60",
-                        ].join(" ")}
-                        aria-pressed={isSelected}
-                      >
-                        {slot}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="mb-4 text-lg font-semibold tracking-[-0.03em] text-slate-600">
-                  AFTERNOON
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {afternoonSlots.map((slot) => (
-                    <button
-                      key={slot}
-                      type="button"
-                      className="h-12 rounded-[12px] border border-slate-200 bg-white px-4 text-base font-semibold text-slate-900 transition hover:border-brand-100 hover:bg-brand-50/60"
-                    >
-                      {slot}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
+            <AppointmentAvailability
+              selectedDate={selectedDate}
+              selectedSlot={selectedSlot}
+              availableSlots={availableSlots}
+              onSlotSelect={setSelectedSlot}
+            />
           </div>
 
           <div className="space-y-6">
