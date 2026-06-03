@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { isBefore, startOfDay } from "date-fns";
+import { format, isBefore, startOfDay } from "date-fns";
 
 import { Calendar } from "@/components/ui/calendar";
 
@@ -14,7 +14,7 @@ type AppointmentCalendarProps = {
 };
 
 function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return format(date, "yyyy-MM-dd");
 }
 
 export function AppointmentCalendar({
@@ -68,7 +68,10 @@ export function AppointmentCalendar({
         available:
           "border border-brand-200 bg-brand-50 text-brand-600 font-semibold shadow-[0_8px_18px_rgba(6,182,212,0.08)]",
       }}
-      disabled={(date) => isBefore(date, minimumSelectableDate)}
+      disabled={(date) =>
+        isBefore(date, minimumSelectableDate) ||
+        !availableDateKeys.has(toDateKey(date))
+      }
     />
   );
 }

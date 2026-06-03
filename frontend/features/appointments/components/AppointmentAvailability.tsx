@@ -53,6 +53,24 @@ export function AppointmentAvailability({
     availableSlots.map((slot) => [slot.time, slot.available]),
   );
 
+  if (!selectedDate) {
+    return (
+      <section className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-soft">
+        <div className="flex items-start gap-3">
+          <TimeSlotIcon />
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+              Appointment Availability
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Select a date to see available appointment times.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-soft">
       <div className="flex items-start gap-3">
@@ -121,4 +139,3 @@ export function AppointmentAvailability({
     </section>
   );
 }
-

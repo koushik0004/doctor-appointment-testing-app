@@ -1,51 +1,77 @@
 "use client";
 
 import { addMonths, format, startOfMonth } from "date-fns";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { AppointmentAvailability } from "@/features/appointments/components/AppointmentAvailability";
 import { AppointmentCalendar } from "@/features/appointments/components/AppointmentCalendar";
 import { DoctorSummaryCard } from "@/features/appointments/components/DoctorSummaryCard";
-import type { AppointmentSlot } from "@/features/appointments/types";
-import { doctors } from "@/features/doctors/mock-doctors";
-
-const availableSlots: AppointmentSlot[] = [
-  { time: "09:00 AM", available: true },
-  { time: "09:30 AM", available: true },
-  { time: "10:00 AM", available: true },
-  { time: "10:30 AM", available: true },
-  { time: "11:00 AM", available: true },
-  { time: "11:30 AM", available: true },
-  { time: "02:00 PM", available: true },
-  { time: "02:30 PM", available: true },
-  { time: "03:00 PM", available: true },
-  { time: "03:30 PM", available: true },
-  { time: "04:00 PM", available: true },
-];
+import { PatientDetailsForm } from "@/features/appointments/components/PatientDetailsForm";
+import {
+  appointmentAvailableDates,
+  appointmentAvailableSlots,
+  appointmentBookingDoctor,
+} from "@/features/appointments/mock-data";
+import type { AppointmentFormValues } from "@/features/appointments/schema";
+import { useBookingStore } from "@/stores/booking-store";
 
 export default function AppointmentsPage() {
-  const doctor = doctors[0];
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(2024, 9, 24),
+    appointmentAvailableDates[4],
   );
   const [selectedSlot, setSelectedSlot] = useState<string | null>("10:30 AM");
   const [visibleMonth, setVisibleMonth] = useState<Date>(
-    startOfMonth(new Date(2024, 9, 1)),
+    startOfMonth(appointmentAvailableDates[0]),
   );
-  const availableDates = [
-    new Date(2024, 9, 20),
-    new Date(2024, 9, 21),
-    new Date(2024, 9, 22),
-    new Date(2024, 9, 23),
-    new Date(2024, 9, 24),
-    new Date(2024, 9, 25),
-    new Date(2024, 9, 26),
-    new Date(2024, 9, 27),
-    new Date(2024, 9, 28),
-    new Date(2024, 9, 29),
-    new Date(2024, 9, 30),
-    new Date(2024, 9, 31),
-  ];
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const setSelectedDoctorId = useBookingStore(
+    (state) => state.setSelectedDoctorId,
+  );
+  const setSelectedAvailabilityId = useBookingStore(
+    (state) => state.setSelectedAvailabilityId,
+  );
+  const setSelectedDateStore = useBookingStore((state) => state.setSelectedDate);
+  const setSelectedTime = useBookingStore((state) => state.setSelectedTime);
+  const setAppointmentType = useBookingStore(
+    (state) => state.setAppointmentType,
+  );
+  const setPatientDetails = useBookingStore(
+    (state) => state.setPatientDetails,
+  );
+  const setConfirmationId = useBookingStore(
+    (state) => state.setConfirmationId,
+  );
+
+  const handleSubmit = (values: AppointmentFormValues) => {
+    if (!selectedDate || !selectedSlot) {
+      setBookingError("Select a date and time before confirming the booking.");
+      return;
+    }
+
+    const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
+    const confirmationId = `CA-${format(selectedDate, "yyyyMMdd")}-${selectedSlot
+      .replace(/[^0-9]/g, "")
+      .slice(0, 4)}`;
+
+    setBookingError(null);
+    setSelectedDoctorId(appointmentBookingDoctor.id);
+    setSelectedAvailabilityId(`${selectedDateKey}-${selectedSlot}`);
+    setSelectedDateStore(selectedDateKey);
+    setSelectedTime(selectedSlot);
+    setAppointmentType(values.appointment_type);
+    setPatientDetails({
+      full_name: values.full_name,
+      email: values.email,
+      phone: values.phone,
+      health_description: values.health_description,
+    });
+    setConfirmationId(confirmationId);
+
+    router.push("/appointments/confirmation");
+  };
 
   return (
     <section className="py-10 lg:py-14">
@@ -136,8 +162,11 @@ export default function AppointmentsPage() {
 
               <AppointmentCalendar
                 selectedDate={selectedDate}
-                availableDates={availableDates}
-                onDateSelect={setSelectedDate}
+                availableDates={appointmentAvailableDates}
+                onDateSelect={(date) => {
+                  setSelectedDate(date);
+                  setBookingError(null);
+                }}
                 month={visibleMonth}
                 onMonthChange={setVisibleMonth}
               />
@@ -146,13 +175,16 @@ export default function AppointmentsPage() {
             <AppointmentAvailability
               selectedDate={selectedDate}
               selectedSlot={selectedSlot}
-              availableSlots={availableSlots}
-              onSlotSelect={setSelectedSlot}
+              availableSlots={appointmentAvailableSlots}
+              onSlotSelect={(slot) => {
+                setSelectedSlot(slot);
+                setBookingError(null);
+              }}
             />
           </div>
 
           <div className="space-y-6">
-            <DoctorSummaryCard doctor={doctor} />
+            <DoctorSummaryCard doctor={appointmentBookingDoctor} />
 
             <aside className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-soft">
               <div className="flex items-start gap-3">
@@ -182,117 +214,17 @@ export default function AppointmentsPage() {
                 </div>
               </div>
 
-              <div className="mt-8">
-                <p className="text-sm font-semibold text-slate-900">
-                  Appointment Type
+              {bookingError ? (
+                <p className="mt-6 rounded-[12px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {bookingError}
                 </p>
-                <div className="mt-3 grid grid-cols-2 rounded-[16px] bg-slate-100 p-1">
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2 rounded-[12px] bg-white py-3 text-sm font-semibold text-brand-500 shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M14 9V5a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h5a3 3 0 0 0 3-3v-4" />
-                      <path d="M21 12h-6" />
-                      <path d="M18 9l3 3-3 3" />
-                    </svg>
-                    In-Person
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2 rounded-[12px] py-3 text-sm font-semibold text-slate-500"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="3" y="6" width="14" height="12" rx="2" />
-                      <path d="M17 10l4-2v8l-4-2" />
-                    </svg>
-                    Telemedicine
-                  </button>
-                </div>
-              </div>
+              ) : null}
 
-              <div className="mt-6 space-y-5">
-                <div>
-                  <label
-                    htmlFor="fullName"
-                    className="mb-2 block text-sm font-semibold text-slate-900"
-                  >
-                    Full Name
-                  </label>
-                  <input
-                    id="fullName"
-                    type="text"
-                    placeholder="John Doe"
-                    className="h-12 w-full rounded-[12px] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="mb-2 block text-sm font-semibold text-slate-900"
-                  >
-                    Email Address
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder="john.doe@example.com"
-                    className="h-12 w-full rounded-[12px] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="description"
-                    className="mb-2 block text-sm font-semibold text-slate-900"
-                  >
-                    Brief Health Description
-                  </label>
-                  <textarea
-                    id="description"
-                    rows={4}
-                    placeholder="e.g., Shortness of breath, regular follow-up for high blood pressure..."
-                    className="w-full rounded-[12px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100"
-                  />
-                  <p className="mt-2 text-xs italic leading-5 text-slate-500">
-                    This information helps Dr. Sarah Jenkins prepare for your
-                    visit.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-8 space-y-3">
-                <button
-                  type="button"
-                  className="inline-flex h-14 w-full items-center justify-center rounded-[12px] bg-brand-500 text-base font-semibold text-white transition hover:bg-brand-600"
-                >
-                  Confirm Appointment
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-12 w-full items-center justify-center rounded-[12px] border border-slate-200 bg-white text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                >
-                  Cancel / Back
-                </button>
+              <div className="mt-6">
+                <PatientDetailsForm
+                  isBookingReady={Boolean(selectedDate && selectedSlot)}
+                  onSubmit={handleSubmit}
+                />
               </div>
             </aside>
 
@@ -309,7 +241,6 @@ export default function AppointmentsPage() {
             </p>
           </div>
         </div>
-
       </div>
     </section>
   );
