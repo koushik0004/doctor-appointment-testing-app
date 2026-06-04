@@ -1,5 +1,8 @@
-const BACKEND_BASE_URL =
-  process.env.BACKEND_API_BASE_URL ?? "http://127.0.0.1:8000";
+const BACKEND_BASE_URL = process.env.BACKEND_API_BASE_URL;
+
+if (!BACKEND_BASE_URL) {
+  throw new Error("BACKEND_API_BASE_URL is required for the API proxy.");
+}
 
 function buildBackendUrl(request: Request, pathSegments: string[]) {
   const incomingUrl = new URL(request.url);
@@ -22,9 +25,9 @@ function buildHeaders(request: Request) {
 
 async function proxyRequest(
   request: Request,
-  context: { params: { path: string[] } },
+  context: { params: Promise<{ path?: string[] }> },
 ) {
-  const { path } = context.params;
+  const { path = [] } = await context.params;
   const backendUrl = buildBackendUrl(request, path);
   const init: RequestInit = {
     method: request.method,

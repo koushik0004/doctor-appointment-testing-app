@@ -125,7 +125,8 @@ Frontend:
 
 ```txt
 frontend/.env.local
-NEXT_PUBLIC_API_BASE_URL=http://localhost:4001/api
+NEXT_PUBLIC_API_BASE_URL=/api
+BACKEND_API_BASE_URL=http://127.0.0.1:4001
 ```
 
 Backend:
@@ -133,7 +134,7 @@ Backend:
 ```txt
 backend/.env
 DATABASE_URL=sqlite:///./app.db
-CORS_ORIGINS=http://localhost:3000
+CORS_ORIGINS=http://127.0.0.1:4002
 SMTP_MODE=console
 SMTP_HOST=
 SMTP_PORT=587

@@ -15,8 +15,8 @@ Tasks:
 
 Done when:
 
-- Frontend runs on port 3000.
-- Backend runs on port 8000.
+- Frontend runs on port 4002.
+- Backend runs on port 4001.
 - Health API returns `ok`.
 
 ## Milestone 1: Backend DB and Seed Data
@@ -132,4 +132,3 @@ Tasks:
 - Playwright visible automation
 - Agent asks user for missing required data
 - Agent books appointment visibly through UI
-
