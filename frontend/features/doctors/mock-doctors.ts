@@ -1,20 +1,5 @@
 import { Doctor } from "@/features/doctors/types";
 
-export const specialtyOptions = [
-  "All specialties",
-  "General Practice",
-  "Cardiology",
-  "Pediatrics",
-  "Dermatology",
-  "Internal Medicine",
-] as const;
-
-export const appointmentTypeOptions = [
-  { label: "All types", value: "ALL" },
-  { label: "In-person", value: "IN_PERSON" },
-  { label: "Telemedicine", value: "TELEMEDICINE" },
-] as const;
-
 export const doctors: Doctor[] = [
   {
     id: "dr-sarah-jenkins",

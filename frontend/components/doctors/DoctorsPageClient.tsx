@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+
 import { BookingSummary } from "@/components/doctors/BookingSummary";
 import { DoctorCard } from "@/components/doctors/DoctorCard";
 import { DoctorFilters } from "@/components/doctors/DoctorFilters";
 import { DoctorsPagination } from "@/components/doctors/DoctorsPagination";
-import { doctors } from "@/features/doctors/mock-doctors";
+import { listDoctors } from "@/features/doctors/api";
 import {
-  AppointmentType,
-  Doctor,
-  DoctorSortOption,
+  type AppointmentType,
+  type Doctor,
+  type DoctorSortOption,
 } from "@/features/doctors/types";
+import { ApiError } from "@/lib/api-client";
 
 const PAGE_SIZE = 4;
 
@@ -37,14 +39,125 @@ function compareAvailability(left: Doctor, right: Doctor) {
   return leftIndex - rightIndex;
 }
 
+function LoadingPlaceholder() {
+  return (
+    <div className="space-y-5">
+      {Array.from({ length: PAGE_SIZE }).map((_, index) => (
+        <div
+          key={`doctor-skeleton-${index}`}
+          className="grid animate-pulse overflow-hidden rounded-[20px] border border-slate-200 bg-white lg:grid-cols-[minmax(0,1fr)_188px]"
+        >
+          <div className="grid gap-5 p-5 sm:grid-cols-[104px_minmax(0,1fr)] sm:p-6">
+            <div className="h-24 w-24 rounded-full bg-slate-100" />
+            <div className="space-y-4">
+              <div className="h-8 w-2/3 rounded-full bg-slate-100" />
+              <div className="h-4 w-1/3 rounded-full bg-slate-100" />
+              <div className="space-y-3">
+                <div className="h-3 w-full rounded-full bg-slate-100" />
+                <div className="h-3 w-5/6 rounded-full bg-slate-100" />
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-slate-200 px-6 py-6 lg:border-l lg:border-t-0 lg:px-5">
+            <div className="h-3 w-28 rounded-full bg-slate-100" />
+            <div className="mt-3 h-5 w-36 rounded-full bg-slate-100" />
+            <div className="mt-5 h-11 w-full rounded-[12px] bg-slate-100" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-6 py-10 text-center">
+      <h2 className="text-2xl font-semibold tracking-[-0.03em] text-rose-900">
+        We could not load doctors
+      </h2>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-rose-700">
+        {message}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-6 rounded-[12px] bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+      >
+        Try Again
+      </button>
+    </div>
+  );
+}
+
 export function DoctorsPageClient() {
   const [selectedSpecialty, setSelectedSpecialty] = useState("All specialties");
   const [selectedAppointmentType, setSelectedAppointmentType] = useState<
     AppointmentType | "ALL"
   >("ALL");
   const [sortBy, setSortBy] = useState<DoctorSortOption>("TOP_RATED");
-  const [selectedDoctorId, setSelectedDoctorId] = useState(doctors[0]?.id ?? "");
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let isActive = true;
+    const controller = new AbortController();
+
+    async function loadDoctors() {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await listDoctors(
+          {
+            specialty:
+              selectedSpecialty === "All specialties"
+                ? undefined
+                : selectedSpecialty,
+            appointmentType: selectedAppointmentType,
+          },
+          { signal: controller.signal },
+        );
+
+        if (!isActive) {
+          return;
+        }
+
+        setDoctors(response.items);
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
+        setDoctors([]);
+        setErrorMessage(
+          error instanceof ApiError
+            ? error.message
+            : "Unable to load doctors right now. Please try again.",
+        );
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadDoctors();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [reloadKey, selectedAppointmentType, selectedSpecialty]);
 
   const filteredDoctors = useMemo(() => {
     return doctors.filter((doctor) => {
@@ -57,7 +170,7 @@ export function DoctorsPageClient() {
 
       return matchesSpecialty && matchesAppointmentType;
     });
-  }, [selectedAppointmentType, selectedSpecialty]);
+  }, [doctors, selectedAppointmentType, selectedSpecialty]);
 
   const sortedDoctors = useMemo(() => {
     if (sortBy === "TOP_RATED") {
@@ -123,8 +236,14 @@ export function DoctorsPageClient() {
                   Available Doctors
                 </h1>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[0.98rem] text-slate-500">
-                  <p className="max-w-[160px]">Showing {sortedDoctors.length} top-rated providers in</p>
-                  <p className="font-semibold leading-5 text-slate-700">London, UK</p>
+                  <p className="max-w-[190px]">
+                    {isLoading
+                      ? "Loading live doctor availability"
+                      : `Showing ${sortedDoctors.length} doctors from the live API`}
+                  </p>
+                  <p className="font-semibold leading-5 text-slate-700">
+                    London, UK
+                  </p>
                   <button
                     type="button"
                     className="font-semibold text-sky-500 transition hover:text-sky-600"
@@ -152,7 +271,14 @@ export function DoctorsPageClient() {
             </div>
 
             <div className="space-y-5">
-              {paginatedDoctors.length > 0 ? (
+              {isLoading ? (
+                <LoadingPlaceholder />
+              ) : errorMessage ? (
+                <ErrorState
+                  message={errorMessage}
+                  onRetry={() => setReloadKey((value) => value + 1)}
+                />
+              ) : paginatedDoctors.length > 0 ? (
                 paginatedDoctors.map((doctor) => (
                   <DoctorCard
                     key={doctor.id}
@@ -175,11 +301,13 @@ export function DoctorsPageClient() {
           </div>
 
           <div className="mt-8">
-            <DoctorsPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
+            {!isLoading && !errorMessage ? (
+              <DoctorsPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            ) : null}
           </div>
         </div>
 
