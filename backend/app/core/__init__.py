@@ -1,1 +1,1 @@
-"""Core backend configuration and shared helpers."""
+"""Core application settings and shared utilities."""

@@ -1,5 +1,4 @@
 import json
-from typing import List
 
 from sqlalchemy import Boolean, Float, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,7 +26,7 @@ class Doctor(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     @staticmethod
-    def encode_list(values: List[str]) -> str:
+    def encode_list(values: list[str]) -> str:
         return json.dumps(values)
 
     @staticmethod
