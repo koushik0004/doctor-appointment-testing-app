@@ -28,6 +28,9 @@
 # local env files
 /frontend/.env*.local
 .env
+.venv
+/backend/**/*.pyc
+!/backend/.env
 
 # vercel
 /frontend/.vercel

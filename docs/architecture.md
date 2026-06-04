@@ -54,7 +54,7 @@ doctor-appointment-ai/
 │   │   └── main.py
 │   ├── scripts/
 │   ├── tests/
-│   ├── requirements.txt
+│   ├── pyproject.toml
 │   └── README.md
 │
 ├── ai-agent/
@@ -125,7 +125,7 @@ Frontend:
 
 ```txt
 frontend/.env.local
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4001/api
 ```
 
 Backend:
@@ -141,4 +141,3 @@ SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM=no-reply@carenow.local
 ```
-
