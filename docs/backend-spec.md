@@ -74,11 +74,7 @@ Avoid putting business logic directly inside route handlers.
 ## 4. Virtual Environment Setup
 
 ```bash
-cd backend
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
+make setup
 ```
 
 Minimal `pyproject.toml`:
@@ -98,10 +94,10 @@ dependencies = [
 ## 5. Local Run Command
 
 ```bash
-cd backend
-source .venv/bin/activate
-uvicorn app.main:app --reload --port 4001
+make dev
 ```
+
+Use `make stop` to stop both servers started by `make dev`.
 
 ## 6. Backend Rules
 

@@ -1,24 +1,30 @@
+from enum import Enum
+
 from pydantic import BaseModel
 
 
-class DoctorBase(BaseModel):
+class AppointmentType(str, Enum):
+    IN_PERSON = "IN_PERSON"
+    TELEMEDICINE = "TELEMEDICINE"
+
+
+class DoctorResponse(BaseModel):
+    id: int
     name: str
-    slug: str
     specialty: str
-    title: str | None = None
     rating: float
     review_count: int
     clinic_name: str
     location: str
-    address: str | None = None
-    fee_min: int | None = None
-    fee_max: int | None = None
-    languages: str | None = None
-    image_url: str | None = None
-    is_active: bool = True
+    consultation_fee_min: int
+    consultation_fee_max: int
+    next_available_slot: str
+    appointment_types: list[str]
+    languages: list[str]
+    description: str
+    image_url: str
 
 
-class DoctorRead(DoctorBase):
-    id: int
-
-    model_config = {"from_attributes": True}
+class DoctorListResponse(BaseModel):
+    items: list[DoctorResponse]
+    total: int

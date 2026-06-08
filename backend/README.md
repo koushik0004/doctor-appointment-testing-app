@@ -83,12 +83,14 @@ SQLite is configured with `check_same_thread=False` when the database URL starts
 
 ## 9. Run Development Server
 
+From the repo root:
+
 ```bash
-cd backend
 make dev
 ```
 
-Use `make setup` first if you want to prepare the virtual environment explicitly.
+Use `make setup` first if you want to prepare both the backend and frontend dependencies explicitly.
+Use `make stop` to stop both background servers.
 
 ## 10. API Documentation URLs
 
@@ -101,11 +103,10 @@ When the server is running on port `4001`:
 ## 11. Common Development Commands
 
 ```bash
-cd backend
 make help
 make setup
 make dev
-make run
+make stop
 ```
 
 ## 12. Troubleshooting Notes
@@ -113,4 +114,4 @@ make run
 - If `python3.12` is not available on your machine, run `make BOOTSTRAP_PYTHON=python3 setup`.
 - If the app cannot open the database, confirm `DATABASE_URL` points to a valid SQLite file path.
 - If the schema looks stale, delete the local `app.db` file and restart the server so the tables are recreated.
-- If imports fail, make sure commands are run from the `backend/` directory.
+- If imports fail, make sure the backend virtual environment exists under `backend/.venv`.

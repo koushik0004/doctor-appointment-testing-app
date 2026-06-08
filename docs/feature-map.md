@@ -14,10 +14,10 @@ BLOCKED
 | ID | Feature | Status | Phase | Notes |
 |---|---|---|---|---|
 | F001 | Project skeleton | TODO | Foundation | Monorepo setup |
-| F002 | Backend health API | TODO | Foundation | `/api/health` |
-| F003 | SQLite DB setup | TODO | Backend | SQLAlchemy + SQLite |
-| F004 | Seed doctors and availability | TODO | Backend | Four doctors minimum |
-| F005 | Doctor listing API | TODO | Backend | Filters included |
+| F002 | Backend health API | DONE | Foundation | `/api/health` |
+| F003 | SQLite DB setup | DONE | Backend | SQLAlchemy + SQLite |
+| F004 | Seed doctors and availability | DONE | Backend | Four doctors minimum |
+| F005 | Doctor listing API | DONE | Backend | Filters included |
 | F006 | Appointment create API | TODO | Backend | Saves patient and appointment |
 | F007 | Email confirmation service | TODO | Backend | Console mode first |
 | F008 | Frontend layout | TODO | Frontend | Header/footer/common card system |
@@ -35,4 +35,3 @@ BLOCKED
 ```txt
 F001 → F002 → F003 → F004 → F005 → F008 → F009 → F010 → F006 → F011 → F007 → F012 → F013
 ```
-

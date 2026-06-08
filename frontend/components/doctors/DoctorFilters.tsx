@@ -1,7 +1,10 @@
 "use client";
 
-import { appointmentTypeOptions, specialtyOptions } from "@/features/doctors/mock-doctors";
-import { AppointmentType } from "@/features/doctors/types";
+import {
+  appointmentTypeOptions,
+  type AppointmentType,
+  specialtyOptions,
+} from "@/features/doctors/types";
 
 type DoctorFiltersProps = {
   selectedSpecialty: string;

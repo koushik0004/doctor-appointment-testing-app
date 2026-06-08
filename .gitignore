@@ -47,3 +47,7 @@
 /backend/**/*.pyc
 /backend/**/*.egg-info/
 /backend/.env
+
+
+# Make file related
+.run/*

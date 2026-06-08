@@ -1,1 +1,1 @@
-"""Pydantic schemas."""
+"""Pydantic schemas for backend APIs."""

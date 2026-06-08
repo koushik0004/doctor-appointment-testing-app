@@ -76,23 +76,19 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
 
         <dl className="mt-6 space-y-4 text-sm">
           <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-500">Consultation Fee</dt>
+            <dt className="text-slate-500">Fee Range</dt>
             <dd className="font-semibold text-slate-900">
-              ${doctor.consultationFee}
+              ${doctor.feeRange.min} - ${doctor.feeRange.max}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-500">Est. Duration</dt>
-            <dd className="font-semibold text-slate-900">
-              {doctor.durationMinutes} mins
-            </dd>
+            <dt className="text-slate-500">Next Available</dt>
+            <dd className="font-semibold text-slate-900">{doctor.nextAvailable}</dd>
           </div>
           <div className="flex items-center justify-between gap-4 border-t border-slate-200 pt-4">
-            <dt className="text-xl font-semibold text-slate-900">
-              Total Estimate
-            </dt>
+            <dt className="text-xl font-semibold text-slate-900">Starting From</dt>
             <dd className="text-2xl font-semibold text-cyan-500">
-              ${doctor.consultationFee}
+              ${doctor.feeRange.min}
             </dd>
           </div>
         </dl>

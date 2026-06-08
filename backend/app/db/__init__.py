@@ -1,1 +1,1 @@
-"""Database package."""
+"""Database helpers and session management."""

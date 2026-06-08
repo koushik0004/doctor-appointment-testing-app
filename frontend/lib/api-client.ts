@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
 export class ApiError extends Error {
   status: number;
@@ -13,10 +13,58 @@ export class ApiError extends Error {
   }
 }
 
-type ApiRequestOptions = Omit<RequestInit, "body" | "headers"> & {
+export type ApiRequestOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: unknown;
   headers?: HeadersInit;
 };
+
+function extractErrorMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  if ("error" in payload && payload.error && typeof payload.error === "object") {
+    const errorPayload = payload.error as Record<string, unknown>;
+
+    if (typeof errorPayload.message === "string" && errorPayload.message.trim()) {
+      return errorPayload.message;
+    }
+  }
+
+  if ("detail" in payload) {
+    const detail = (payload as Record<string, unknown>).detail;
+
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+
+    if (Array.isArray(detail)) {
+      const parts = detail
+        .map((entry) => {
+          if (typeof entry === "string") {
+            return entry;
+          }
+
+          if (entry && typeof entry === "object") {
+            const detailEntry = entry as Record<string, unknown>;
+
+            if (typeof detailEntry.msg === "string") {
+              return detailEntry.msg;
+            }
+          }
+
+          return null;
+        })
+        .filter((message): message is string => Boolean(message));
+
+      if (parts.length > 0) {
+        return parts.join(", ");
+      }
+    }
+  }
+
+  return null;
+}
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
@@ -24,14 +72,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
   const payload = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message =
-      isJson &&
-      payload &&
-      typeof payload === "object" &&
-      "detail" in payload &&
-      typeof payload.detail === "string"
-        ? payload.detail
-        : "Request failed";
+    const message = extractErrorMessage(payload) ?? "Request failed";
 
     throw new ApiError(message, response.status, payload);
   }
@@ -44,15 +85,16 @@ export async function apiRequest<T>(
   options: ApiRequestOptions = {},
 ): Promise<T> {
   const { body, headers, ...restOptions } = options;
+  const hasBody = body !== undefined;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...restOptions,
     headers: {
-      "Content-Type": "application/json",
       Accept: "application/json",
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
       ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: hasBody ? JSON.stringify(body) : undefined,
     cache: "no-store",
   });
 

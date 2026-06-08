@@ -2,34 +2,33 @@
 
 ## Current Feature
 
-Feature 03 - Appointment Booking
+Feature 02 - Doctor Listing and Filters
 
 ## Completed
 
-✓ Architecture
-✓ Booking Shell
-✓ Doctor Summary Card
-✓ Calendar
-✓ Availability Component
+✓ Backend analysis
+✓ Doctor ORM model
+✓ Doctor schemas
+✓ Seed data
+✓ Repository layer
+✓ Service layer
+✓ Doctor APIs
+✓ Router registration
+✓ API validation
 
 ## Remaining
 
-□ Appointment Type Selector
-□ Patient Details Form
-□ Booking Integration
-□ Confirmation Shell
-□ Appointment Summary
-□ Next Steps
-□ Confirmation Integration
+□ Frontend backend integration for the doctor listing screen
+□ Optional pagination/search expansion if the product spec requires it
 
-## UI Decisions
+## Backend Decisions
 
-- Use shadcn Calendar
-- Existing Header reused
-- Existing Footer reused
-- Existing Left Navigation reused
+- Use SQLite-compatible ORM fields for appointment types and languages
+- Seed 10 doctors with idempotent startup seeding
+- Keep doctor list filtering in the repository/service split
 
 ## Routes
 
-/appointments/book
-/appointments/confirmation
+/api/health
+/api/doctors
+/api/doctors/{doctor_id}

@@ -21,3 +21,20 @@ Start reading in this order:
 6. `.claude/project-map.md`
 7. `.claude/feature-map.md`
 
+Root dev workflow:
+
+```bash
+make setup
+make dev
+make stop
+```
+
+Useful root commands:
+
+```bash
+make backend-setup
+make frontend-setup
+make backend-restart
+make frontend-restart
+make restart
+```
