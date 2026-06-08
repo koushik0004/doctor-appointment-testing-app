@@ -15,6 +15,7 @@ dependencies = [
   "alembic",
   "pydantic",
   "pydantic-settings",
+  "email-validator",
   "python-dotenv",
 ]
 

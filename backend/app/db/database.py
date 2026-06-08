@@ -72,7 +72,7 @@ def _reset_seeded_tables_if_schema_mismatch(engine: Engine) -> None:
 
 def init_db() -> None:
     from app import models  # noqa: F401
-    from app.db.seed import seed_doctors
+    from app.db.seed import seed_availability, seed_doctors
 
     engine = get_engine()
     _reset_seeded_tables_if_schema_mismatch(engine)
@@ -81,5 +81,6 @@ def init_db() -> None:
     session = get_session_factory()()
     try:
         seed_doctors(session)
+        seed_availability(session)
     finally:
         session.close()

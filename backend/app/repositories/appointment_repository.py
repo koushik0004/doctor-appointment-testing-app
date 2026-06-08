@@ -6,7 +6,7 @@ from app.models.appointment import Appointment
 
 def create_appointment(session: Session, appointment: Appointment) -> Appointment:
     session.add(appointment)
-    session.commit()
+    session.flush()
     session.refresh(appointment)
     return appointment
 

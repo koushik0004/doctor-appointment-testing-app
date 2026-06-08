@@ -49,6 +49,6 @@ def mark_slot_booked(session: Session, availability_id: int) -> DoctorAvailabili
         return None
 
     slot.is_booked = True
-    session.commit()
+    session.flush()
     session.refresh(slot)
     return slot
