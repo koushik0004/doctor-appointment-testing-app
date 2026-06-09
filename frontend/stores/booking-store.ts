@@ -9,19 +9,21 @@ import type {
 
 type BookingState = {
   selectedDoctorId: string | null;
-  selectedAvailabilityId: string | null;
+  selectedAvailabilityId: number | null;
   selectedDate: string | null;
   selectedTime: string | null;
   appointmentType: AppointmentType | null;
   patientDetails: BookingPatientDetails | null;
-  confirmationId: string | null;
+  appointmentId: number | null;
+  confirmationCode: string | null;
   setSelectedDoctorId: (doctorId: string | null) => void;
-  setSelectedAvailabilityId: (availabilityId: string | null) => void;
+  setSelectedAvailabilityId: (availabilityId: number | null) => void;
   setSelectedDate: (date: string | null) => void;
   setSelectedTime: (time: string | null) => void;
   setAppointmentType: (appointmentType: AppointmentType | null) => void;
   setPatientDetails: (patientDetails: BookingPatientDetails | null) => void;
-  setConfirmationId: (confirmationId: string | null) => void;
+  setAppointmentId: (appointmentId: number | null) => void;
+  setConfirmationCode: (confirmationCode: string | null) => void;
   resetBooking: () => void;
 };
 
@@ -32,7 +34,8 @@ const initialState = {
   selectedTime: null,
   appointmentType: null,
   patientDetails: null,
-  confirmationId: null,
+  appointmentId: null,
+  confirmationCode: null,
 };
 
 export const useBookingStore = create<BookingState>()((set) => ({
@@ -44,6 +47,7 @@ export const useBookingStore = create<BookingState>()((set) => ({
   setSelectedTime: (selectedTime) => set({ selectedTime }),
   setAppointmentType: (appointmentType) => set({ appointmentType }),
   setPatientDetails: (patientDetails) => set({ patientDetails }),
-  setConfirmationId: (confirmationId) => set({ confirmationId }),
+  setAppointmentId: (appointmentId) => set({ appointmentId }),
+  setConfirmationCode: (confirmationCode) => set({ confirmationCode }),
   resetBooking: () => set(initialState),
 }));

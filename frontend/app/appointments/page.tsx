@@ -1,31 +1,118 @@
 "use client";
 
-import { addMonths, format, startOfMonth } from "date-fns";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+export const dynamic = "force-dynamic";
+
+import { addMonths, format, parseISO, startOfMonth } from "date-fns";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { AppointmentAvailability } from "@/features/appointments/components/AppointmentAvailability";
 import { AppointmentCalendar } from "@/features/appointments/components/AppointmentCalendar";
 import { DoctorSummaryCard } from "@/features/appointments/components/DoctorSummaryCard";
 import { PatientDetailsForm } from "@/features/appointments/components/PatientDetailsForm";
 import {
-  appointmentAvailableDates,
-  appointmentAvailableSlots,
-  appointmentBookingDoctor,
-} from "@/features/appointments/mock-data";
-import type { AppointmentFormValues } from "@/features/appointments/schema";
+  createAppointment,
+  getDoctorAvailability,
+} from "@/features/appointments/api";
+import type {
+  AppointmentFormValues,
+} from "@/features/appointments/schema";
+import type {
+  AppointmentType,
+  AvailabilitySlot,
+  DoctorAvailability,
+} from "@/features/appointments/types";
+import {
+  createDateKey,
+} from "@/features/appointments/utils";
+import type { Doctor } from "@/features/doctors/types";
+import { ApiError } from "@/lib/api-client";
 import { useBookingStore } from "@/stores/booking-store";
 
-export default function AppointmentsPage() {
+function LoadingState() {
+  return (
+    <section className="py-10 lg:py-14">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(380px,0.95fr)]">
+          <div className="space-y-8">
+            <div className="h-12 w-80 animate-pulse rounded-full bg-slate-100" />
+            <div className="space-y-4 rounded-[20px] border border-slate-100 bg-white p-6 shadow-soft">
+              <div className="h-6 w-40 animate-pulse rounded-full bg-slate-100" />
+              <div className="h-[420px] animate-pulse rounded-[20px] bg-slate-50" />
+            </div>
+            <div className="h-[360px] animate-pulse rounded-[20px] border border-slate-100 bg-white shadow-soft" />
+          </div>
+          <div className="space-y-6">
+            <div className="h-[220px] animate-pulse rounded-[20px] border border-slate-100 bg-white shadow-soft" />
+            <div className="h-[360px] animate-pulse rounded-[20px] border border-slate-100 bg-white shadow-soft" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="py-10 lg:py-14">
+      <div className="mx-auto max-w-3xl rounded-[24px] border border-rose-200 bg-rose-50 px-6 py-10 text-center">
+        <h1 className="text-3xl font-semibold tracking-[-0.05em] text-rose-950">
+          We could not load the booking details
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-rose-700">{message}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-6 rounded-[12px] bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+        >
+          Try Again
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function NoDoctorState() {
+  return (
+    <section className="py-10 lg:py-14">
+      <div className="mx-auto max-w-3xl rounded-[24px] border border-slate-100 bg-white p-8 shadow-soft">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
+          Booking flow
+        </p>
+        <h1 className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-slate-950">
+          Select a doctor first
+        </h1>
+        <p className="mt-4 text-base leading-7 text-slate-600">
+          This page needs a selected doctor so it can load live availability and
+          submit a valid booking request.
+        </p>
+        <a
+          href="/doctors"
+          className="mt-6 inline-flex h-12 items-center justify-center rounded-[12px] bg-brand-500 px-5 text-sm font-semibold text-white transition hover:bg-brand-600"
+        >
+          Browse Doctors
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function AppointmentsPageContent() {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    appointmentAvailableDates[4],
-  );
-  const [selectedSlot, setSelectedSlot] = useState<string | null>("10:30 AM");
-  const [visibleMonth, setVisibleMonth] = useState<Date>(
-    startOfMonth(appointmentAvailableDates[0]),
-  );
-  const [bookingError, setBookingError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const searchDoctorId = searchParams.get("doctorId");
+
+  const storedDoctorId = useBookingStore((state) => state.selectedDoctorId);
+  const storedAppointmentType = useBookingStore((state) => state.appointmentType);
+  const storedSelectedDate = useBookingStore((state) => state.selectedDate);
+  const storedSelectedTime = useBookingStore((state) => state.selectedTime);
+  const storedPatientDetails = useBookingStore((state) => state.patientDetails);
 
   const setSelectedDoctorId = useBookingStore(
     (state) => state.setSelectedDoctorId,
@@ -34,44 +121,341 @@ export default function AppointmentsPage() {
     (state) => state.setSelectedAvailabilityId,
   );
   const setSelectedDateStore = useBookingStore((state) => state.setSelectedDate);
-  const setSelectedTime = useBookingStore((state) => state.setSelectedTime);
-  const setAppointmentType = useBookingStore(
+  const setSelectedTimeStore = useBookingStore((state) => state.setSelectedTime);
+  const setAppointmentTypeStore = useBookingStore(
     (state) => state.setAppointmentType,
   );
-  const setPatientDetails = useBookingStore(
+  const setPatientDetailsStore = useBookingStore(
     (state) => state.setPatientDetails,
   );
-  const setConfirmationId = useBookingStore(
-    (state) => state.setConfirmationId,
+  const setAppointmentIdStore = useBookingStore((state) => state.setAppointmentId);
+  const setConfirmationCodeStore = useBookingStore(
+    (state) => state.setConfirmationCode,
   );
 
-  const handleSubmit = (values: AppointmentFormValues) => {
-    if (!selectedDate || !selectedSlot) {
+  const effectiveDoctorId =
+    searchDoctorId ??
+    (storedDoctorId && /^\d+$/.test(storedDoctorId) ? storedDoctorId : null);
+
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [availability, setAvailability] = useState<DoctorAvailability | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+  const [selectedAppointmentType, setSelectedAppointmentType] =
+    useState<AppointmentType>(storedAppointmentType ?? "IN_PERSON");
+  const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchDoctorId) {
+      setSelectedDoctorId(searchDoctorId);
+    }
+  }, [searchDoctorId, setSelectedDoctorId]);
+
+  useEffect(() => {
+    if (storedAppointmentType) {
+      setSelectedAppointmentType(storedAppointmentType);
+    }
+  }, [storedAppointmentType]);
+
+  useEffect(() => {
+    if (!storedSelectedDate) {
+      return;
+    }
+
+    const restoredDate = parseISO(storedSelectedDate);
+    if (!Number.isNaN(restoredDate.getTime())) {
+      setSelectedDate(restoredDate);
+    }
+  }, [storedSelectedDate]);
+
+  useEffect(() => {
+    if (!availability) {
+      return;
+    }
+
+    const allSlots = [...availability.morningSlots, ...availability.afternoonSlots];
+    const filteredSlots = allSlots.filter(
+      (slot) =>
+        !slot.isBooked && slot.appointmentType === selectedAppointmentType,
+    );
+    const availableDates = availability.availableDates.filter((date) =>
+      filteredSlots.some((slot) => slot.availableDate === createDateKey(date)),
+    );
+
+    if (availableDates.length === 0) {
+      setSelectedDate(undefined);
+      setSelectedSlotId(null);
+      return;
+    }
+
+    const selectedDateKey = selectedDate ? createDateKey(selectedDate) : null;
+    const hasSelectedDate =
+      selectedDateKey !== null &&
+      availableDates.some((date) => createDateKey(date) === selectedDateKey);
+
+    if (!hasSelectedDate) {
+      setSelectedDate((current) =>
+        current && availableDates.some((date) => createDateKey(date) === createDateKey(current))
+          ? current
+          : availableDates[0],
+      );
+    }
+  }, [availability, selectedAppointmentType, selectedDate]);
+
+  useEffect(() => {
+    if (!availability || !selectedDate) {
+      setSelectedSlotId(null);
+      return;
+    }
+
+    const selectedDateKey = createDateKey(selectedDate);
+    const availableSlots = [
+      ...availability.morningSlots,
+      ...availability.afternoonSlots,
+    ].filter(
+      (slot) =>
+        !slot.isBooked &&
+        slot.appointmentType === selectedAppointmentType &&
+        slot.availableDate === selectedDateKey,
+    );
+
+    if (availableSlots.length === 0) {
+      setSelectedSlotId(null);
+      return;
+    }
+
+    const storedMatch = availableSlots.find(
+      (slot) => slot.startTime === storedSelectedTime,
+    );
+    const currentMatch = availableSlots.find((slot) => slot.id === selectedSlotId);
+    const nextSlot = storedMatch ?? currentMatch ?? availableSlots[0];
+
+    if (nextSlot.id !== selectedSlotId) {
+      setSelectedSlotId(nextSlot.id);
+    }
+  }, [
+    availability,
+    selectedAppointmentType,
+    selectedDate,
+    selectedSlotId,
+    storedSelectedTime,
+  ]);
+
+  useEffect(() => {
+    if (selectedDate) {
+      setVisibleMonth(startOfMonth(selectedDate));
+    }
+  }, [selectedDate]);
+
+  useEffect(() => {
+    let isActive = true;
+    const controller = new AbortController();
+
+    async function loadBookingData() {
+      if (!effectiveDoctorId) {
+        setDoctor(null);
+        setAvailability(null);
+        setLoadError(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const response = await getDoctorAvailability(effectiveDoctorId, {
+          signal: controller.signal,
+        });
+
+        if (!isActive) {
+          return;
+        }
+
+        setDoctor(response.doctor);
+        setAvailability(response);
+        setSelectedDoctorId(response.doctor.id);
+
+        if (response.availableDates.length > 0) {
+          setVisibleMonth(startOfMonth(response.availableDates[0]));
+        }
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
+        setDoctor(null);
+        setAvailability(null);
+        setLoadError(
+          error instanceof ApiError
+            ? error.message
+            : "Unable to load the booking details right now. Please try again.",
+        );
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadBookingData();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [effectiveDoctorId, reloadKey, setSelectedDoctorId]);
+
+  const allSlots = useMemo(() => {
+    if (!availability) {
+      return [];
+    }
+
+    return [...availability.morningSlots, ...availability.afternoonSlots];
+  }, [availability]);
+
+  const availableSlots = useMemo(() => {
+    if (!selectedDate) {
+      return [];
+    }
+
+    const selectedDateKey = createDateKey(selectedDate);
+    return allSlots.filter(
+      (slot) =>
+        !slot.isBooked &&
+        slot.appointmentType === selectedAppointmentType &&
+        slot.availableDate === selectedDateKey,
+    );
+  }, [allSlots, selectedAppointmentType, selectedDate]);
+
+  const filteredAvailableDates = useMemo(() => {
+    if (!availability) {
+      return [];
+    }
+
+    return availability.availableDates.filter((date) =>
+      allSlots.some(
+        (slot) =>
+          !slot.isBooked &&
+          slot.appointmentType === selectedAppointmentType &&
+          slot.availableDate === createDateKey(date),
+      ),
+    );
+  }, [allSlots, availability, selectedAppointmentType]);
+
+  const selectedSlot = useMemo(
+    () => availableSlots.find((slot) => slot.id === selectedSlotId) ?? null,
+    [availableSlots, selectedSlotId],
+  );
+
+  const defaultPatientValues = useMemo(
+    () => ({
+      appointment_type: selectedAppointmentType,
+      full_name: storedPatientDetails?.full_name ?? "",
+      email: storedPatientDetails?.email ?? "",
+      phone: storedPatientDetails?.phone ?? "",
+      health_description: storedPatientDetails?.health_description ?? "",
+    }),
+    [selectedAppointmentType, storedPatientDetails],
+  );
+
+  const handleDateSelect = (date: Date | undefined) => {
+    setBookingError(null);
+    setSelectedDate(date);
+    setSelectedSlotId(null);
+    setSelectedDateStore(date ? createDateKey(date) : null);
+    setSelectedTimeStore(null);
+    setSelectedAvailabilityId(null);
+  };
+
+  const handleSlotSelect = (slot: AvailabilitySlot) => {
+    setBookingError(null);
+    setSelectedSlotId(slot.id);
+    setSelectedAvailabilityId(slot.id);
+    setSelectedTimeStore(slot.startTime);
+  };
+
+  const handleAppointmentTypeChange = (appointmentType: AppointmentType) => {
+    setBookingError(null);
+    setSelectedAppointmentType(appointmentType);
+    setAppointmentTypeStore(appointmentType);
+  };
+
+  const handleSubmit = async (values: AppointmentFormValues) => {
+    if (!doctor || !selectedDate || !selectedSlot) {
       setBookingError("Select a date and time before confirming the booking.");
       return;
     }
 
-    const selectedDateKey = format(selectedDate, "yyyy-MM-dd");
-    const confirmationId = `CA-${format(selectedDate, "yyyyMMdd")}-${selectedSlot
-      .replace(/[^0-9]/g, "")
-      .slice(0, 4)}`;
-
     setBookingError(null);
-    setSelectedDoctorId(appointmentBookingDoctor.id);
-    setSelectedAvailabilityId(`${selectedDateKey}-${selectedSlot}`);
-    setSelectedDateStore(selectedDateKey);
-    setSelectedTime(selectedSlot);
-    setAppointmentType(values.appointment_type);
-    setPatientDetails({
-      full_name: values.full_name,
-      email: values.email,
-      phone: values.phone,
-      health_description: values.health_description,
-    });
-    setConfirmationId(confirmationId);
 
-    router.push("/appointments/confirmation");
+    try {
+      const response = await createAppointment({
+        doctor_id: doctor.backendId,
+        availability_id: selectedSlot.id,
+        appointment_date: createDateKey(selectedDate),
+        start_time: selectedSlot.startTime,
+        appointment_type: values.appointment_type,
+        patient: {
+          full_name: values.full_name,
+          email: values.email,
+          phone: values.phone?.trim() ? values.phone.trim() : null,
+        },
+        health_description: values.health_description?.trim() || null,
+      });
+
+      setSelectedDoctorId(doctor.id);
+      setSelectedAvailabilityId(selectedSlot.id);
+      setSelectedDateStore(createDateKey(selectedDate));
+      setSelectedTimeStore(selectedSlot.startTime);
+      setAppointmentTypeStore(values.appointment_type);
+      setPatientDetailsStore({
+        full_name: values.full_name,
+        email: values.email,
+        phone: values.phone,
+        health_description: values.health_description,
+      });
+      setAppointmentIdStore(response.id);
+      setConfirmationCodeStore(response.confirmation_code);
+
+      router.push(
+        `/appointments/confirmation?appointmentId=${response.id}&doctorId=${doctor.backendId}`,
+      );
+    } catch (error) {
+      setBookingError(
+        error instanceof ApiError
+          ? error.message
+          : "Unable to create the appointment right now. Please try again.",
+      );
+    }
   };
+
+  if (!effectiveDoctorId) {
+    return <NoDoctorState />;
+  }
+
+  if (isLoading && !doctor) {
+    return <LoadingState />;
+  }
+
+  if (loadError) {
+    return (
+      <ErrorState
+        message={loadError}
+        onRetry={() => setReloadKey((value) => value + 1)}
+      />
+    );
+  }
+
+  if (!doctor || !availability) {
+    return <NoDoctorState />;
+  }
 
   return (
     <section className="py-10 lg:py-14">
@@ -162,11 +546,8 @@ export default function AppointmentsPage() {
 
               <AppointmentCalendar
                 selectedDate={selectedDate}
-                availableDates={appointmentAvailableDates}
-                onDateSelect={(date) => {
-                  setSelectedDate(date);
-                  setBookingError(null);
-                }}
+                availableDates={filteredAvailableDates}
+                onDateSelect={handleDateSelect}
                 month={visibleMonth}
                 onMonthChange={setVisibleMonth}
               />
@@ -174,17 +555,14 @@ export default function AppointmentsPage() {
 
             <AppointmentAvailability
               selectedDate={selectedDate}
-              selectedSlot={selectedSlot}
-              availableSlots={appointmentAvailableSlots}
-              onSlotSelect={(slot) => {
-                setSelectedSlot(slot);
-                setBookingError(null);
-              }}
+              selectedSlotId={selectedSlotId}
+              availableSlots={availableSlots}
+              onSlotSelect={handleSlotSelect}
             />
           </div>
 
           <div className="space-y-6">
-            <DoctorSummaryCard doctor={appointmentBookingDoctor} />
+            <DoctorSummaryCard doctor={doctor} />
 
             <aside className="rounded-[20px] border border-slate-100 bg-white p-6 shadow-soft">
               <div className="flex items-start gap-3">
@@ -222,8 +600,10 @@ export default function AppointmentsPage() {
 
               <div className="mt-6">
                 <PatientDetailsForm
+                  defaultValues={defaultPatientValues}
                   isBookingReady={Boolean(selectedDate && selectedSlot)}
                   onSubmit={handleSubmit}
+                  onAppointmentTypeChange={handleAppointmentTypeChange}
                 />
               </div>
             </aside>
@@ -243,5 +623,13 @@ export default function AppointmentsPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+export default function AppointmentsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <AppointmentsPageContent />
+    </Suspense>
   );
 }

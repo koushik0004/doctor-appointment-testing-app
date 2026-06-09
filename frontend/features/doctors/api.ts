@@ -12,9 +12,10 @@ type DoctorListParams = {
   appointmentType?: AppointmentType | "ALL";
 };
 
-function mapDoctorApiRecord(record: DoctorApiRecord): Doctor {
+export function mapDoctorApiRecord(record: DoctorApiRecord): Doctor {
   return {
     id: String(record.id),
+    backendId: record.id,
     name: record.name,
     specialty: record.specialty,
     rating: record.rating,

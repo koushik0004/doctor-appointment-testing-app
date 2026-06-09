@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 import type { FieldErrors, Resolver } from "react-hook-form";
 import { useForm } from "react-hook-form";
 
@@ -16,7 +18,8 @@ import { AppointmentTypeSelector } from "@/features/appointments/components/Appo
 type PatientDetailsFormProps = {
   defaultValues?: Partial<AppointmentFormValues>;
   submitLabel?: string;
-  onSubmit?: (values: AppointmentFormValues) => void;
+  onSubmit?: (values: AppointmentFormValues) => void | Promise<void>;
+  onAppointmentTypeChange?: (appointmentType: AppointmentFormValues["appointment_type"]) => void;
   isBookingReady?: boolean;
   className?: string;
 };
@@ -66,6 +69,7 @@ export function PatientDetailsForm({
   defaultValues,
   submitLabel = "Confirm Appointment",
   onSubmit,
+  onAppointmentTypeChange,
   isBookingReady = true,
   className,
 }: PatientDetailsFormProps) {
@@ -86,9 +90,12 @@ export function PatientDetailsForm({
 
   const selectedAppointmentType = watch("appointment_type");
 
-  const submitHandler = handleSubmit((values) => {
-    console.log(values);
-    onSubmit?.(values);
+  React.useEffect(() => {
+    onAppointmentTypeChange?.(selectedAppointmentType);
+  }, [onAppointmentTypeChange, selectedAppointmentType]);
+
+  const submitHandler = handleSubmit(async (values) => {
+    await onSubmit?.(values);
   });
 
   return (

@@ -12,6 +12,7 @@ import type {
   BookingPatientDetails,
 } from "@/features/appointments/types";
 import { appointmentTypeLabels } from "@/features/appointments/schema";
+import { formatAppointmentTime } from "@/features/appointments/utils";
 
 type AppointmentSummaryProps = {
   doctor: Doctor;
@@ -95,10 +96,10 @@ export function AppointmentSummary({
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className="rounded-[18px] border border-slate-100 bg-slate-50/60 p-5">
-          <SectionHeading>Appointment Date &amp; Time</SectionHeading>
+            <SectionHeading>Appointment Date &amp; Time</SectionHeading>
           <dl className="mt-4 space-y-3">
             <InfoRow label="Date" value={format(appointmentDate, "EEEE, MMMM d, yyyy")} />
-            <InfoRow label="Time" value={appointmentTime} />
+            <InfoRow label="Time" value={formatAppointmentTime(appointmentTime)} />
             <InfoRow label="Duration" value={`${doctor.durationMinutes} minutes`} />
           </dl>
         </section>

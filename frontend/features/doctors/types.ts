@@ -17,6 +17,7 @@ export const appointmentTypeOptions = [
 
 export type Doctor = {
   id: string;
+  backendId: number;
   name: string;
   specialty: string;
   rating: number;

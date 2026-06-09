@@ -94,7 +94,9 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
         </dl>
 
         <Link
-          href="/appointments"
+          href={
+            doctor ? `/appointments?doctorId=${doctor.backendId}` : "/appointments"
+          }
           className="mt-6 inline-flex w-full items-center justify-center rounded-[12px] bg-sky-400 px-5 py-4 text-sm font-semibold text-white transition hover:bg-sky-500"
         >
           Proceed to Booking
