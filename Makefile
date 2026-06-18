@@ -10,10 +10,10 @@ FRONTEND_PID_FILE := $(RUN_DIR)/frontend.pid
 BACKEND_LOG_FILE := $(RUN_DIR)/backend.log
 FRONTEND_LOG_FILE := $(RUN_DIR)/frontend.log
 
-BOOTSTRAP_PYTHON ?= python3.12
+BOOTSTRAP_PYTHON_CANDIDATES ?= $(if $(CONDA_PREFIX),$(CONDA_PREFIX)/bin/python) python3.13 python3.12 python3.11 python3
 BACKEND_VENV_DIR := $(BACKEND_DIR)/.venv
-BACKEND_PYTHON := $(BACKEND_VENV_DIR)/bin/python
-BACKEND_PIP := $(BACKEND_VENV_DIR)/bin/pip
+BACKEND_PYTHON := $(abspath $(BACKEND_VENV_DIR))/bin/python
+BACKEND_PIP := $(abspath $(BACKEND_VENV_DIR))/bin/pip
 BACKEND_APP := app.main:app
 BACKEND_PORT ?= 4001
 FRONTEND_PORT ?= 4002
@@ -36,14 +36,80 @@ help:
 		'  make frontend-dev  Start only the frontend dev server'
 
 $(BACKEND_VENV_DIR):
-	$(BOOTSTRAP_PYTHON) -m venv $(BACKEND_VENV_DIR)
+	@set -e; \
+	bootstrap_python=""; \
+	venv_flags=""; \
+	is_supported_version() { \
+		major="$${1%%.*}"; \
+		minor="$${1#*.}"; \
+		[ "$$major" = 3 ] && [ "$$minor" -ge 11 ] && [ "$$minor" -le 13 ]; \
+	}; \
+	for candidate in $(BOOTSTRAP_PYTHON_CANDIDATES); do \
+		if [ -n "$$candidate" ] && command -v "$$candidate" >/dev/null 2>&1; then \
+			version="$$( "$$candidate" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")' )"; \
+			if is_supported_version "$$version"; then \
+				bootstrap_python="$$candidate"; \
+				break; \
+			fi; \
+		fi; \
+	done; \
+	if [ -z "$$bootstrap_python" ]; then \
+		echo "No supported Python interpreter found. Need Python 3.11, 3.12, or 3.13."; \
+		exit 1; \
+	fi; \
+	if [ -n "$${CONDA_PREFIX:-}" ] && [ "$$bootstrap_python" = "$${CONDA_PREFIX}/bin/python" ]; then \
+		venv_flags="--system-site-packages"; \
+	fi; \
+	if [ -n "$$venv_flags" ]; then \
+		"$$bootstrap_python" -m venv $$venv_flags "$(BACKEND_VENV_DIR)"; \
+	else \
+		"$$bootstrap_python" -m venv "$(BACKEND_VENV_DIR)"; \
+	fi; \
+	"$$bootstrap_python" -m ensurepip --upgrade >/dev/null
 
 $(RUN_DIR):
 	mkdir -p $(RUN_DIR)
 
 backend-setup: $(BACKEND_VENV_DIR)
-	cd $(BACKEND_DIR) && .venv/bin/python -m pip install --upgrade pip
-	cd $(BACKEND_DIR) && .venv/bin/pip install -e ".[dev]"
+	@set -e; \
+	bootstrap_python=""; \
+	venv_flags=""; \
+	is_supported_version() { \
+		major="$${1%%.*}"; \
+		minor="$${1#*.}"; \
+		[ "$$major" = 3 ] && [ "$$minor" -ge 11 ] && [ "$$minor" -le 13 ]; \
+	}; \
+	if [ -x "$(BACKEND_PYTHON)" ]; then \
+		current_version="$$( $(BACKEND_PYTHON) -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")' )"; \
+		if ! is_supported_version "$$current_version" || ! "$(BACKEND_PYTHON)" -m pip show setuptools wheel >/dev/null 2>&1; then \
+			rm -rf "$(BACKEND_VENV_DIR)"; \
+		fi; \
+	fi; \
+	if [ ! -x "$(BACKEND_PYTHON)" ]; then \
+		for candidate in $(BOOTSTRAP_PYTHON_CANDIDATES); do \
+			if [ -n "$$candidate" ] && command -v "$$candidate" >/dev/null 2>&1; then \
+				version="$$( "$$candidate" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")' )"; \
+				if is_supported_version "$$version"; then \
+					bootstrap_python="$$candidate"; \
+					break; \
+				fi; \
+			fi; \
+		done; \
+		if [ -z "$$bootstrap_python" ]; then \
+			echo "No supported Python interpreter found. Need Python 3.11, 3.12, or 3.13."; \
+			exit 1; \
+		fi; \
+		if [ -n "$${CONDA_PREFIX:-}" ] && [ "$$bootstrap_python" = "$${CONDA_PREFIX}/bin/python" ]; then \
+			venv_flags="--system-site-packages"; \
+		fi; \
+		if [ -n "$$venv_flags" ]; then \
+			"$$bootstrap_python" -m venv $$venv_flags "$(BACKEND_VENV_DIR)"; \
+		else \
+			"$$bootstrap_python" -m venv "$(BACKEND_VENV_DIR)"; \
+		fi; \
+		"$$bootstrap_python" -m ensurepip --upgrade >/dev/null; \
+	fi; \
+	cd $(BACKEND_DIR) && $(BACKEND_PIP) install --no-build-isolation -e ".[dev]"
 
 frontend-setup:
 	cd $(FRONTEND_DIR) && $(FRONTEND_NPM) install
@@ -57,7 +123,7 @@ backend-start: $(RUN_DIR)
 	if [ -n "$$backend_pid" ] && kill -0 "$$backend_pid" 2>/dev/null; then \
 		echo "Backend is already running (pid $$backend_pid)."; \
 	else \
-		cd $(BACKEND_DIR) && nohup sh -c 'exec .venv/bin/python -m uvicorn $(BACKEND_APP) --host 0.0.0.0 --port $(BACKEND_PORT)' > "../$(BACKEND_LOG_FILE)" 2>&1 < /dev/null & \
+		cd $(BACKEND_DIR) && nohup sh -c 'exec $(BACKEND_PYTHON) -m uvicorn $(BACKEND_APP) --host 0.0.0.0 --port $(BACKEND_PORT)' > "../$(BACKEND_LOG_FILE)" 2>&1 < /dev/null & \
 		echo $$! > "$(BACKEND_PID_FILE)"; \
 		echo "Starting backend on http://127.0.0.1:$(BACKEND_PORT) ..."; \
 	fi; \
@@ -85,7 +151,7 @@ frontend-start: $(RUN_DIR)
 	fi
 
 backend-dev:
-	cd $(BACKEND_DIR) && .venv/bin/python -m uvicorn $(BACKEND_APP) --host 0.0.0.0 --port $(BACKEND_PORT)
+	cd $(BACKEND_DIR) && $(BACKEND_PYTHON) -m uvicorn $(BACKEND_APP) --host 0.0.0.0 --port $(BACKEND_PORT)
 
 frontend-dev:
 	cd $(FRONTEND_DIR) && $(FRONTEND_NPM) run dev

@@ -40,13 +40,13 @@ backend/
 
 ## 4. Python Version Requirement
 
-Use Python 3.12 or newer. The project docs prefer Python 3.12.
+Use Python 3.11, 3.12, or 3.13. Activate your conda environment before running `make setup`.
 
 ## 5. Virtual Environment Setup
 
 ```bash
 cd backend
-python3.12 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -55,8 +55,8 @@ source .venv/bin/activate
 ```bash
 cd backend
 source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
+python -m ensurepip --upgrade
+python -m pip install --no-build-isolation -e ".[dev]"
 ```
 
 ## 7. Environment Variables
@@ -66,6 +66,7 @@ Settings are loaded from `backend/.env` through `pydantic-settings`.
 - `APP_NAME=Doctor Appointment API`
 - `API_PREFIX=/api`
 - `DATABASE_URL=sqlite:///./app.db`
+- `CORS_ORIGINS=http://localhost:4002,http://127.0.0.1:4002`
 
 These values are required by the backend settings loader.
 
@@ -111,7 +112,7 @@ make stop
 
 ## 12. Troubleshooting Notes
 
-- If `python3.12` is not available on your machine, run `make BOOTSTRAP_PYTHON=python3 setup`.
+- If `make setup` creates a venv with the wrong interpreter, remove `backend/.venv`, activate the conda env with Python 3.11, 3.12, or 3.13, and rerun `make setup`.
 - If the app cannot open the database, confirm `DATABASE_URL` points to a valid SQLite file path.
 - If the schema looks stale, delete the local `app.db` file and restart the server so the tables are recreated.
 - If imports fail, make sure the backend virtual environment exists under `backend/.venv`.

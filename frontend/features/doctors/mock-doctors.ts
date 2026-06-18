@@ -3,6 +3,7 @@ import { Doctor } from "@/features/doctors/types";
 export const doctors: Doctor[] = [
   {
     id: "dr-sarah-jenkins",
+    backendId: 1,
     name: "Dr. Sarah Jenkins",
     specialty: "Cardiology",
     rating: 4.9,
@@ -24,6 +25,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: "dr-marcus-chen",
+    backendId: 2,
     name: "Dr. Marcus Chen",
     specialty: "Pediatrics",
     rating: 4.8,
@@ -45,6 +47,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: "dr-elena-rodriguez",
+    backendId: 3,
     name: "Dr. Elena Rodriguez",
     specialty: "Dermatology",
     rating: 5,
@@ -66,6 +69,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: "dr-james-wilson",
+    backendId: 4,
     name: "Dr. James Wilson",
     specialty: "Internal Medicine",
     rating: 4.7,
@@ -87,6 +91,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: "dr-aisha-khan",
+    backendId: 5,
     name: "Dr. Aisha Khan",
     specialty: "General Practice",
     rating: 4.9,
@@ -108,6 +113,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: "dr-daniel-park",
+    backendId: 6,
     name: "Dr. Daniel Park",
     specialty: "Cardiology",
     rating: 4.6,
@@ -129,6 +135,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: "dr-lucy-bennett",
+    backendId: 7,
     name: "Dr. Lucy Bennett",
     specialty: "Pediatrics",
     rating: 4.8,
@@ -150,6 +157,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: "dr-noah-turner",
+    backendId: 8,
     name: "Dr. Noah Turner",
     specialty: "Internal Medicine",
     rating: 4.7,

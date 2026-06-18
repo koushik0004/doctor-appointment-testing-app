@@ -1,34 +1,15 @@
-# Project Memory
+# Feature 03 Integration Memory
 
-## Current Feature
+## Implemented
 
-Feature 02 - Doctor Listing and Filters
+- Replaced the appointments page mock booking data with live doctor availability from the backend.
+- Wired the booking submit flow to `POST /api/appointments`.
+- Wired the confirmation page to `GET /api/appointments/{appointment_id}`.
+- Preserved the doctor selection flow by passing the backend doctor ID through the booking and confirmation URLs.
+- Added frontend booking API types for availability, appointment creation, and appointment confirmation payloads.
 
-## Completed
+## Notable Contract Detail
 
-✓ Backend analysis
-✓ Doctor ORM model
-✓ Doctor schemas
-✓ Seed data
-✓ Repository layer
-✓ Service layer
-✓ Doctor APIs
-✓ Router registration
-✓ API validation
+- The frontend doctor model now keeps both the UI string `id` and the backend numeric `backendId`.
+- Booking requests now use the numeric backend doctor ID and backend slot IDs.
 
-## Remaining
-
-□ Frontend backend integration for the doctor listing screen
-□ Optional pagination/search expansion if the product spec requires it
-
-## Backend Decisions
-
-- Use SQLite-compatible ORM fields for appointment types and languages
-- Seed 10 doctors with idempotent startup seeding
-- Keep doctor list filtering in the repository/service split
-
-## Routes
-
-/api/health
-/api/doctors
-/api/doctors/{doctor_id}

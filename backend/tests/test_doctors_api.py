@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 
+import importlib
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine, inspect, text
@@ -18,12 +19,12 @@ get_settings.cache_clear()
 database_module.get_engine.cache_clear()
 database_module.get_session_factory.cache_clear()
 
-from app.main import app  # noqa: E402
-
 
 @pytest.fixture()
 def client():
-    with TestClient(app) as test_client:
+    app_main_module = importlib.reload(importlib.import_module("app.main"))
+
+    with TestClient(app_main_module.app) as test_client:
         yield test_client
 
 

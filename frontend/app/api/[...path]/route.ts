@@ -1,8 +1,5 @@
-const BACKEND_BASE_URL = process.env.BACKEND_API_BASE_URL;
-
-if (!BACKEND_BASE_URL) {
-  throw new Error("BACKEND_API_BASE_URL is required for the API proxy.");
-}
+const BACKEND_BASE_URL =
+  process.env.BACKEND_API_BASE_URL ?? "http://localhost:4001";
 
 function buildBackendUrl(request: Request, pathSegments: string[]) {
   const incomingUrl = new URL(request.url);
