@@ -4,7 +4,7 @@
 
 Use:
 
-- Python 3.12 preferred
+- Python 3.11, 3.12, or 3.13
 - FastAPI
 - Uvicorn
 - SQLAlchemy

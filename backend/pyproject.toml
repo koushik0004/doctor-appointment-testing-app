@@ -7,7 +7,7 @@ name = "doctor-appointment-backend"
 version = "0.1.0"
 description = "FastAPI backend for the doctor appointment app"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11,<3.14"
 dependencies = [
   "fastapi",
   "uvicorn[standard]",
