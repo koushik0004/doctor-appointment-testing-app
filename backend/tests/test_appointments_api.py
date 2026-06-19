@@ -50,6 +50,35 @@ def _get_doctor_id(client: TestClient, name: str) -> int:
     raise AssertionError(f"Doctor {name} not found")
 
 
+def _book_appointment(
+    client: TestClient,
+    *,
+    doctor_id: int,
+    appointment_date: date,
+    start_time: str,
+    full_name: str,
+    email: str,
+    phone: str,
+):
+    response = client.post(
+        "/api/appointments",
+        json={
+            "doctor_id": doctor_id,
+            "appointment_date": appointment_date.isoformat(),
+            "start_time": start_time,
+            "appointment_type": "IN_PERSON",
+            "patient": {
+                "full_name": full_name,
+                "email": email,
+                "phone": phone,
+            },
+            "health_description": "Search endpoint test booking.",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
 def test_booking_flow_and_confirmation_endpoint(client):
     doctor_id = _get_doctor_id(client, "Dr. Sarah Jenkins")
     booking_date = date.today() + timedelta(days=1)
@@ -101,6 +130,69 @@ def test_booking_flow_and_confirmation_endpoint(client):
     conflict_response = client.post("/api/appointments", json=booking_payload)
     assert conflict_response.status_code == 409
     assert "already booked" in conflict_response.json()["detail"]
+
+
+def test_search_appointments_endpoint_filters_and_orders_results(client):
+    doctor_id = _get_doctor_id(client, "Dr. Sarah Jenkins")
+    tomorrow = date.today() + timedelta(days=1)
+    day_after_tomorrow = date.today() + timedelta(days=2)
+
+    first = _book_appointment(
+        client,
+        doctor_id=doctor_id,
+        appointment_date=tomorrow,
+        start_time="10:00",
+        full_name="John Doe",
+        email="john.one@example.com",
+        phone="1111111111",
+    )
+    second = _book_appointment(
+        client,
+        doctor_id=doctor_id,
+        appointment_date=day_after_tomorrow,
+        start_time="12:00",
+        full_name="Johnathan Doe",
+        email="john.two@example.com",
+        phone="2222222222",
+    )
+    _book_appointment(
+        client,
+        doctor_id=doctor_id,
+        appointment_date=day_after_tomorrow,
+        start_time="14:00",
+        full_name="Jane Smith",
+        email="jane.smith@example.com",
+        phone="3333333333",
+    )
+
+    response = client.get("/api/appointments/search", params={"name": "  john  "})
+    assert response.status_code == 200
+
+    payload = response.json()
+    assert payload["count"] == 2
+    assert [item["appointment_id"] for item in payload["appointments"]] == [
+        second["id"],
+        first["id"],
+    ]
+    assert payload["appointments"][0]["patient_name"] == "Johnathan Doe"
+    assert payload["appointments"][1]["patient_name"] == "John Doe"
+    assert payload["appointments"][0]["status"] == "booked"
+
+
+def test_search_appointments_endpoint_requires_search_param(client):
+    response = client.get("/api/appointments/search")
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "At least one search parameter is required."
+
+
+def test_search_appointments_endpoint_rejects_invalid_email(client):
+    response = client.get("/api/appointments/search", params={"email": "not-an-email"})
+
+    assert response.status_code == 422
+    error = response.json()["detail"][0]
+    assert error["loc"] == ["query", "email"]
+    assert error["type"] == "value_error"
 
 
 def test_booking_payload_validation():
