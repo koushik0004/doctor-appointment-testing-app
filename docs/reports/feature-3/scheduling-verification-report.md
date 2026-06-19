@@ -14,6 +14,7 @@ Verify the appointment booking flow after removing the dependency on pre-created
 - Booked slots are excluded from selection and can also be rendered as disabled if present.
 - The frontend no longer depends on backend availability records as the source of selectable dates.
 - Booking still completes end to end and returns a confirmation response.
+- Live browser verification was run against the frontend on `127.0.0.1:4002` and the backend proxy target on `127.0.0.1:4001`.
 
 ## Implementation State
 
@@ -47,27 +48,27 @@ Verify the appointment booking flow after removing the dependency on pre-created
 
 1. Today is 19 June, user selects 20 June.
    - Expected: all generated slots are visible.
-   - Result: verified by the date-driven availability flow and backend test coverage.
+   - Result: `08:00 AM`, `10:00 AM`, `12:00 PM`, `02:00 PM`, `04:00 PM`, and `06:00 PM` were visible in the live browser run.
 
 2. Today is 19 June 08:00, user selects today.
    - Expected: only future slots are visible.
-   - Result: verified by elapsed-slot filtering in the frontend and backend validation.
+   - Result: only future slots were shown in the live browser run; `08:00 AM` was hidden.
 
 3. Book doctor A on 20 June 10:00.
    - Expected: appointment is saved.
-   - Result: covered by `backend/tests/test_appointments_api.py`.
+   - Result: the live browser booking completed and the confirmation page displayed `Your visit is booked`.
 
 4. Refresh the page after booking doctor A on 20 June 10:00.
    - Expected: 10:00 is no longer available for doctor A.
-   - Result: covered by the availability API test, which confirms booked times are excluded.
+   - Result: after reloading doctor A on 20 June, `10:00 AM` was no longer present in the slot list.
 
 5. Book doctor B on the same date and time.
    - Expected: the slot is still available.
-   - Result: covered by the booking model, which scopes booked times by doctor.
+   - Result: doctor B still showed `10:00 AM` on the same date and time.
 
 6. No availability records exist in the database.
    - Expected: the calendar still works.
-   - Result: verified by the removal of availability-record dependencies in the frontend flow and by database tests asserting the availability table is not required.
+   - Result: verified by the current schema and tests; the booking flow continued to work without any availability-table dependency.
 
 ## Checks Run
 
