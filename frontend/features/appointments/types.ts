@@ -34,7 +34,6 @@ export type AppointmentPatientInput = {
 
 export type AppointmentCreatePayload = {
   doctor_id: number;
-  availability_id: number;
   appointment_date: string;
   start_time: string;
   appointment_type: AppointmentType;

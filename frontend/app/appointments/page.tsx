@@ -119,9 +119,6 @@ function AppointmentsPageContent() {
   const setSelectedDoctorId = useBookingStore(
     (state) => state.setSelectedDoctorId,
   );
-  const setSelectedAvailabilityId = useBookingStore(
-    (state) => state.setSelectedAvailabilityId,
-  );
   const setSelectedDateStore = useBookingStore((state) => state.setSelectedDate);
   const setSelectedTimeStore = useBookingStore((state) => state.setSelectedTime);
   const setAppointmentTypeStore = useBookingStore(
@@ -146,7 +143,9 @@ function AppointmentsPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    () => new Date(),
+  );
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [selectedAppointmentType, setSelectedAppointmentType] =
     useState<AppointmentType>(storedAppointmentType ?? "IN_PERSON");
@@ -178,49 +177,13 @@ function AppointmentsPageContent() {
   }, [storedSelectedDate]);
 
   useEffect(() => {
-    if (!availability) {
-      return;
-    }
-
-    const allSlots = [...availability.morningSlots, ...availability.afternoonSlots];
-    const filteredSlots = allSlots.filter(
-      (slot) =>
-        !slot.isBooked && slot.appointmentType === selectedAppointmentType,
-    );
-    const availableDates = availability.availableDates.filter((date) =>
-      filteredSlots.some((slot) => slot.availableDate === createDateKey(date)),
-    );
-
-    if (availableDates.length === 0) {
-      setSelectedDate(undefined);
-      setSelectedSlotId(null);
-      return;
-    }
-
-    const selectedDateKey = selectedDate ? createDateKey(selectedDate) : null;
-    const hasSelectedDate =
-      selectedDateKey !== null &&
-      availableDates.some((date) => createDateKey(date) === selectedDateKey);
-
-    if (!hasSelectedDate) {
-      setSelectedDate((current) =>
-        current && availableDates.some((date) => createDateKey(date) === createDateKey(current))
-          ? current
-          : availableDates[0],
-      );
-    }
-  }, [availability, selectedAppointmentType, selectedDate]);
-
-  useEffect(() => {
     if (!availability || !selectedDate) {
       setSelectedSlotId(null);
       return;
     }
 
     const availableSlots = filterBookableSlotsForDate(
-      [...availability.morningSlots, ...availability.afternoonSlots].filter(
-        (slot) => slot.appointmentType === selectedAppointmentType,
-      ),
+      [...availability.morningSlots, ...availability.afternoonSlots],
       selectedDate,
       currentDateTime,
     );
@@ -242,7 +205,6 @@ function AppointmentsPageContent() {
   }, [
     availability,
     currentDateTime,
-    selectedAppointmentType,
     selectedDate,
     selectedSlotId,
     storedSelectedTime,
@@ -278,11 +240,20 @@ function AppointmentsPageContent() {
 
       setIsLoading(true);
       setLoadError(null);
+      setAvailability(null);
 
       try {
-        const response = await getDoctorAvailability(effectiveDoctorId, {
-          signal: controller.signal,
-        });
+        const selectedBookingDate = selectedDate ?? new Date();
+        const response = await getDoctorAvailability(
+          effectiveDoctorId,
+          {
+            dateFrom: selectedBookingDate,
+            dateTo: selectedBookingDate,
+          },
+          {
+            signal: controller.signal,
+          },
+        );
 
         if (!isActive) {
           return;
@@ -291,10 +262,7 @@ function AppointmentsPageContent() {
         setDoctor(response.doctor);
         setAvailability(response);
         setSelectedDoctorId(response.doctor.id);
-
-        if (response.availableDates.length > 0) {
-          setVisibleMonth(startOfMonth(response.availableDates[0]));
-        }
+        setVisibleMonth(startOfMonth(selectedBookingDate));
       } catch (error) {
         if (!isActive) {
           return;
@@ -320,7 +288,7 @@ function AppointmentsPageContent() {
       isActive = false;
       controller.abort();
     };
-  }, [effectiveDoctorId, reloadKey, setSelectedDoctorId]);
+  }, [effectiveDoctorId, reloadKey, selectedDate, setSelectedDoctorId]);
 
   const allSlots = useMemo(() => {
     if (!availability) {
@@ -335,27 +303,8 @@ function AppointmentsPageContent() {
       return [];
     }
 
-    return filterBookableSlotsForDate(
-      allSlots.filter((slot) => slot.appointmentType === selectedAppointmentType),
-      selectedDate,
-      currentDateTime,
-    );
-  }, [allSlots, currentDateTime, selectedAppointmentType, selectedDate]);
-
-  const filteredAvailableDates = useMemo(() => {
-    if (!availability) {
-      return [];
-    }
-
-    return availability.availableDates.filter((date) =>
-      allSlots.some(
-        (slot) =>
-          !slot.isBooked &&
-          slot.appointmentType === selectedAppointmentType &&
-          slot.availableDate === createDateKey(date),
-      ),
-    );
-  }, [allSlots, availability, selectedAppointmentType]);
+    return filterBookableSlotsForDate(allSlots, selectedDate, currentDateTime);
+  }, [allSlots, currentDateTime, selectedDate]);
 
   const selectedSlot = useMemo(
     () => availableSlots.find((slot) => slot.id === selectedSlotId) ?? null,
@@ -379,13 +328,11 @@ function AppointmentsPageContent() {
     setSelectedSlotId(null);
     setSelectedDateStore(date ? createDateKey(date) : null);
     setSelectedTimeStore(null);
-    setSelectedAvailabilityId(null);
   };
 
   const handleSlotSelect = (slot: AvailabilitySlot) => {
     setBookingError(null);
     setSelectedSlotId(slot.id);
-    setSelectedAvailabilityId(slot.id);
     setSelectedTimeStore(slot.startTime);
   };
 
@@ -412,7 +359,6 @@ function AppointmentsPageContent() {
         "Selected time has already passed. Please choose a different slot.",
       );
       setSelectedSlotId(null);
-      setSelectedAvailabilityId(null);
       setSelectedTimeStore(null);
       return;
     }
@@ -422,7 +368,6 @@ function AppointmentsPageContent() {
     try {
       const response = await createAppointment({
         doctor_id: doctor.backendId,
-        availability_id: selectedSlot.id,
         appointment_date: createDateKey(selectedDate),
         start_time: selectedSlot.startTime,
         appointment_type: values.appointment_type,
@@ -435,7 +380,6 @@ function AppointmentsPageContent() {
       });
 
       setSelectedDoctorId(doctor.id);
-      setSelectedAvailabilityId(selectedSlot.id);
       setSelectedDateStore(createDateKey(selectedDate));
       setSelectedTimeStore(selectedSlot.startTime);
       setAppointmentTypeStore(values.appointment_type);
@@ -464,7 +408,7 @@ function AppointmentsPageContent() {
     return <NoDoctorState />;
   }
 
-  if (isLoading && !doctor) {
+  if (isLoading && !availability) {
     return <LoadingState />;
   }
 
@@ -570,7 +514,6 @@ function AppointmentsPageContent() {
 
               <AppointmentCalendar
                 selectedDate={selectedDate}
-                availableDates={filteredAvailableDates}
                 onDateSelect={handleDateSelect}
                 month={visibleMonth}
                 onMonthChange={setVisibleMonth}

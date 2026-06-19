@@ -1,4 +1,4 @@
-import { parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 import { apiClient, type ApiRequestOptions } from "@/lib/api-client";
 import {
@@ -29,6 +29,12 @@ type DoctorAvailabilityApiResponse = {
   available_dates: string[];
   morning_slots: AvailabilitySlotApiRecord[];
   afternoon_slots: AvailabilitySlotApiRecord[];
+};
+
+type DoctorAvailabilityQuery = {
+  dateFrom?: Date;
+  dateTo?: Date;
+  appointmentType?: AvailabilitySlot["appointmentType"];
 };
 
 type AppointmentCreateApiResponse = {
@@ -89,10 +95,22 @@ function mapDoctorAvailability(
 
 export async function getDoctorAvailability(
   doctorId: string | number,
+  query?: DoctorAvailabilityQuery,
   options?: ApiRequestOptions,
 ): Promise<DoctorAvailability> {
+  const params = new URLSearchParams();
+  if (query?.dateFrom) {
+    params.set("date_from", format(query.dateFrom, "yyyy-MM-dd"));
+  }
+  if (query?.dateTo) {
+    params.set("date_to", format(query.dateTo, "yyyy-MM-dd"));
+  }
+  if (query?.appointmentType) {
+    params.set("appointment_type", query.appointmentType);
+  }
+
   const response = await apiClient.get<DoctorAvailabilityApiResponse>(
-    `/doctors/${doctorId}/availability`,
+    `/doctors/${doctorId}/availability${params.toString() ? `?${params.toString()}` : ""}`,
     options,
   );
 
