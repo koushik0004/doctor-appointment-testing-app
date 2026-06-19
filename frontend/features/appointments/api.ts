@@ -5,6 +5,8 @@ import type {
   AppointmentConfirmationResponse,
   AppointmentCreatePayload,
   AppointmentCreateResponse,
+  AppointmentSearchQuery,
+  AppointmentSearchResponse,
   AvailabilitySlot,
   AppointmentType,
   DoctorAvailability,
@@ -123,6 +125,32 @@ export async function getAppointmentConfirmation(
 ): Promise<AppointmentConfirmationResponse> {
   const response = await apiClient.get<AppointmentConfirmationApiResponse>(
     `/appointments/${appointmentId}`,
+    options,
+  );
+
+  return response;
+}
+
+export async function searchAppointments(
+  query: AppointmentSearchQuery,
+  options?: ApiRequestOptions,
+): Promise<AppointmentSearchResponse> {
+  const params = new URLSearchParams();
+
+  if (query.name?.trim()) {
+    params.set("name", query.name.trim());
+  }
+
+  if (query.email?.trim()) {
+    params.set("email", query.email.trim());
+  }
+
+  if (query.phone?.trim()) {
+    params.set("phone", query.phone.trim());
+  }
+
+  const response = await apiClient.get<AppointmentSearchResponse>(
+    `/appointments/search${params.toString() ? `?${params.toString()}` : ""}`,
     options,
   );
 

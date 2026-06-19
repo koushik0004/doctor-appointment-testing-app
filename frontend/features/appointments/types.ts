@@ -75,3 +75,29 @@ export type AppointmentConfirmationResponse = {
   appointment_type: AppointmentType;
   health_description: string | null;
 };
+
+export type AppointmentSearchStatus = "booked" | "completed" | "cancelled";
+
+export type AppointmentSearchResult = {
+  appointment_id: number;
+  patient_name: string;
+  patient_email: string;
+  patient_phone: string | null;
+  doctor_name: string;
+  doctor_specialty: string;
+  appointment_date: string;
+  appointment_time: string;
+  appointment_type: AppointmentType;
+  status: AppointmentSearchStatus;
+};
+
+export type AppointmentSearchResponse = {
+  count: number;
+  appointments: AppointmentSearchResult[];
+};
+
+export type AppointmentSearchQuery = {
+  name?: string;
+  email?: string;
+  phone?: string;
+};
