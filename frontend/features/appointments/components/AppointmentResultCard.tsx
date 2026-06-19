@@ -66,7 +66,7 @@ function getInitials(name: string) {
 
 function DoctorAvatar({ name }: { name: string }) {
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-50 text-base font-semibold text-brand-700 ring-1 ring-brand-100">
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-base font-semibold text-brand-700 ring-1 ring-brand-100">
       {getInitials(name)}
     </div>
   );
@@ -84,10 +84,10 @@ function MetaItem({
   return (
     <div
       className={cn(
-        "rounded-[14px] border px-4 py-3",
+        "rounded-[16px] border px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]",
         isSelected
-          ? "border-brand-100 bg-white/90"
-          : "border-slate-100 bg-slate-50/70",
+          ? "border-brand-100 bg-white"
+          : "border-slate-100 bg-white",
       )}
     >
       <dt className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -121,10 +121,10 @@ export function AppointmentResultCard({
       aria-label={`Appointment ${appointment.appointment_id} with ${appointment.doctor_name}`}
       aria-pressed={isSelected}
       className={cn(
-        "cursor-pointer rounded-[20px] border p-5 text-left shadow-soft transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 sm:p-6",
+        "cursor-pointer rounded-[22px] border p-5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 sm:p-6",
         isSelected
-          ? "border-brand-100 bg-brand-50/60"
-          : "border-slate-100 bg-white hover:border-brand-100",
+          ? "border-brand-100 bg-brand-50/65"
+          : "border-slate-100 bg-slate-50/80 hover:border-brand-100",
       )}
     >
       <div className="flex items-start gap-4">
@@ -169,7 +169,7 @@ export function AppointmentResultCard({
         />
       </dl>
 
-      <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-5 flex flex-col gap-4 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
             Patient Name
@@ -189,10 +189,10 @@ export function AppointmentResultCard({
             "inline-flex h-11 items-center justify-center rounded-[14px] px-5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2",
             isSelected
               ? "bg-brand-600 text-white hover:bg-brand-700"
-              : "border border-brand-100 bg-brand-500 text-white hover:bg-brand-600",
+              : "border border-brand-100 bg-white text-brand-700 hover:bg-brand-50",
           )}
         >
-          View Details
+          {isSelected ? "Viewing Details" : "View Details"}
         </button>
       </div>
     </article>
