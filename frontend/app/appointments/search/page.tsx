@@ -6,8 +6,8 @@ import type { FieldError, FieldErrors, Resolver } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { AppointmentResultCard } from "@/features/appointments/components/AppointmentResultCard";
 import { useAppointmentSearch } from "@/features/appointments/hooks/use-appointment-search";
-import type { AppointmentSearchResponse } from "@/features/appointments/types";
 
 const searchFormSchema = z
   .object({
@@ -158,26 +158,58 @@ function ErrorStateCard({ message }: { message: string }) {
   );
 }
 
-function RawResponseCard({ response }: { response: AppointmentSearchResponse }) {
+function SearchSidebarCard({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description: string;
+  items: string[];
+}) {
   return (
-    <div className="rounded-[20px] border border-slate-200 bg-slate-950 px-5 py-5 text-slate-50">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
-            Raw API response
-          </p>
-          <p className="mt-1 text-sm text-slate-300">
-            Appointment search response returned by{" "}
-            <code>/api/appointments/search</code>.
-          </p>
-        </div>
-        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
-          {response.count} found
-        </span>
+    <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft">
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
+        Search Guide
+      </p>
+      <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+        {title}
+      </h3>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+      <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-600">
+        {items.map((item) => (
+          <li
+            key={item}
+            className="rounded-[16px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100"
+          >
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ResultsHeader({
+  count,
+}: {
+  count: number | null;
+}) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
+          Appointment Results
+        </p>
+        <h2 className="mt-2 text-[2rem] font-semibold tracking-[-0.05em] text-slate-950">
+          {count === null ? "Search results will appear here" : "Matched appointments"}
+        </h2>
       </div>
-      <pre className="mt-4 overflow-x-auto rounded-[16px] bg-slate-900 p-4 text-xs leading-6 text-slate-100">
-        {JSON.stringify(response, null, 2)}
-      </pre>
+      {count !== null ? (
+        <span className="rounded-full bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 ring-1 ring-sky-100">
+          {count} result{count === 1 ? "" : "s"}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -217,6 +249,8 @@ export default function AppointmentSearchPage() {
   const onSubmit = handleSubmit(async (values) => {
     await search(values);
   });
+
+  const appointments = searchResponse?.appointments ?? [];
 
   function handleReset() {
     reset(emptySearchValues);
@@ -336,52 +370,80 @@ export default function AppointmentSearchPage() {
                 Email and phone are useful for confirming the exact booking.
               </li>
               <li className="rounded-[16px] bg-slate-50 px-4 py-3">
-                Results below show the raw backend response for now.
+                Results below show appointment cards with a View Details action.
               </li>
             </ul>
           </aside>
         </div>
 
-        <section className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-                Search Results
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-                Appointment API response
-              </h2>
-            </div>
-            {hasSearched ? (
-              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                API queried
-              </span>
-            ) : null}
-          </div>
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8">
+            <ResultsHeader count={hasSearched ? searchResponse?.count ?? 0 : null} />
 
-          <div className="mt-6 space-y-4">
-            {isLoading ? (
-              <LoadingStateCard />
-            ) : searchError ? (
-              <ErrorStateCard message={searchError} />
-            ) : !hasSearched ? (
-              <EmptyStateCard
-                title="No search has been run yet"
-                description="Use the form above to fetch the raw appointment search response."
-              />
-            ) : searchResponse && searchResponse.count === 0 ? (
-              <>
+            <div className="mt-6">
+              {isLoading ? (
+                <LoadingStateCard />
+              ) : searchError ? (
+                <ErrorStateCard message={searchError} />
+              ) : !hasSearched ? (
+                <EmptyStateCard
+                  title="No search has been run yet"
+                  description="Use the form above to load appointment cards from the API."
+                />
+              ) : appointments.length === 0 ? (
                 <EmptyStateCard
                   title="No matching appointments"
-                  description="The API returned an empty response for the provided search criteria."
+                  description="The API returned no appointments for the provided search details."
                 />
-                <RawResponseCard response={searchResponse} />
-              </>
-            ) : searchResponse ? (
-              <RawResponseCard response={searchResponse} />
-            ) : null}
-          </div>
-        </section>
+              ) : (
+                <div className="grid gap-5">
+                  {appointments.map((appointment, index) => (
+                    <div
+                      key={appointment.appointment_id}
+                      className={
+                        index === 0
+                          ? "rounded-[28px] border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-1 shadow-[0_24px_60px_-36px_rgba(56,189,248,0.55)]"
+                          : ""
+                      }
+                    >
+                      <AppointmentResultCard
+                        appointment={appointment}
+                        onViewDetails={() => {
+                          // Details panel is intentionally deferred to the next step.
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <aside className="space-y-5">
+            <SearchSidebarCard
+              title="Use one or more patient details"
+              description="Search by name, email, or phone. The API trims whitespace, validates email format, and returns matching appointments as cards."
+              items={[
+                "Name supports partial, case-insensitive matching.",
+                "Email and phone use exact matching after trimming.",
+                "Result cards show appointment ID, patient, doctor, schedule, type, and status.",
+              ]}
+            />
+
+            <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
+                Coming next
+              </p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+                Details panel
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                The View Details action is in place, but the full appointment
+                details panel stays out of this step.
+              </p>
+            </div>
+          </aside>
+        </div>
       </div>
     </section>
   );
