@@ -75,3 +75,42 @@ export type AppointmentConfirmationResponse = {
   appointment_type: AppointmentType;
   health_description: string | null;
 };
+
+export type AppointmentStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+
+export type AppointmentSearchStatus = "booked" | "completed" | "cancelled";
+
+export type AppointmentSearchResult = {
+  appointment_id: number;
+  patient_name: string;
+  patient_email: string;
+  patient_phone: string | null;
+  doctor_name: string;
+  doctor_specialty: string;
+  appointment_date: string;
+  appointment_time: string;
+  appointment_type: AppointmentType;
+  status: AppointmentSearchStatus;
+};
+
+export type AppointmentSearchResponse = {
+  count: number;
+  appointments: AppointmentSearchResult[];
+};
+
+export type AppointmentDetailsResponse = {
+  appointment_id: number;
+  doctor: AppointmentDoctorSummary;
+  patient: AppointmentPatientSummary;
+  appointment_date: string;
+  appointment_time: string;
+  appointment_type: AppointmentType;
+  status: AppointmentStatus;
+  created_at: string;
+};
+
+export type AppointmentSearchQuery = {
+  name?: string;
+  email?: string;
+  phone?: string;
+};
