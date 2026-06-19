@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { format, parse, parseISO } from "date-fns";
 
 import { useAppointmentDetails } from "@/features/appointments/hooks/use-appointment-details";
@@ -7,6 +9,7 @@ import type {
   AppointmentDetailsResponse,
   AppointmentStatus,
 } from "@/features/appointments/types";
+import { doctors } from "@/features/doctors/mock-doctors";
 import { cn } from "@/lib/utils";
 
 function appointmentTypeLabel(
@@ -64,6 +67,10 @@ function getInitials(name: string) {
   return initials || "DR";
 }
 
+function resolveDoctorAvatar(name: string) {
+  return doctors.find((doctor) => doctor.name === name)?.avatar ?? null;
+}
+
 function CalendarIcon() {
   return (
     <svg
@@ -80,71 +87,142 @@ function CalendarIcon() {
   );
 }
 
-function DetailBlock({
-  title,
-  rows,
+function StethoscopeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4 text-slate-400"
+    >
+      <path d="M6 3v5a3 3 0 0 0 6 0V3" />
+      <path d="M12 8v4a5 5 0 0 0 10 0v-1" />
+      <path d="M18 15v2a4 4 0 0 1-8 0v-1" />
+      <circle cx="6" cy="20" r="1.5" />
+      <circle cx="18" cy="15" r="1.5" />
+    </svg>
+  );
+}
+
+function ClinicIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4 text-slate-400"
+    >
+      <path d="M4 21V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14" />
+      <path d="M16 11h2a2 2 0 0 1 2 2v8" />
+      <path d="M8 9h4" />
+      <path d="M10 7v4" />
+    </svg>
+  );
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-brand-600">
+      {children}
+    </p>
+  );
+}
+
+function InfoTile({
+  label,
+  value,
 }: {
-  title: string;
-  rows: Array<{ label: string; value: string }>;
+  label: string;
+  value: string;
 }) {
   return (
-    <section className="rounded-[18px] border border-slate-100 bg-slate-50/70 p-5">
-      <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {title}
-      </h4>
-      <dl className="mt-4 space-y-3">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
-          >
-            <dt className="text-sm text-slate-500">{row.label}</dt>
-            <dd className="max-w-[60%] text-right text-sm font-medium text-slate-900">
-              {row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+    <div className="rounded-[16px] border border-brand-100 bg-white px-4 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function PatientRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-[16px] border border-slate-100 bg-white px-4 py-4">
+      <dt className="text-sm text-slate-500">{label}</dt>
+      <dd className="max-w-[62%] text-right text-sm font-semibold leading-6 text-slate-950">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function DoctorAvatar({ doctorName }: { doctorName: string }) {
+  const avatar = resolveDoctorAvatar(doctorName);
+
+  if (avatar) {
+    return (
+      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-brand-100">
+        <Image
+          src={avatar.imageSrc}
+          alt={avatar.imageAlt}
+          fill
+          sizes="64px"
+          className="object-cover"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white text-base font-semibold text-brand-700 ring-1 ring-brand-100">
+      {getInitials(doctorName)}
+    </div>
   );
 }
 
 function EmptyState() {
   return (
     <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft">
-      <div className="border-b border-slate-100 pb-5">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-500 ring-1 ring-brand-100">
-            <CalendarIcon />
-          </span>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-              Your Booking
-            </p>
-            <h3 className="mt-1 text-2xl font-semibold tracking-[-0.05em] text-slate-950">
-              No appointment selected
-            </h3>
-          </div>
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-500 ring-1 ring-brand-100">
+          <CalendarIcon />
+        </span>
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
+            Your Booking
+          </p>
+          <h3 className="mt-1 text-2xl font-semibold tracking-[-0.05em] text-slate-950">
+            No appointment selected
+          </h3>
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-50 ring-1 ring-slate-100">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className="h-9 w-9 text-slate-300"
-          >
-            <path d="M12 8v5l3 2" />
-            <circle cx="12" cy="12" r="9" />
-          </svg>
+      <div className="mt-6 rounded-[22px] border border-brand-100 bg-brand-50/60 px-5 py-8 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-brand-500 ring-1 ring-brand-100">
+          <CalendarIcon />
         </div>
-        <p className="mt-5 max-w-xs text-sm leading-6 text-slate-500">
-          Select an appointment to review the doctor, patient, and schedule
-          details here.
+        <p className="mt-5 text-lg font-semibold tracking-[-0.03em] text-slate-950">
+          Choose a result to preview the booking
+        </p>
+        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-600">
+          Select an appointment card to review the doctor summary, appointment
+          information, and patient details in this panel.
         </p>
       </div>
     </div>
@@ -156,11 +234,14 @@ function LoadingState() {
     <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft">
       <div className="h-4 w-36 animate-pulse rounded-full bg-slate-100" />
       <div className="mt-5 h-8 w-56 animate-pulse rounded-full bg-slate-100" />
-      <div className="mt-8 space-y-3">
-        <div className="h-20 animate-pulse rounded-[18px] bg-slate-50" />
-        <div className="h-20 animate-pulse rounded-[18px] bg-slate-50" />
-        <div className="h-20 animate-pulse rounded-[18px] bg-slate-50" />
+      <div className="mt-6 h-28 animate-pulse rounded-[22px] bg-brand-50/60" />
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="h-24 animate-pulse rounded-[16px] bg-slate-50" />
+        <div className="h-24 animate-pulse rounded-[16px] bg-slate-50" />
+        <div className="h-24 animate-pulse rounded-[16px] bg-slate-50" />
+        <div className="h-24 animate-pulse rounded-[16px] bg-slate-50" />
       </div>
+      <div className="mt-5 h-44 animate-pulse rounded-[22px] bg-slate-50" />
     </div>
   );
 }
@@ -220,31 +301,29 @@ export function AppointmentDetailsPanel({
       className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft"
       aria-live="polite"
     >
-      <div className="border-b border-slate-100 pb-5">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-500 ring-1 ring-brand-100">
-            <CalendarIcon />
-          </span>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-              Your Booking
-            </p>
-            <h3 className="mt-1 text-2xl font-semibold tracking-[-0.05em] text-slate-950">
-              Appointment #{data.appointment_id}
-            </h3>
-          </div>
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-500 ring-1 ring-brand-100">
+          <CalendarIcon />
+        </span>
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
+            Your Booking
+          </p>
+          <h3 className="mt-1 text-2xl font-semibold tracking-[-0.05em] text-slate-950">
+            Appointment #{data.appointment_id}
+          </h3>
         </div>
       </div>
 
       <div className="mt-6 space-y-5">
-        <section className="rounded-[20px] border border-brand-100 bg-brand-50/60 p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-base font-semibold text-brand-700 ring-1 ring-brand-100">
-              {getInitials(data.doctor.name)}
-            </div>
-            <div className="min-w-0">
+        <section className="rounded-[22px] border border-brand-100 bg-brand-50/60 p-5">
+          <SectionLabel>Doctor Summary</SectionLabel>
+          <div className="mt-4 flex items-start gap-4">
+            <DoctorAvatar doctorName={data.doctor.name} />
+
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">
-                <h4 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+                <h4 className="text-[1.75rem] font-semibold tracking-[-0.04em] text-slate-950">
                   {data.doctor.name}
                 </h4>
                 <span
@@ -256,49 +335,49 @@ export function AppointmentDetailsPanel({
                   {statusLabel(data.status)}
                 </span>
               </div>
-              <p className="mt-1 text-base text-brand-600">
-                {data.doctor.specialty}
-              </p>
-              <p className="mt-2 text-sm text-slate-600">
-                {data.doctor.clinic_name}
-              </p>
+
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                <StethoscopeIcon />
+                <span>{data.doctor.specialty}</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                <ClinicIcon />
+                <span>{data.doctor.clinic_name}</span>
+              </div>
             </div>
           </div>
         </section>
 
-        <DetailBlock
-          title="Appointment Information"
-          rows={[
-            {
-              label: "Date",
-              value: formatAppointmentDate(data.appointment_date),
-            },
-            {
-              label: "Time",
-              value: formatAppointmentTime(data.appointment_time),
-            },
-            {
-              label: "Type",
-              value: appointmentTypeLabel(data.appointment_type),
-            },
-            {
-              label: "Status",
-              value: statusLabel(data.status),
-            },
-          ]}
-        />
+        <section className="rounded-[22px] border border-brand-100 bg-brand-50/40 p-5">
+          <SectionLabel>Appointment Information</SectionLabel>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <InfoTile
+              label="Date"
+              value={formatAppointmentDate(data.appointment_date)}
+            />
+            <InfoTile
+              label="Time"
+              value={formatAppointmentTime(data.appointment_time)}
+            />
+            <InfoTile
+              label="Type"
+              value={appointmentTypeLabel(data.appointment_type)}
+            />
+            <InfoTile label="Status" value={statusLabel(data.status)} />
+          </div>
+        </section>
 
-        <DetailBlock
-          title="Patient Information"
-          rows={[
-            { label: "Name", value: data.patient.full_name },
-            { label: "Email", value: data.patient.email },
-            {
-              label: "Phone",
-              value: data.patient.phone ?? "Not provided",
-            },
-          ]}
-        />
+        <section className="rounded-[22px] border border-slate-100 bg-slate-50/80 p-5">
+          <SectionLabel>Patient Information</SectionLabel>
+          <dl className="mt-4 space-y-3">
+            <PatientRow label="Name" value={data.patient.full_name} />
+            <PatientRow label="Email" value={data.patient.email} />
+            <PatientRow
+              label="Phone"
+              value={data.patient.phone ?? "Not provided"}
+            />
+          </dl>
+        </section>
       </div>
     </section>
   );
