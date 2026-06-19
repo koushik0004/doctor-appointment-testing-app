@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { AppointmentResultCard } from "@/features/appointments/components/AppointmentResultCard";
+import { AppointmentDetailsPanel } from "@/features/appointments/components/AppointmentDetailsPanel";
 import { useAppointmentSearch } from "@/features/appointments/hooks/use-appointment-search";
 
 const searchFormSchema = z
@@ -158,38 +159,6 @@ function ErrorStateCard({ message }: { message: string }) {
   );
 }
 
-function SearchSidebarCard({
-  title,
-  description,
-  items,
-}: {
-  title: string;
-  description: string;
-  items: string[];
-}) {
-  return (
-    <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft">
-      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-        Search Guide
-      </p>
-      <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-        {title}
-      </h3>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-      <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-600">
-        {items.map((item) => (
-          <li
-            key={item}
-            className="rounded-[16px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100"
-          >
-            {item}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function ResultsHeader({
   count,
 }: {
@@ -236,6 +205,9 @@ export default function AppointmentSearchPage() {
     resetSearch,
     search,
   } = useAppointmentSearch();
+  const [selectedAppointmentId, setSelectedAppointmentId] = React.useState<
+    number | null
+  >(null);
 
   const currentValues = watch();
   const parsedCurrentValues = searchFormSchema.safeParse(currentValues);
@@ -247,6 +219,7 @@ export default function AppointmentSearchPage() {
   );
 
   const onSubmit = handleSubmit(async (values) => {
+    setSelectedAppointmentId(null);
     await search(values);
   });
 
@@ -255,128 +228,109 @@ export default function AppointmentSearchPage() {
   function handleReset() {
     reset(emptySearchValues);
     resetSearch();
+    setSelectedAppointmentId(null);
   }
 
   return (
-    <section className="py-10 lg:py-14">
+    <section className="py-8 lg:py-12">
       <div className="mx-auto max-w-7xl space-y-8">
-        <div className="rounded-[28px] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-6 shadow-soft lg:p-8">
-          <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-            Appointment search
-          </span>
-          <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950 lg:text-5xl">
-            Search Your Appointment
-          </h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            Find previously booked appointments using your name, email, or phone
-            number.
-          </p>
-        </div>
-
-        <div className="grid gap-8 xl:grid-cols-[1.12fr_0.88fr]">
-          <form
-            onSubmit={onSubmit}
-            className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8"
-          >
-            <div className="grid gap-5 md:grid-cols-3">
-              <SearchField
-                label="Name"
-                name="name"
-                value={currentValues.name}
-                onChange={(field, value) =>
-                  setValue(field, value, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-                placeholder="Enter patient name"
-                autoComplete="name"
-                errorMessage={errors.name?.message}
-              />
-              <SearchField
-                label="Email"
-                name="email"
-                value={currentValues.email}
-                onChange={(field, value) =>
-                  setValue(field, value, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-                placeholder="Enter email address"
-                type="email"
-                autoComplete="email"
-                errorMessage={errors.email?.message}
-              />
-              <SearchField
-                label="Phone"
-                name="phone"
-                value={currentValues.phone}
-                onChange={(field, value) =>
-                  setValue(field, value, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-                placeholder="Enter phone number"
-                autoComplete="tel"
-                inputMode="numeric"
-                errorMessage={errors.phone?.message}
-              />
-            </div>
-
-            {!searchIsValid && !hasAnySearchValue ? (
-              <p className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Enter at least one search detail to enable Search.
-              </p>
-            ) : null}
-
-            {errors.root?.message ? (
-              <p className="mt-4 rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {errors.root.message}
-              </p>
-            ) : null}
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="submit"
-                disabled={!searchIsValid || isSubmitting || isLoading}
-                className="inline-flex h-12 items-center justify-center rounded-[14px] bg-sky-500 px-6 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300"
-              >
-                {isLoading ? "Searching..." : "Search"}
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="inline-flex h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
-              >
-                Reset
-              </button>
-            </div>
-          </form>
-
-          <aside className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-              Search tips
+        <div className="overflow-hidden rounded-[32px] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50 shadow-soft">
+          <div className="px-6 py-10 text-center sm:px-10 lg:px-16 lg:py-14">
+            <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+              Appointment search
+            </span>
+            <h1 className="mx-auto mt-5 max-w-5xl text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl lg:text-6xl">
+              Find your booked appointments and review the full visit details.
+            </h1>
+            <p className="mx-auto mt-4 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
+              Search by patient name, email, or phone number, then open any
+              result to inspect the appointment record in the panel on the right.
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-              Use one or more patient details to narrow the search.
-            </h2>
-            <ul className="mt-5 space-y-4 text-sm leading-6 text-slate-600">
-              <li className="rounded-[16px] bg-slate-50 px-4 py-3">
-                Name works best for quick lookups when spelling is known.
-              </li>
-              <li className="rounded-[16px] bg-slate-50 px-4 py-3">
-                Email and phone are useful for confirming the exact booking.
-              </li>
-              <li className="rounded-[16px] bg-slate-50 px-4 py-3">
-                Results below show appointment cards with a View Details action.
-              </li>
-            </ul>
-          </aside>
+          </div>
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <form
+          onSubmit={onSubmit}
+          className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8"
+        >
+          <div className="grid gap-5 md:grid-cols-3">
+            <SearchField
+              label="Name"
+              name="name"
+              value={currentValues.name}
+              onChange={(field, value) =>
+                setValue(field, value, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              placeholder="Enter patient name"
+              autoComplete="name"
+              errorMessage={errors.name?.message}
+            />
+            <SearchField
+              label="Email"
+              name="email"
+              value={currentValues.email}
+              onChange={(field, value) =>
+                setValue(field, value, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              placeholder="Enter email address"
+              type="email"
+              autoComplete="email"
+              errorMessage={errors.email?.message}
+            />
+            <SearchField
+              label="Phone"
+              name="phone"
+              value={currentValues.phone}
+              onChange={(field, value) =>
+                setValue(field, value, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              placeholder="Enter phone number"
+              autoComplete="tel"
+              inputMode="numeric"
+              errorMessage={errors.phone?.message}
+            />
+          </div>
+
+          {!searchIsValid && !hasAnySearchValue ? (
+            <p className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Enter at least one search detail to enable Search.
+            </p>
+          ) : null}
+
+          {errors.root?.message ? (
+            <p className="mt-4 rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {errors.root.message}
+            </p>
+          ) : null}
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              type="submit"
+              disabled={!searchIsValid || isSubmitting || isLoading}
+              className="inline-flex h-12 items-center justify-center rounded-[14px] bg-sky-500 px-6 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isLoading ? "Searching..." : "Search"}
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+            >
+              Reset
+            </button>
+          </div>
+        </form>
+
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
           <section className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8">
             <ResultsHeader count={hasSearched ? searchResponse?.count ?? 0 : null} />
 
@@ -397,51 +351,23 @@ export default function AppointmentSearchPage() {
                 />
               ) : (
                 <div className="grid gap-5">
-                  {appointments.map((appointment, index) => (
-                    <div
+                  {appointments.map((appointment) => (
+                    <AppointmentResultCard
                       key={appointment.appointment_id}
-                      className={
-                        index === 0
-                          ? "rounded-[28px] border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-1 shadow-[0_24px_60px_-36px_rgba(56,189,248,0.55)]"
-                          : ""
-                      }
-                    >
-                      <AppointmentResultCard
-                        appointment={appointment}
-                        onViewDetails={() => {
-                          // Details panel is intentionally deferred to the next step.
-                        }}
-                      />
-                    </div>
+                      appointment={appointment}
+                      isSelected={selectedAppointmentId === appointment.appointment_id}
+                      onViewDetails={(appointmentId) => {
+                        setSelectedAppointmentId(appointmentId);
+                      }}
+                    />
                   ))}
                 </div>
               )}
             </div>
           </section>
 
-          <aside className="space-y-5">
-            <SearchSidebarCard
-              title="Use one or more patient details"
-              description="Search by name, email, or phone. The API trims whitespace, validates email format, and returns matching appointments as cards."
-              items={[
-                "Name supports partial, case-insensitive matching.",
-                "Email and phone use exact matching after trimming.",
-                "Result cards show appointment ID, patient, doctor, schedule, type, and status.",
-              ]}
-            />
-
-            <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-                Coming next
-              </p>
-              <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
-                Details panel
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                The View Details action is in place, but the full appointment
-                details panel stays out of this step.
-              </p>
-            </div>
+          <aside className="xl:sticky xl:top-6">
+            <AppointmentDetailsPanel appointmentId={selectedAppointmentId} />
           </aside>
         </div>
       </div>

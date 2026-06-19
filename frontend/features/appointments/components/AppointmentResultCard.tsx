@@ -5,8 +5,20 @@ import { cn } from "@/lib/utils";
 
 type AppointmentResultCardProps = {
   appointment: AppointmentSearchResult;
+  isSelected?: boolean;
   onViewDetails?: (appointmentId: number) => void;
 };
+
+function statusLabel(status: AppointmentSearchResult["status"]) {
+  switch (status) {
+    case "booked":
+      return "Booked";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+  }
+}
 
 function statusStyles(status: AppointmentSearchResult["status"]) {
   switch (status) {
@@ -56,10 +68,16 @@ function PatientAvatar({ name }: { name: string }) {
 
 export function AppointmentResultCard({
   appointment,
+  isSelected = false,
   onViewDetails,
 }: AppointmentResultCardProps) {
   return (
-    <article className="grid overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-soft transition hover:-translate-y-0.5 hover:border-sky-200">
+    <article
+      className={cn(
+        "grid overflow-hidden rounded-[24px] border bg-white shadow-soft transition hover:-translate-y-0.5",
+        isSelected ? "border-sky-200 ring-1 ring-sky-100" : "border-slate-200 hover:border-sky-200",
+      )}
+    >
       <div className="grid gap-5 p-5 sm:grid-cols-[72px_minmax(0,1fr)] sm:p-6">
         <PatientAvatar name={appointment.patient_name} />
 
@@ -83,7 +101,7 @@ export function AppointmentResultCard({
                 statusStyles(appointment.status),
               )}
             >
-              {appointment.status}
+              {statusLabel(appointment.status)}
             </span>
           </div>
 

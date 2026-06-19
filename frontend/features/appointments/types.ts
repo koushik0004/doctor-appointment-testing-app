@@ -76,6 +76,8 @@ export type AppointmentConfirmationResponse = {
   health_description: string | null;
 };
 
+export type AppointmentStatus = "PENDING" | "CONFIRMED" | "CANCELLED";
+
 export type AppointmentSearchStatus = "booked" | "completed" | "cancelled";
 
 export type AppointmentSearchResult = {
@@ -94,6 +96,17 @@ export type AppointmentSearchResult = {
 export type AppointmentSearchResponse = {
   count: number;
   appointments: AppointmentSearchResult[];
+};
+
+export type AppointmentDetailsResponse = {
+  appointment_id: number;
+  doctor: AppointmentDoctorSummary;
+  patient: AppointmentPatientSummary;
+  appointment_date: string;
+  appointment_time: string;
+  appointment_type: AppointmentType;
+  status: AppointmentStatus;
+  created_at: string;
 };
 
 export type AppointmentSearchQuery = {

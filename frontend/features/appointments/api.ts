@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 
 import { apiClient, type ApiRequestOptions } from "@/lib/api-client";
 import type {
+  AppointmentDetailsResponse,
   AppointmentConfirmationResponse,
   AppointmentCreatePayload,
   AppointmentCreateResponse,
@@ -124,6 +125,18 @@ export async function getAppointmentConfirmation(
   options?: ApiRequestOptions,
 ): Promise<AppointmentConfirmationResponse> {
   const response = await apiClient.get<AppointmentConfirmationApiResponse>(
+    `/appointments/${appointmentId}`,
+    options,
+  );
+
+  return response;
+}
+
+export async function getAppointmentDetails(
+  appointmentId: string | number,
+  options?: ApiRequestOptions,
+): Promise<AppointmentDetailsResponse> {
+  const response = await apiClient.get<AppointmentDetailsResponse>(
     `/appointments/${appointmentId}`,
     options,
   );
