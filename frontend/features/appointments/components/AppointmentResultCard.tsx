@@ -73,8 +73,22 @@ export function AppointmentResultCard({
 }: AppointmentResultCardProps) {
   return (
     <article
+      tabIndex={onViewDetails ? 0 : undefined}
+      onClick={() => onViewDetails?.(appointment.appointment_id)}
+      onKeyDown={(event) => {
+        if (!onViewDetails) {
+          return;
+        }
+
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onViewDetails(appointment.appointment_id);
+        }
+      }}
+      aria-label={`Appointment ${appointment.appointment_id} for ${appointment.patient_name}`}
+      aria-pressed={isSelected}
       className={cn(
-        "grid overflow-hidden rounded-[24px] border bg-white shadow-soft transition hover:-translate-y-0.5",
+        "grid cursor-pointer overflow-hidden rounded-[24px] border bg-white shadow-soft transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2",
         isSelected ? "border-sky-200 ring-1 ring-sky-100" : "border-slate-200 hover:border-sky-200",
       )}
     >
@@ -161,8 +175,11 @@ export function AppointmentResultCard({
           </p>
           <button
             type="button"
-            onClick={() => onViewDetails?.(appointment.appointment_id)}
-            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:text-sky-700"
+            onClick={(event) => {
+              event.stopPropagation();
+              onViewDetails?.(appointment.appointment_id);
+            }}
+            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2"
           >
             View Details
           </button>

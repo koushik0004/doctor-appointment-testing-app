@@ -96,7 +96,8 @@ function EmptyState() {
         No appointment selected
       </h3>
       <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500">
-        Select a result card to load the appointment details in this panel.
+        Select an appointment to inspect the patient, doctor, and booking
+        details here.
       </p>
     </div>
   );
@@ -165,29 +166,58 @@ export function AppointmentDetailsPanel({
   }
 
   return (
-    <section className="rounded-[28px] border border-slate-100 bg-white shadow-soft">
+    <section
+      className="rounded-[28px] border border-slate-100 bg-white shadow-soft"
+      aria-live="polite"
+    >
       <div className="border-b border-slate-100 px-6 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-500 ring-1 ring-sky-100">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="h-5 w-5"
+            >
+              <path d="M8 3v4M16 3v4M4 8h16" />
+              <rect x="4" y="5" width="16" height="16" rx="3" />
+            </svg>
+          </span>
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-              Appointment Details
+              Your Booking
             </p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-slate-950">
+            <h3 className="mt-1 text-2xl font-semibold tracking-[-0.05em] text-slate-950">
               Appointment #{data.appointment_id}
             </h3>
           </div>
-          <span
-            className={cn(
-              "inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-              statusStyles(data.status),
-            )}
-          >
-            {statusLabel(data.status)}
-          </span>
         </div>
       </div>
 
       <div className="space-y-6 px-6 py-6">
+        <div className="rounded-[24px] bg-sky-50/60 px-4 py-3 ring-1 ring-sky-100">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700/80">
+                Current Status
+              </p>
+              <p className="mt-1 text-sm font-medium text-slate-900">
+                {data.patient.full_name} with {data.doctor.name}
+              </p>
+            </div>
+            <span
+              className={cn(
+                "inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                statusStyles(data.status),
+              )}
+            >
+              {statusLabel(data.status)}
+            </span>
+          </div>
+        </div>
+
         <div>
           <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
             Patient Information
@@ -217,7 +247,10 @@ export function AppointmentDetailsPanel({
           <dl className="mt-3 grid gap-3">
             <DetailRow label="Date" value={formatAppointmentDate(data.appointment_date)} />
             <DetailRow label="Time" value={formatAppointmentTime(data.appointment_time)} />
-            <DetailRow label="Appointment Type" value={appointmentTypeLabel(data.appointment_type)} />
+            <DetailRow
+              label="Appointment Type"
+              value={appointmentTypeLabel(data.appointment_type)}
+            />
             <DetailRow label="Status" value={statusLabel(data.status)} />
             <DetailRow label="Booking Date" value={formatBookingDate(data.created_at)} />
           </dl>

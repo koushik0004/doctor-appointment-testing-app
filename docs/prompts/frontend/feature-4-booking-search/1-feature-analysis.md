@@ -10,7 +10,7 @@ Analyze:
 
 Create:
 
-docs/feature-4-frontend-analysis.md
+docs/analysis/feature-4/feature-4-frontend-analysis.md
 
 Identify:
 
