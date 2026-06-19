@@ -2,6 +2,7 @@ import Link from "next/link";
 
 const navigation = [
   { href: "/doctors", label: "Find Doctors" },
+  { href: "/appointments/search", label: "Appointment Search" },
   { href: "#", label: "Services" },
 ];
 
