@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -91,6 +91,11 @@ def _validate_slot(
     return slot
 
 
+def _slot_has_passed(slot_date: date, start_time: str) -> bool:
+    slot_datetime = datetime.combine(slot_date, datetime.strptime(start_time, "%H:%M").time())
+    return slot_datetime <= datetime.now()
+
+
 def create_appointment_booking(
     session: Session,
     request: AppointmentCreateRequest,
@@ -106,6 +111,9 @@ def create_appointment_booking(
             start_time=request.start_time,
             appointment_type=request.appointment_type.value,
         )
+
+        if _slot_has_passed(slot.available_date, slot.start_time):
+            raise invalid_booking_request("Selected slot has already passed.")
 
         patient = _get_or_create_patient(session, request.patient)
         appointment = Appointment(

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Doctor } from "@/features/doctors/types";
+import { formatCurrencyInr } from "@/lib/formatters";
 
 type BookingSummaryProps = {
   doctor: Doctor | null;
@@ -78,7 +79,7 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
           <div className="flex items-center justify-between gap-4">
             <dt className="text-slate-500">Fee Range</dt>
             <dd className="font-semibold text-slate-900">
-              ${doctor.feeRange.min} - ${doctor.feeRange.max}
+              {formatCurrencyInr(doctor.feeRange.min)} - {formatCurrencyInr(doctor.feeRange.max)}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-4">
@@ -88,7 +89,7 @@ export function BookingSummary({ doctor }: BookingSummaryProps) {
           <div className="flex items-center justify-between gap-4 border-t border-slate-200 pt-4">
             <dt className="text-xl font-semibold text-slate-900">Starting From</dt>
             <dd className="text-2xl font-semibold text-cyan-500">
-              ${doctor.feeRange.min}
+              {formatCurrencyInr(doctor.feeRange.min)}
             </dd>
           </div>
         </dl>

@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -54,19 +55,17 @@ def _get_doctor_id(client: TestClient, name: str) -> int:
 def test_booking_flow_and_confirmation_endpoint(client):
     doctor_id = _get_doctor_id(client, "Dr. Sarah Jenkins")
     with database_module.get_session_factory()() as session:
-        slot = (
-            session.query(DoctorAvailability)
-            .filter(
-                DoctorAvailability.doctor_id == doctor_id,
-                DoctorAvailability.is_booked.is_(False),
-            )
-            .order_by(
-                DoctorAvailability.available_date.asc(),
-                DoctorAvailability.start_time.asc(),
-                DoctorAvailability.id.asc(),
-            )
-            .first()
+        slot = DoctorAvailability(
+            doctor_id=doctor_id,
+            available_date=date.today() + timedelta(days=1),
+            start_time="10:30",
+            end_time="11:00",
+            appointment_type="IN_PERSON",
+            is_booked=False,
         )
+        session.add(slot)
+        session.commit()
+        session.refresh(slot)
 
     assert slot is not None
     booking_payload = {
@@ -132,3 +131,39 @@ def test_booking_payload_validation(client):
     assert ("patient", "full_name") in error_locations
     assert ("patient", "email") in error_locations
     assert ("health_description",) in error_locations
+
+
+def test_booking_rejects_elapsed_slots(client):
+    doctor_id = _get_doctor_id(client, "Dr. Sarah Jenkins")
+    with database_module.get_session_factory()() as session:
+        past_slot = DoctorAvailability(
+            doctor_id=doctor_id,
+            available_date=date.today() - timedelta(days=1),
+            start_time="09:00",
+            end_time="09:30",
+            appointment_type="IN_PERSON",
+            is_booked=False,
+        )
+        session.add(past_slot)
+        session.commit()
+        session.refresh(past_slot)
+
+    booking_response = client.post(
+        "/api/appointments",
+        json={
+            "doctor_id": doctor_id,
+            "availability_id": past_slot.id,
+            "appointment_date": past_slot.available_date.isoformat(),
+            "start_time": past_slot.start_time,
+            "appointment_type": past_slot.appointment_type,
+            "patient": {
+                "full_name": "John Doe",
+                "email": "john.doe@example.com",
+                "phone": "9999999999",
+            },
+            "health_description": "Past slot booking attempt.",
+        },
+    )
+
+    assert booking_response.status_code == 400
+    assert "already passed" in booking_response.json()["detail"]

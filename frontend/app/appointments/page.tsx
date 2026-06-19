@@ -24,6 +24,8 @@ import type {
 } from "@/features/appointments/types";
 import {
   createDateKey,
+  filterBookableSlotsForDate,
+  isElapsedAppointmentSlot,
 } from "@/features/appointments/utils";
 import type { Doctor } from "@/features/doctors/types";
 import { ApiError } from "@/lib/api-client";
@@ -150,6 +152,7 @@ function AppointmentsPageContent() {
     useState<AppointmentType>(storedAppointmentType ?? "IN_PERSON");
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
 
   useEffect(() => {
     if (searchDoctorId) {
@@ -214,15 +217,12 @@ function AppointmentsPageContent() {
       return;
     }
 
-    const selectedDateKey = createDateKey(selectedDate);
-    const availableSlots = [
-      ...availability.morningSlots,
-      ...availability.afternoonSlots,
-    ].filter(
-      (slot) =>
-        !slot.isBooked &&
-        slot.appointmentType === selectedAppointmentType &&
-        slot.availableDate === selectedDateKey,
+    const availableSlots = filterBookableSlotsForDate(
+      [...availability.morningSlots, ...availability.afternoonSlots].filter(
+        (slot) => slot.appointmentType === selectedAppointmentType,
+      ),
+      selectedDate,
+      currentDateTime,
     );
 
     if (availableSlots.length === 0) {
@@ -241,6 +241,7 @@ function AppointmentsPageContent() {
     }
   }, [
     availability,
+    currentDateTime,
     selectedAppointmentType,
     selectedDate,
     selectedSlotId,
@@ -252,6 +253,15 @@ function AppointmentsPageContent() {
       setVisibleMonth(startOfMonth(selectedDate));
     }
   }, [selectedDate]);
+
+  useEffect(() => {
+    const updateClock = () => setCurrentDateTime(new Date());
+
+    updateClock();
+    const timer = window.setInterval(updateClock, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -325,14 +335,12 @@ function AppointmentsPageContent() {
       return [];
     }
 
-    const selectedDateKey = createDateKey(selectedDate);
-    return allSlots.filter(
-      (slot) =>
-        !slot.isBooked &&
-        slot.appointmentType === selectedAppointmentType &&
-        slot.availableDate === selectedDateKey,
+    return filterBookableSlotsForDate(
+      allSlots.filter((slot) => slot.appointmentType === selectedAppointmentType),
+      selectedDate,
+      currentDateTime,
     );
-  }, [allSlots, selectedAppointmentType, selectedDate]);
+  }, [allSlots, currentDateTime, selectedAppointmentType, selectedDate]);
 
   const filteredAvailableDates = useMemo(() => {
     if (!availability) {
@@ -390,6 +398,22 @@ function AppointmentsPageContent() {
   const handleSubmit = async (values: AppointmentFormValues) => {
     if (!doctor || !selectedDate || !selectedSlot) {
       setBookingError("Select a date and time before confirming the booking.");
+      return;
+    }
+
+    if (
+      isElapsedAppointmentSlot(
+        selectedDate,
+        selectedSlot.startTime,
+        currentDateTime,
+      )
+    ) {
+      setBookingError(
+        "Selected time has already passed. Please choose a different slot.",
+      );
+      setSelectedSlotId(null);
+      setSelectedAvailabilityId(null);
+      setSelectedTimeStore(null);
       return;
     }
 
@@ -550,6 +574,7 @@ function AppointmentsPageContent() {
                 onDateSelect={handleDateSelect}
                 month={visibleMonth}
                 onMonthChange={setVisibleMonth}
+                referenceDate={currentDateTime}
               />
             </section>
 

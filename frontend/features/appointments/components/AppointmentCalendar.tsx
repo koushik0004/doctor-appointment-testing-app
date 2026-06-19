@@ -11,6 +11,7 @@ type AppointmentCalendarProps = {
   onDateSelect: (date: Date | undefined) => void;
   month?: Date;
   onMonthChange?: (date: Date) => void;
+  referenceDate?: Date;
 };
 
 function toDateKey(date: Date) {
@@ -23,14 +24,15 @@ export function AppointmentCalendar({
   onDateSelect,
   month,
   onMonthChange,
+  referenceDate = new Date(),
 }: AppointmentCalendarProps) {
   const availableDateKeys = React.useMemo(() => {
     return new Set(availableDates.map(toDateKey));
   }, [availableDates]);
 
   const minimumSelectableDate = React.useMemo(() => {
-    return startOfDay(availableDates[0] ?? new Date());
-  }, [availableDates]);
+    return startOfDay(referenceDate);
+  }, [referenceDate]);
 
   return (
     <Calendar

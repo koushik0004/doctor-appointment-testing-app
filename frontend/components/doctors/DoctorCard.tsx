@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Doctor } from "@/features/doctors/types";
+import { formatCurrencyInr } from "@/lib/formatters";
 
 type DoctorCardProps = {
   doctor: Doctor;
@@ -108,7 +109,7 @@ export function DoctorCard({ doctor, isSelected, onSelect }: DoctorCardProps) {
                 </svg>
               </InfoIcon>
               <span>
-                ${doctor.feeRange.min} - ${doctor.feeRange.max}
+                {formatCurrencyInr(doctor.feeRange.min)} - {formatCurrencyInr(doctor.feeRange.max)}
               </span>
             </div>
           </div>
