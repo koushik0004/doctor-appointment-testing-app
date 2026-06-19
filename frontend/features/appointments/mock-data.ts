@@ -17,7 +17,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "09:00",
     endTime: "09:30",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -25,7 +24,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "09:30",
     endTime: "10:00",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -33,7 +31,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "10:00",
     endTime: "10:30",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -41,7 +38,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "10:30",
     endTime: "11:00",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -49,7 +45,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "11:00",
     endTime: "11:30",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -57,7 +52,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "11:30",
     endTime: "12:00",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -65,7 +59,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "14:00",
     endTime: "14:30",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -73,7 +66,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "14:30",
     endTime: "15:00",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -81,7 +73,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "15:00",
     endTime: "15:30",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -89,7 +80,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "15:30",
     endTime: "16:00",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
   {
@@ -97,7 +87,6 @@ export const appointmentAvailableSlots: AvailabilitySlot[] = [
     availableDate: "2024-10-20",
     startTime: "16:00",
     endTime: "16:30",
-    appointmentType: "IN_PERSON",
     isBooked: false,
   },
 ];

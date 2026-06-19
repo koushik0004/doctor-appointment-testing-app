@@ -89,20 +89,14 @@ def test_booking_flow_and_confirmation_endpoint(client):
 
     availability_response = client.get(
         f"/api/doctors/{doctor_id}/availability",
-        params={
-            "date_from": booking_date.isoformat(),
-            "date_to": booking_date.isoformat(),
-        },
+        params={"date": booking_date.isoformat()},
     )
     assert availability_response.status_code == 200
     availability = availability_response.json()
-    assert availability["available_dates"] == [booking_date.isoformat()]
-    assert len(availability["morning_slots"]) == 2
-    assert len(availability["afternoon_slots"]) == 4
-    assert any(
-        slot["start_time"] == "10:00" and slot["is_booked"] is True
-        for slot in availability["morning_slots"]
-    )
+    assert availability["date"] == booking_date.isoformat()
+    assert availability["doctor_id"] == doctor_id
+    assert len(availability["available_slots"]) == 5
+    assert "10:00" not in {slot["start_time"] for slot in availability["available_slots"]}
 
     conflict_response = client.post("/api/appointments", json=booking_payload)
     assert conflict_response.status_code == 409

@@ -18,7 +18,6 @@ def format_slot_payload(
     *,
     slot_date: date,
     start_time: str,
-    appointment_type: str,
     is_booked: bool,
 ) -> dict[str, object]:
     end_time = (
@@ -30,7 +29,6 @@ def format_slot_payload(
         "available_date": slot_date.isoformat(),
         "start_time": start_time,
         "end_time": end_time,
-        "appointment_type": appointment_type,
         "is_booked": is_booked,
     }
 
@@ -38,7 +36,6 @@ def format_slot_payload(
 def generate_daily_slots(
     slot_date: date,
     *,
-    appointment_type: str,
     booked_start_times: set[str] | None = None,
     reference_datetime: datetime | None = None,
 ) -> list[dict[str, object]]:
@@ -52,12 +49,13 @@ def generate_daily_slots(
             continue
         if slot_date == now.date() and slot_datetime <= now:
             continue
+        if start_time in booked_start_times:
+            continue
 
         slots.append(
             format_slot_payload(
                 slot_date=slot_date,
                 start_time=start_time,
-                appointment_type=appointment_type,
                 is_booked=start_time in booked_start_times,
             )
         )

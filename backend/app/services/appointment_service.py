@@ -84,7 +84,6 @@ def _validate_slot(
         slot["start_time"]
         for slot in generate_daily_slots(
             appointment_date,
-            appointment_type=appointment_type,
             reference_datetime=datetime.now(),
         )
     }

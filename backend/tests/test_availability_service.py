@@ -14,9 +14,8 @@ from app.models.appointment import Appointment, AppointmentStatus  # noqa: E402
 from app.models.doctor import Doctor  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.services.availability_service import (  # noqa: E402
-    get_available_dates,
     get_available_slots,
-    get_doctor_availability_window,
+    get_doctor_available_slots,
 )
 from app.services.schedule_service import generate_daily_slots  # noqa: E402
 
@@ -24,14 +23,13 @@ from app.services.schedule_service import generate_daily_slots  # noqa: E402
 def test_generate_daily_slots_hides_elapsed_slots_for_today():
     slots = generate_daily_slots(
         date(2026, 6, 19),
-        appointment_type="IN_PERSON",
         reference_datetime=datetime(2026, 6, 19, 13, 0),
     )
 
     assert [slot["start_time"] for slot in slots] == ["14:00", "16:00", "18:00"]
 
 
-def test_availability_service_groups_runtime_slots_and_marks_booked():
+def test_availability_service_returns_available_slots_for_single_date():
     engine = create_engine(f"sqlite:///{TEST_DB}")
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
@@ -79,29 +77,20 @@ def test_availability_service_groups_runtime_slots_and_marks_booked():
             session.commit()
 
             slots = get_available_slots(session, doctor.id, available_date=future_date)
-            assert len(slots) == 6
-            assert any(
-                slot["start_time"] == "10:00" and slot["is_booked"] is True
-                for slot in slots
-            )
+            assert len(slots) == 5
+            assert all(slot["is_booked"] is False for slot in slots)
+            assert "10:00" not in {slot["start_time"] for slot in slots}
 
-            availability = get_doctor_availability_window(
+            availability = get_doctor_available_slots(
                 session,
                 doctor.id,
-                date_from=future_date,
-                date_to=future_date,
+                slot_date=future_date,
             )
-            assert availability["doctor"]["name"] == "Dr. Availability Doctor"
-            assert availability["available_dates"] == ["2026-06-20"]
-            assert len(availability["morning_slots"]) == 2
-            assert len(availability["afternoon_slots"]) == 4
-            assert any(
-                slot["start_time"] == "10:00" and slot["is_booked"] is True
-                for slot in availability["morning_slots"]
-            )
-
-            dates = get_available_dates(session, doctor.id)
-            assert date(2026, 6, 20) in dates
+            assert availability == {
+                "date": "2026-06-20",
+                "doctor_id": doctor.id,
+                "available_slots": slots,
+            }
     finally:
         engine.dispose()
         if TEST_DB.exists():

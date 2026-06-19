@@ -7,7 +7,6 @@ export type AvailabilitySlot = {
   availableDate: string;
   startTime: string;
   endTime: string;
-  appointmentType: AppointmentType;
   isBooked: boolean;
 };
 
@@ -20,8 +19,8 @@ export type BookingPatientDetails = {
 
 export type DoctorAvailability = {
   doctorId: number;
-  doctor: Doctor;
-  availableDates: Date[];
+  date: Date;
+  availableSlots: AvailabilitySlot[];
   morningSlots: AvailabilitySlot[];
   afternoonSlots: AvailabilitySlot[];
 };

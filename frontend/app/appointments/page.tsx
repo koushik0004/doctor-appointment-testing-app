@@ -27,6 +27,7 @@ import {
   filterBookableSlotsForDate,
   isElapsedAppointmentSlot,
 } from "@/features/appointments/utils";
+import { getDoctor } from "@/features/doctors/api";
 import type { Doctor } from "@/features/doctors/types";
 import { ApiError } from "@/lib/api-client";
 import { useBookingStore } from "@/stores/booking-store";
@@ -244,24 +245,28 @@ function AppointmentsPageContent() {
 
       try {
         const selectedBookingDate = selectedDate ?? new Date();
-        const response = await getDoctorAvailability(
-          effectiveDoctorId,
-          {
-            dateFrom: selectedBookingDate,
-            dateTo: selectedBookingDate,
-          },
-          {
+        const [doctorResponse, availabilityResponse] = await Promise.all([
+          getDoctor(effectiveDoctorId, {
             signal: controller.signal,
-          },
-        );
+          }),
+          getDoctorAvailability(
+            effectiveDoctorId,
+            {
+              date: selectedBookingDate,
+            },
+            {
+              signal: controller.signal,
+            },
+          ),
+        ]);
 
         if (!isActive) {
           return;
         }
 
-        setDoctor(response.doctor);
-        setAvailability(response);
-        setSelectedDoctorId(response.doctor.id);
+        setDoctor(doctorResponse);
+        setAvailability(availabilityResponse);
+        setSelectedDoctorId(doctorResponse.id);
         setVisibleMonth(startOfMonth(selectedBookingDate));
       } catch (error) {
         if (!isActive) {
@@ -295,7 +300,7 @@ function AppointmentsPageContent() {
       return [];
     }
 
-    return [...availability.morningSlots, ...availability.afternoonSlots];
+    return availability.availableSlots;
   }, [availability]);
 
   const availableSlots = useMemo(() => {
@@ -408,7 +413,7 @@ function AppointmentsPageContent() {
     return <NoDoctorState />;
   }
 
-  if (isLoading && !availability) {
+  if (isLoading) {
     return <LoadingState />;
   }
 
