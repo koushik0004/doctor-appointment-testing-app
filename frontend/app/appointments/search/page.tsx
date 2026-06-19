@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import * as React from "react";
 
-type SearchFormState = {
-  name: string;
-  email: string;
-  phone: string;
-};
+import type { FieldErrors, Resolver } from "react-hook-form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 type MockAppointment = {
   id: string;
@@ -20,6 +18,31 @@ type MockAppointment = {
   reason: string;
   appointmentType: "Video Visit" | "In Person";
 };
+
+const searchFormSchema = z
+  .object({
+    name: z.string().trim(),
+    email: z
+      .string()
+      .trim()
+      .refine((value) => value === "" || z.string().email().safeParse(value).success, {
+        message: "Enter a valid email address.",
+      }),
+    phone: z.string().trim().refine((value) => value === "" || /^\d+$/.test(value), {
+      message: "Phone must contain numbers only.",
+    }),
+  })
+  .superRefine((values, context) => {
+    if (!values.name && !values.email && !values.phone) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [],
+        message: "Enter at least one search detail to look up an appointment.",
+      });
+    }
+  });
+
+type SearchFormValues = z.infer<typeof searchFormSchema>;
 
 const mockAppointments: MockAppointment[] = [
   {
@@ -66,30 +89,86 @@ const statusStyles: Record<MockAppointment["status"], string> = {
   Completed: "bg-slate-100 text-slate-700 ring-1 ring-slate-200",
 };
 
+const emptySearchValues: SearchFormValues = {
+  name: "",
+  email: "",
+  phone: "",
+};
+
+const searchFormResolver: Resolver<SearchFormValues> = async (values) => {
+  const parsedValues = searchFormSchema.safeParse(values);
+
+  if (parsedValues.success) {
+    return {
+      values: parsedValues.data,
+      errors: {},
+    };
+  }
+
+  const errors: FieldErrors<SearchFormValues> = {};
+
+  for (const issue of parsedValues.error.issues) {
+    const fieldName = issue.path[0] as keyof SearchFormValues | undefined;
+
+    if (!fieldName) {
+      errors.root = {
+        type: issue.code,
+        message: issue.message,
+      };
+      continue;
+    }
+
+    if (errors[fieldName]) {
+      continue;
+    }
+
+    errors[fieldName] = {
+      type: issue.code,
+      message: issue.message,
+    };
+  }
+
+  return {
+    values: {},
+    errors,
+  };
+};
+
 function SearchField({
   label,
   name,
   value,
   onChange,
   placeholder,
+  type = "text",
+  autoComplete,
+  errorMessage,
 }: {
   label: string;
-  name: keyof SearchFormState;
+  name: keyof SearchFormValues;
   value: string;
-  onChange: (name: keyof SearchFormState, value: string) => void;
+  onChange: (name: keyof SearchFormValues, value: string) => void;
   placeholder: string;
+  type?: string;
+  autoComplete?: string;
+  errorMessage?: string;
 }) {
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
       <input
-        type="text"
+        type={type}
         name={name}
         value={value}
         onChange={(event) => onChange(name, event.target.value)}
         placeholder={placeholder}
+        autoComplete={autoComplete}
+        aria-invalid={Boolean(errorMessage)}
         className="mt-2 h-12 w-full rounded-[14px] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-50"
       />
+      {errorMessage ? (
+        <p className="mt-2 text-sm text-rose-600">{errorMessage}</p>
+      ) : null}
     </label>
   );
 }
@@ -110,41 +189,91 @@ function EmptyStateCard({
 }
 
 export default function AppointmentSearchPage() {
-  const [formState, setFormState] = useState<SearchFormState>({
-    name: "",
-    email: "",
-    phone: "",
+  const {
+    handleSubmit,
+    watch,
+    reset,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<SearchFormValues>({
+    resolver: searchFormResolver,
+    defaultValues: emptySearchValues,
+    mode: "onChange",
+    reValidateMode: "onChange",
   });
-  const [hasSearched, setHasSearched] = useState(false);
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState(
-    mockAppointments[0].id,
+
+  const [submittedFilters, setSubmittedFilters] =
+    React.useState<SearchFormValues | null>(null);
+  const [selectedAppointmentId, setSelectedAppointmentId] = React.useState<
+    string | null
+  >(null);
+
+  const currentValues = watch();
+  const parsedCurrentValues = searchFormSchema.safeParse(currentValues);
+  const searchIsValid = parsedCurrentValues.success;
+  const hasAnySearchValue = Boolean(
+    currentValues.name.trim() || currentValues.email.trim() || currentValues.phone.trim(),
   );
 
+  const visibleAppointments = React.useMemo(() => {
+    if (!submittedFilters) {
+      return [];
+    }
+
+    return mockAppointments.filter((appointment) => {
+      const normalizedName = submittedFilters.name.trim().toLowerCase();
+      const normalizedEmail = submittedFilters.email.trim().toLowerCase();
+      const normalizedPhone = submittedFilters.phone.trim();
+
+      const matchesName =
+        normalizedName.length === 0 ||
+        appointment.patientName.toLowerCase().includes(normalizedName);
+      const matchesEmail =
+        normalizedEmail.length === 0 ||
+        appointment.email.toLowerCase().includes(normalizedEmail);
+      const matchesPhone =
+        normalizedPhone.length === 0 ||
+        appointment.phone.replace(/\D/g, "").includes(normalizedPhone);
+
+      return matchesName && matchesEmail && matchesPhone;
+    });
+  }, [submittedFilters]);
+
+  React.useEffect(() => {
+    if (!visibleAppointments.length) {
+      setSelectedAppointmentId(null);
+      return;
+    }
+
+    if (!selectedAppointmentId) {
+      setSelectedAppointmentId(visibleAppointments[0].id);
+      return;
+    }
+
+    const selectedStillExists = visibleAppointments.some(
+      (appointment) => appointment.id === selectedAppointmentId,
+    );
+
+    if (!selectedStillExists) {
+      setSelectedAppointmentId(visibleAppointments[0].id);
+    }
+  }, [selectedAppointmentId, visibleAppointments]);
+
   const selectedAppointment =
-    mockAppointments.find((appointment) => appointment.id === selectedAppointmentId) ??
-    mockAppointments[0];
+    visibleAppointments.find(
+      (appointment) => appointment.id === selectedAppointmentId,
+    ) ?? null;
+  const hasSubmittedSearch = Boolean(submittedFilters);
 
-  function updateField(name: keyof SearchFormState, value: string) {
-    setFormState((current) => ({
-      ...current,
-      [name]: value,
-    }));
-  }
-
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setHasSearched(true);
+  const onSubmit = handleSubmit((values) => {
+    setSubmittedFilters(values);
     setSelectedAppointmentId(mockAppointments[0].id);
-  }
+  });
 
   function handleReset() {
-    setFormState({
-      name: "",
-      email: "",
-      phone: "",
-    });
-    setHasSearched(false);
-    setSelectedAppointmentId(mockAppointments[0].id);
+    reset(emptySearchValues);
+    setSubmittedFilters(null);
+    setSelectedAppointmentId(null);
   }
 
   return (
@@ -165,37 +294,73 @@ export default function AppointmentSearchPage() {
 
         <div className="grid gap-8 xl:grid-cols-[1.12fr_0.88fr]">
           <form
-            onSubmit={handleSearch}
+            onSubmit={onSubmit}
             className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8"
           >
             <div className="grid gap-5 md:grid-cols-3">
               <SearchField
                 label="Name"
                 name="name"
-                value={formState.name}
-                onChange={updateField}
+                value={currentValues.name}
+                onChange={(field, value) =>
+                  setValue(field, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
                 placeholder="Enter patient name"
+                autoComplete="name"
+                errorMessage={errors.name?.message}
               />
               <SearchField
                 label="Email"
                 name="email"
-                value={formState.email}
-                onChange={updateField}
+                value={currentValues.email}
+                onChange={(field, value) =>
+                  setValue(field, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
                 placeholder="Enter email address"
+                type="email"
+                autoComplete="email"
+                errorMessage={errors.email?.message}
               />
               <SearchField
                 label="Phone"
                 name="phone"
-                value={formState.phone}
-                onChange={updateField}
+                value={currentValues.phone}
+                onChange={(field, value) =>
+                  setValue(field, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
                 placeholder="Enter phone number"
+                type="text"
+                autoComplete="tel"
+                errorMessage={errors.phone?.message}
               />
             </div>
+
+            {!searchIsValid && !hasAnySearchValue ? (
+              <p className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Enter at least one search detail to enable Search.
+              </p>
+            ) : null}
+
+            {errors.root?.message ? (
+              <p className="mt-4 rounded-[16px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {errors.root.message}
+              </p>
+            ) : null}
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center rounded-[14px] bg-sky-500 px-6 text-sm font-semibold text-white transition hover:bg-sky-600"
+                disabled={!searchIsValid || isSubmitting}
+                className="inline-flex h-12 items-center justify-center rounded-[14px] bg-sky-500 px-6 text-sm font-semibold text-white transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Search
               </button>
@@ -242,7 +407,7 @@ export default function AppointmentSearchPage() {
                   Appointment matches
                 </h2>
               </div>
-              {hasSearched ? (
+              {hasSubmittedSearch ? (
                 <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
                   Mock data loaded
                 </span>
@@ -250,13 +415,18 @@ export default function AppointmentSearchPage() {
             </div>
 
             <div className="mt-6 space-y-4">
-              {!hasSearched ? (
+              {!submittedFilters ? (
                 <EmptyStateCard
                   title="No search has been run yet"
                   description="Use the form above to reserve this area for appointment search results."
                 />
+              ) : visibleAppointments.length === 0 ? (
+                <EmptyStateCard
+                  title="No matching appointments"
+                  description="Adjust the name, email, or phone values and search again using the mock data set."
+                />
               ) : (
-                mockAppointments.map((appointment) => {
+                visibleAppointments.map((appointment) => {
                   const isSelected = appointment.id === selectedAppointmentId;
 
                   return (
@@ -327,7 +497,7 @@ export default function AppointmentSearchPage() {
               Selected appointment preview
             </h2>
 
-            {!hasSearched ? (
+            {!submittedFilters || !selectedAppointment ? (
               <div className="mt-6">
                 <EmptyStateCard
                   title="Details will appear here"
