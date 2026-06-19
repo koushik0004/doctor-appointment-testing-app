@@ -54,6 +54,11 @@ def test_appointment_tables_and_repository_round_trip():
             for constraint in unique_constraints
         )
 
+        patient_indexes = inspect(engine).get_indexes("patients")
+        patient_index_names = {index["name"] for index in patient_indexes}
+        assert "ix_patients_full_name" in patient_index_names
+        assert "ix_patients_phone" in patient_index_names
+
         with SessionLocal() as session:
             doctor = Doctor(
                 name="Dr. Test Doctor",

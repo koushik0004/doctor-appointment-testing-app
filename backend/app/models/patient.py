@@ -10,9 +10,9 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    full_name: Mapped[str] = mapped_column(Text, nullable=False)
+    full_name: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     email: Mapped[str] = mapped_column(Text, nullable=False, unique=True, index=True)
-    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
