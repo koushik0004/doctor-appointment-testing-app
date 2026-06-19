@@ -9,13 +9,13 @@ from app.schemas.appointment_search import (
     AppointmentSearchResponse,
 )
 from app.schemas.appointment import (
-    AppointmentConfirmationResponse,
+    AppointmentDetailsResponse,
     AppointmentCreateRequest,
     AppointmentCreateResponse,
 )
 from app.services.appointment_service import (
     create_appointment_booking,
-    get_appointment_confirmation,
+    get_appointment_details,
 )
 from app.services.appointment_search_service import search_appointments as search_appointment_records
 
@@ -78,9 +78,18 @@ def search_appointments(
     return search_appointment_records(session, request)
 
 
-@router.get("/{appointment_id}", response_model=AppointmentConfirmationResponse)
+@router.get(
+    "/{appointment_id}",
+    response_model=AppointmentDetailsResponse,
+    summary="Get appointment details",
+    description="Fetch the appointment record along with doctor and patient details.",
+    responses={
+        404: {"description": "Appointment not found."},
+        500: {"description": "Unexpected server error."},
+    },
+)
 def read_appointment(
     appointment_id: int,
     session: Session = Depends(get_db),
-) -> AppointmentConfirmationResponse:
-    return get_appointment_confirmation(session, appointment_id)
+) -> AppointmentDetailsResponse:
+    return get_appointment_details(session, appointment_id)

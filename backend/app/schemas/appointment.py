@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 
 from pydantic import BaseModel, EmailStr, Field
@@ -60,3 +60,14 @@ class AppointmentConfirmationResponse(BaseModel):
     end_time: str
     appointment_type: AppointmentType
     health_description: str | None = None
+
+
+class AppointmentDetailsResponse(BaseModel):
+    appointment_id: int
+    doctor: AppointmentDoctorSummary
+    patient: AppointmentPatientSummary
+    appointment_date: date
+    appointment_time: str
+    appointment_type: AppointmentType
+    status: AppointmentStatus
+    created_at: datetime

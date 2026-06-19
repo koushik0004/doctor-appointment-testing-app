@@ -23,6 +23,7 @@ from app.repositories.appointment_repository import (
 from app.repositories.patient_repository import create_patient, get_patient_by_email
 from app.schemas.appointment import (
     AppointmentConfirmationResponse,
+    AppointmentDetailsResponse,
     AppointmentCreateRequest,
     AppointmentCreateResponse,
 )
@@ -181,4 +182,36 @@ def get_appointment_confirmation(session: Session, appointment_id: int) -> Appoi
         end_time=_slot_end_time(appointment.appointment_time),
         appointment_type=appointment.appointment_type,
         health_description=appointment.health_description,
+    )
+
+
+def get_appointment_details(session: Session, appointment_id: int) -> AppointmentDetailsResponse:
+    appointment = get_appointment_by_id(session, appointment_id)
+    if appointment is None:
+        raise appointment_not_found(appointment_id)
+
+    doctor = get_doctor(session, appointment.doctor_id)
+
+    patient_model = session.get(Patient, appointment.patient_id)
+    if patient_model is None:
+        raise invalid_booking_request("Appointment is missing its patient record.")
+
+    return AppointmentDetailsResponse(
+        appointment_id=appointment.id,
+        doctor={
+            "name": doctor.name,
+            "specialty": doctor.specialty,
+            "clinic_name": doctor.clinic_name,
+            "location": doctor.location,
+        },
+        patient={
+            "full_name": patient_model.full_name,
+            "email": patient_model.email,
+            "phone": patient_model.phone,
+        },
+        appointment_date=appointment.appointment_date,
+        appointment_time=appointment.appointment_time,
+        appointment_type=appointment.appointment_type,
+        status=AppointmentStatus(appointment.status),
+        created_at=appointment.created_at,
     )

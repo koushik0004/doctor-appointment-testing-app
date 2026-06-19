@@ -79,7 +79,7 @@ def _book_appointment(
     return response.json()
 
 
-def test_booking_flow_and_confirmation_endpoint(client):
+def test_booking_flow_and_appointment_details_endpoint(client):
     doctor_id = _get_doctor_id(client, "Dr. Sarah Jenkins")
     booking_date = date.today() + timedelta(days=1)
     booking_payload = {
@@ -105,16 +105,17 @@ def test_booking_flow_and_confirmation_endpoint(client):
     assert created["end_time"] == "10:30"
     assert created["confirmation_code"].startswith("CN-")
 
-    confirmation_response = client.get(f"/api/appointments/{created['id']}")
-    assert confirmation_response.status_code == 200
-    confirmation = confirmation_response.json()
-    assert confirmation["confirmation_code"] == created["confirmation_code"]
-    assert confirmation["doctor"]["name"] == "Dr. Sarah Jenkins"
-    assert confirmation["patient"]["full_name"] == "John Doe"
-    assert confirmation["status"] == "CONFIRMED"
-    assert confirmation["appointment_date"] == booking_date.isoformat()
-    assert confirmation["start_time"] == "10:00"
-    assert confirmation["end_time"] == "10:30"
+    details_response = client.get(f"/api/appointments/{created['id']}")
+    assert details_response.status_code == 200
+    details = details_response.json()
+    assert details["appointment_id"] == created["id"]
+    assert details["doctor"]["name"] == "Dr. Sarah Jenkins"
+    assert details["patient"]["full_name"] == "John Doe"
+    assert details["status"] == "CONFIRMED"
+    assert details["appointment_date"] == booking_date.isoformat()
+    assert details["appointment_time"] == "10:00"
+    assert details["appointment_type"] == "IN_PERSON"
+    assert details["created_at"]
 
     availability_response = client.get(
         f"/api/doctors/{doctor_id}/availability",
@@ -193,6 +194,13 @@ def test_search_appointments_endpoint_rejects_invalid_email(client):
     error = response.json()["detail"][0]
     assert error["loc"] == ["query", "email"]
     assert error["type"] == "value_error"
+
+
+def test_appointment_details_endpoint_returns_404_for_missing_appointment(client):
+    response = client.get("/api/appointments/999999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Appointment 999999 not found"
 
 
 def test_booking_payload_validation():
