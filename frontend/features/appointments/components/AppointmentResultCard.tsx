@@ -200,13 +200,7 @@ export function AppointmentResultCard({
       </div>
 
       <div className="border-t border-slate-200 px-5 py-4 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-500">
-            Doctor specialty:{" "}
-            <span className="font-semibold text-slate-900">
-              {appointment.doctor_specialty}
-            </span>
-          </p>
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={(event) => {
