@@ -12,7 +12,6 @@ import type {
 
 type AvailabilitySlotApiRecord = {
   id: number;
-  available_date: string;
   start_time: string;
   end_time: string;
   is_booked: boolean;
@@ -64,7 +63,6 @@ type AppointmentConfirmationApiResponse = {
 function mapAvailabilitySlot(record: AvailabilitySlotApiRecord): AvailabilitySlot {
   return {
     id: record.id,
-    availableDate: record.available_date,
     startTime: record.start_time,
     endTime: record.end_time,
     isBooked: record.is_booked,

@@ -58,10 +58,6 @@ export function filterBookableSlotsForDate(
       return false;
     }
 
-    if (slot.availableDate !== createDateKey(selectedDate)) {
-      return false;
-    }
-
     if (isPastAppointmentDate(selectedDate, referenceDate)) {
       return false;
     }

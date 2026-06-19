@@ -4,7 +4,6 @@ export type AppointmentType = "IN_PERSON" | "TELEMEDICINE";
 
 export type AvailabilitySlot = {
   id: number;
-  availableDate: string;
   startTime: string;
   endTime: string;
   isBooked: boolean;
