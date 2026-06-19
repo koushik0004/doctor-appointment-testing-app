@@ -108,7 +108,7 @@ function SearchField({
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
-        <input
+      <input
         id={inputId}
         type={type}
         name={name}
@@ -138,7 +138,7 @@ function EmptyStateCard({
   description: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center">
       <h3 className="text-base font-semibold text-slate-900">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
     </div>
@@ -175,7 +175,10 @@ function ResultsHeader({
         </h2>
       </div>
       {count !== null ? (
-        <span className="rounded-full bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 ring-1 ring-brand-100" aria-live="polite">
+        <span
+          className="rounded-full bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 ring-1 ring-brand-100"
+          aria-live="polite"
+        >
           {count} result{count === 1 ? "" : "s"}
         </span>
       ) : null}
@@ -234,18 +237,19 @@ export default function AppointmentSearchPage() {
   return (
     <section className="py-8 lg:py-12">
       <div className="mx-auto max-w-7xl space-y-8">
-        <div className="overflow-hidden rounded-[32px] border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-slate-50 shadow-soft">
+        <div className="overflow-hidden rounded-[32px] border border-brand-100 bg-brand-50/60 shadow-soft">
           <div className="px-6 py-10 text-center sm:px-10 lg:px-16 lg:py-14">
-            <span className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
+            <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-700 ring-1 ring-brand-100">
               Appointment search
             </span>
             <h1 className="mx-auto mt-5 max-w-5xl text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl lg:text-6xl">
-              Find and review your next{" "}
+              Find your{" "}
               <span className="text-brand-500">healthcare</span> appointment.
             </h1>
             <p className="mx-auto mt-4 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
               Search by patient name, email, or phone number, then open any
-              appointment to see the full patient, doctor, and booking details.
+              booking to review the doctor, appointment, and patient details in
+              one place.
             </p>
           </div>
         </div>
@@ -303,7 +307,7 @@ export default function AppointmentSearchPage() {
           </div>
 
           {!searchIsValid && !hasAnySearchValue ? (
-            <p className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="mt-4 rounded-[16px] border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-900">
               Enter at least one search detail to enable Search.
             </p>
           ) : null}
@@ -385,12 +389,12 @@ export default function AppointmentSearchPage() {
               ) : !hasSearched ? (
                 <EmptyStateCard
                   title="No search has been run yet"
-                  description="Use the form above to load appointment cards from the API."
+                  description="Use the form above to load matching appointment cards."
                 />
               ) : appointments.length === 0 ? (
                 <EmptyStateCard
                   title="No matching appointments"
-                  description="The API returned no appointments for the provided search details."
+                  description="No bookings matched the search details you entered."
                 />
               ) : (
                 <div className="grid gap-5">
