@@ -15,13 +15,6 @@ def appointment_not_found(appointment_id: int) -> HTTPException:
     )
 
 
-def availability_not_found(availability_id: int) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Availability slot {availability_id} not found",
-    )
-
-
 def booking_conflict(message: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,

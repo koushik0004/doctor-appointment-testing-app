@@ -4,10 +4,8 @@ export type AppointmentType = "IN_PERSON" | "TELEMEDICINE";
 
 export type AvailabilitySlot = {
   id: number;
-  availableDate: string;
   startTime: string;
   endTime: string;
-  appointmentType: AppointmentType;
   isBooked: boolean;
 };
 
@@ -20,8 +18,8 @@ export type BookingPatientDetails = {
 
 export type DoctorAvailability = {
   doctorId: number;
-  doctor: Doctor;
-  availableDates: Date[];
+  date: Date;
+  availableSlots: AvailabilitySlot[];
   morningSlots: AvailabilitySlot[];
   afternoonSlots: AvailabilitySlot[];
 };
@@ -34,7 +32,6 @@ export type AppointmentPatientInput = {
 
 export type AppointmentCreatePayload = {
   doctor_id: number;
-  availability_id: number;
   appointment_date: string;
   start_time: string;
   appointment_type: AppointmentType;

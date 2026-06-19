@@ -18,8 +18,9 @@ BACKEND_APP := app.main:app
 BACKEND_PORT ?= 4001
 FRONTEND_PORT ?= 4002
 FRONTEND_NPM ?= npm
+SESSION_PYTHON ?= /usr/bin/python3
 
-.PHONY: help setup backend-setup frontend-setup dev stop backend-start frontend-start backend-stop frontend-stop backend-restart frontend-restart restart backend-dev frontend-dev
+.PHONY: help setup backend-setup frontend-setup dev dev-detached stop backend-start frontend-start backend-stop frontend-stop backend-restart frontend-restart restart backend-dev frontend-dev
 
 help:
 	@printf '%s\n' \
@@ -27,8 +28,9 @@ help:
 		'  make setup         Install backend dependencies first, then frontend dependencies' \
 		'  make backend-setup Install backend dependencies only' \
 		'  make frontend-setup Install frontend dependencies only' \
-		'  make dev           Start backend first, then start the frontend dev server in the background' \
-		'  make stop          Stop both background servers started by make dev' \
+		'  make dev           Run backend and frontend together in the foreground' \
+		'  make dev-detached  Start backend first, then start the frontend dev server in the background' \
+		'  make stop          Stop both background servers started by make dev-detached' \
 		'  make backend-restart Restart only the backend server in the background' \
 		'  make frontend-restart Restart only the frontend server in the background' \
 		'  make restart       Restart both servers in the background' \
@@ -123,8 +125,20 @@ backend-start: $(RUN_DIR)
 	if [ -n "$$backend_pid" ] && kill -0 "$$backend_pid" 2>/dev/null; then \
 		echo "Backend is already running (pid $$backend_pid)."; \
 	else \
-		cd $(BACKEND_DIR) && nohup sh -c 'exec $(BACKEND_PYTHON) -m uvicorn $(BACKEND_APP) --host 0.0.0.0 --port $(BACKEND_PORT)' > "../$(BACKEND_LOG_FILE)" 2>&1 < /dev/null & \
-		echo $$! > "$(BACKEND_PID_FILE)"; \
+		stale_pid="$$(lsof -tiTCP:$(BACKEND_PORT) -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"; \
+		if [ -n "$$stale_pid" ]; then \
+			echo "Stopping stale backend listener on port $(BACKEND_PORT) (pid $$stale_pid)."; \
+			kill -TERM "-$$stale_pid" 2>/dev/null || kill -TERM "$$stale_pid" 2>/dev/null || true; \
+			sleep 1; \
+			if lsof -tiTCP:$(BACKEND_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
+				kill -KILL "-$$stale_pid" 2>/dev/null || kill -KILL "$$stale_pid" 2>/dev/null || true; \
+			fi; \
+		fi; \
+		cd $(BACKEND_DIR); \
+		nohup $(SESSION_PYTHON) -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' "$(BACKEND_PYTHON)" -m uvicorn $(BACKEND_APP) --host 0.0.0.0 --port $(BACKEND_PORT) > "../$(BACKEND_LOG_FILE)" 2>&1 < /dev/null & \
+		backend_pid=$$!; \
+		cd ..; \
+		echo "$$backend_pid" > "$(BACKEND_PID_FILE)"; \
 		echo "Starting backend on http://127.0.0.1:$(BACKEND_PORT) ..."; \
 	fi; \
 	for _ in $$(seq 1 60); do \
@@ -134,6 +148,7 @@ backend-start: $(RUN_DIR)
 		sleep 1; \
 	done; \
 	if ! curl -fsS http://127.0.0.1:$(BACKEND_PORT)/api/health >/dev/null 2>&1; then \
+		rm -f "$(BACKEND_PID_FILE)"; \
 		echo "Backend did not become ready. See $(BACKEND_LOG_FILE)"; \
 		exit 1; \
 	fi
@@ -145,9 +160,32 @@ frontend-start: $(RUN_DIR)
 	if [ -n "$$frontend_pid" ] && kill -0 "$$frontend_pid" 2>/dev/null; then \
 		echo "Frontend is already running (pid $$frontend_pid)."; \
 	else \
-		cd $(FRONTEND_DIR) && nohup sh -c 'exec $(FRONTEND_NPM) run dev -- -H 0.0.0.0' > "../$(FRONTEND_LOG_FILE)" 2>&1 < /dev/null & \
-		echo $$! > "$(FRONTEND_PID_FILE)"; \
+		stale_pid="$$(lsof -tiTCP:$(FRONTEND_PORT) -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"; \
+		if [ -n "$$stale_pid" ]; then \
+			echo "Stopping stale frontend listener on port $(FRONTEND_PORT) (pid $$stale_pid)."; \
+			kill -TERM "-$$stale_pid" 2>/dev/null || kill -TERM "$$stale_pid" 2>/dev/null || true; \
+			sleep 1; \
+			if lsof -tiTCP:$(FRONTEND_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
+				kill -KILL "-$$stale_pid" 2>/dev/null || kill -KILL "$$stale_pid" 2>/dev/null || true; \
+			fi; \
+		fi; \
+		cd $(FRONTEND_DIR); \
+		nohup $(SESSION_PYTHON) -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' "$(FRONTEND_NPM)" run dev -- -H 0.0.0.0 > "../$(FRONTEND_LOG_FILE)" 2>&1 < /dev/null & \
+		frontend_pid=$$!; \
+		cd ..; \
+		echo "$$frontend_pid" > "$(FRONTEND_PID_FILE)"; \
 		echo "Starting frontend on http://127.0.0.1:$(FRONTEND_PORT) ..."; \
+	fi; \
+	for _ in $$(seq 1 60); do \
+		if curl -fsS http://127.0.0.1:$(FRONTEND_PORT) >/dev/null 2>&1; then \
+			break; \
+		fi; \
+		sleep 1; \
+	done; \
+	if ! curl -fsS http://127.0.0.1:$(FRONTEND_PORT) >/dev/null 2>&1; then \
+		rm -f "$(FRONTEND_PID_FILE)"; \
+		echo "Frontend did not become ready. See $(FRONTEND_LOG_FILE)"; \
+		exit 1; \
 	fi
 
 backend-dev:
@@ -157,6 +195,25 @@ frontend-dev:
 	cd $(FRONTEND_DIR) && $(FRONTEND_NPM) run dev
 
 dev:
+	@set -e; \
+	trap 'kill $$backend_pid $$frontend_pid 2>/dev/null || true; wait $$backend_pid $$frontend_pid 2>/dev/null || true' INT TERM EXIT; \
+	cd $(BACKEND_DIR) && $(BACKEND_PYTHON) -m uvicorn $(BACKEND_APP) --host 0.0.0.0 --port $(BACKEND_PORT) & \
+	backend_pid=$$!; \
+	for _ in $$(seq 1 60); do \
+		if curl -fsS http://127.0.0.1:$(BACKEND_PORT)/api/health >/dev/null 2>&1; then \
+			break; \
+		fi; \
+		sleep 1; \
+	done; \
+	if ! curl -fsS http://127.0.0.1:$(BACKEND_PORT)/api/health >/dev/null 2>&1; then \
+		echo "Backend did not become ready."; \
+		exit 1; \
+	fi; \
+	cd $(FRONTEND_DIR) && $(FRONTEND_NPM) run dev -- -H 0.0.0.0 & \
+	frontend_pid=$$!; \
+	wait $$backend_pid $$frontend_pid
+
+dev-detached:
 	@$(MAKE) --no-print-directory backend-start && $(MAKE) --no-print-directory frontend-start && printf '%s\n' \
 		"Backend log: $(BACKEND_LOG_FILE)" \
 		"Frontend log: $(FRONTEND_LOG_FILE)"
@@ -166,7 +223,7 @@ backend-stop: $(RUN_DIR)
 	if [ -f "$(BACKEND_PID_FILE)" ]; then \
 		pid=$$(cat "$(BACKEND_PID_FILE)"); \
 		if kill -0 "$$pid" 2>/dev/null; then \
-			kill "$$pid"; \
+			kill -TERM "-$$pid" 2>/dev/null || kill -TERM "$$pid" 2>/dev/null || true; \
 			for _ in $$(seq 1 10); do \
 				if ! kill -0 "$$pid" 2>/dev/null; then \
 					break; \
@@ -174,13 +231,22 @@ backend-stop: $(RUN_DIR)
 				sleep 1; \
 			done; \
 			if kill -0 "$$pid" 2>/dev/null; then \
-				kill -9 "$$pid"; \
+				kill -KILL "-$$pid" 2>/dev/null || kill -KILL "$$pid" 2>/dev/null || true; \
 			fi; \
 			echo "Stopped backend (pid $$pid)."; \
 		else \
 			echo "No running backend process."; \
 		fi; \
 		rm -f "$(BACKEND_PID_FILE)"; \
+	fi; \
+	stale_pid="$$(lsof -tiTCP:$(BACKEND_PORT) -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"; \
+	if [ -n "$$stale_pid" ]; then \
+		echo "Stopping stale backend listener on port $(BACKEND_PORT) (pid $$stale_pid)."; \
+		kill -TERM "-$$stale_pid" 2>/dev/null || kill -TERM "$$stale_pid" 2>/dev/null || true; \
+		sleep 1; \
+		if lsof -tiTCP:$(BACKEND_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
+			kill -KILL "-$$stale_pid" 2>/dev/null || kill -KILL "$$stale_pid" 2>/dev/null || true; \
+		fi; \
 	fi
 
 frontend-stop: $(RUN_DIR)
@@ -188,7 +254,7 @@ frontend-stop: $(RUN_DIR)
 	if [ -f "$(FRONTEND_PID_FILE)" ]; then \
 		pid=$$(cat "$(FRONTEND_PID_FILE)"); \
 		if kill -0 "$$pid" 2>/dev/null; then \
-			kill "$$pid"; \
+			kill -TERM "-$$pid" 2>/dev/null || kill -TERM "$$pid" 2>/dev/null || true; \
 			for _ in $$(seq 1 10); do \
 				if ! kill -0 "$$pid" 2>/dev/null; then \
 					break; \
@@ -196,13 +262,22 @@ frontend-stop: $(RUN_DIR)
 				sleep 1; \
 			done; \
 			if kill -0 "$$pid" 2>/dev/null; then \
-				kill -9 "$$pid"; \
+				kill -KILL "-$$pid" 2>/dev/null || kill -KILL "$$pid" 2>/dev/null || true; \
 			fi; \
 			echo "Stopped frontend (pid $$pid)."; \
 		else \
 			echo "No running frontend process."; \
 		fi; \
 		rm -f "$(FRONTEND_PID_FILE)"; \
+	fi; \
+	stale_pid="$$(lsof -tiTCP:$(FRONTEND_PORT) -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"; \
+	if [ -n "$$stale_pid" ]; then \
+		echo "Stopping stale frontend listener on port $(FRONTEND_PORT) (pid $$stale_pid)."; \
+		kill -TERM "-$$stale_pid" 2>/dev/null || kill -TERM "$$stale_pid" 2>/dev/null || true; \
+		sleep 1; \
+		if lsof -tiTCP:$(FRONTEND_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
+			kill -KILL "-$$stale_pid" 2>/dev/null || kill -KILL "$$stale_pid" 2>/dev/null || true; \
+		fi; \
 	fi
 
 stop:
@@ -215,4 +290,4 @@ frontend-restart:
 	@$(MAKE) --no-print-directory frontend-stop && $(MAKE) --no-print-directory frontend-start
 
 restart:
-	@$(MAKE) --no-print-directory stop && $(MAKE) --no-print-directory dev
+	@$(MAKE) --no-print-directory stop && $(MAKE) --no-print-directory dev-detached

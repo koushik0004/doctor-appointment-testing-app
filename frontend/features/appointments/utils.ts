@@ -1,4 +1,4 @@
-import { format, isValid, parse } from "date-fns";
+import { format, isBefore, isValid, parse, startOfDay } from "date-fns";
 
 import type { AvailabilitySlot } from "@/features/appointments/types";
 
@@ -17,6 +17,53 @@ export function formatAppointmentTime(time: string) {
 
 export function createDateKey(date: Date) {
   return format(date, "yyyy-MM-dd");
+}
+
+export function getLocalDateTime(date: Date, time: string) {
+  const parsedTime = parse(time, "HH:mm", date);
+  if (!isValid(parsedTime)) {
+    return null;
+  }
+
+  return parsedTime;
+}
+
+export function isPastAppointmentDate(
+  date: Date,
+  referenceDate: Date = new Date(),
+) {
+  return isBefore(startOfDay(date), startOfDay(referenceDate));
+}
+
+export function isElapsedAppointmentSlot(
+  date: Date,
+  startTime: string,
+  referenceDate: Date = new Date(),
+) {
+  const slotDateTime = getLocalDateTime(date, startTime);
+  if (!slotDateTime) {
+    return false;
+  }
+
+  return slotDateTime.getTime() <= referenceDate.getTime();
+}
+
+export function filterBookableSlotsForDate(
+  slots: AvailabilitySlot[],
+  selectedDate: Date,
+  referenceDate: Date = new Date(),
+) {
+  return slots.filter((slot) => {
+    if (slot.isBooked) {
+      return false;
+    }
+
+    if (isPastAppointmentDate(selectedDate, referenceDate)) {
+      return false;
+    }
+
+    return !isElapsedAppointmentSlot(selectedDate, slot.startTime, referenceDate);
+  });
 }
 
 export function groupAvailabilitySlots(slots: AvailabilitySlot[]) {

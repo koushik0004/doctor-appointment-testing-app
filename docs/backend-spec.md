@@ -106,7 +106,6 @@ Use `make stop` to stop both servers started by `make dev`.
 - Use SQLAlchemy ORM models.
 - Keep SQLite DB simple.
 - Use service functions for appointment creation.
-- Mark availability slot as booked after successful appointment.
 - Generate confirmation code in backend.
 - Send or log email after appointment creation.
 
@@ -115,13 +114,11 @@ Use `make stop` to stop both servers started by `make dev`.
 ```txt
 Validate doctor exists
 ↓
-Validate selected availability exists and is not booked
+Validate selected slot exists for the requested date and is not already booked
 ↓
 Create or reuse patient by email
 ↓
 Create appointment with CONFIRMED status
-↓
-Mark availability as booked
 ↓
 Send/log confirmation email
 ↓

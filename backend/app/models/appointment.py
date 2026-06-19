@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from enum import Enum
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -28,13 +28,6 @@ class Appointment(Base):
         Integer,
         ForeignKey("patients.id"),
         nullable=False,
-        index=True,
-    )
-    availability_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("doctor_availability.id"),
-        nullable=True,
-        unique=True,
         index=True,
     )
     appointment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
@@ -73,5 +66,11 @@ class Appointment(Base):
             "doctor_id",
             "appointment_date",
             "appointment_time",
+        ),
+        UniqueConstraint(
+            "doctor_id",
+            "appointment_date",
+            "appointment_time",
+            name="uq_appointments_doctor_date_time",
         ),
     )

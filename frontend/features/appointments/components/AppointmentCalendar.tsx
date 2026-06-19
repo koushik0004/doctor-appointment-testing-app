@@ -1,36 +1,28 @@
 "use client";
 
 import * as React from "react";
-import { format, isBefore, startOfDay } from "date-fns";
+import { isBefore, startOfDay } from "date-fns";
 
 import { Calendar } from "@/components/ui/calendar";
 
 type AppointmentCalendarProps = {
   selectedDate: Date | undefined;
-  availableDates: Date[];
   onDateSelect: (date: Date | undefined) => void;
   month?: Date;
   onMonthChange?: (date: Date) => void;
+  referenceDate?: Date;
 };
-
-function toDateKey(date: Date) {
-  return format(date, "yyyy-MM-dd");
-}
 
 export function AppointmentCalendar({
   selectedDate,
-  availableDates,
   onDateSelect,
   month,
   onMonthChange,
+  referenceDate = new Date(),
 }: AppointmentCalendarProps) {
-  const availableDateKeys = React.useMemo(() => {
-    return new Set(availableDates.map(toDateKey));
-  }, [availableDates]);
-
   const minimumSelectableDate = React.useMemo(() => {
-    return startOfDay(availableDates[0] ?? new Date());
-  }, [availableDates]);
+    return startOfDay(referenceDate);
+  }, [referenceDate]);
 
   return (
     <Calendar
@@ -61,17 +53,7 @@ export function AppointmentCalendar({
         disabled: "cursor-not-allowed text-slate-300 opacity-35",
         hidden: "invisible",
       }}
-      modifiers={{
-        available: (date) => availableDateKeys.has(toDateKey(date)),
-      }}
-      modifiersClassNames={{
-        available:
-          "border border-brand-200 bg-brand-50 text-brand-600 font-semibold shadow-[0_8px_18px_rgba(6,182,212,0.08)]",
-      }}
-      disabled={(date) =>
-        isBefore(date, minimumSelectableDate) ||
-        !availableDateKeys.has(toDateKey(date))
-      }
+      disabled={(date) => isBefore(date, minimumSelectableDate)}
     />
   );
 }

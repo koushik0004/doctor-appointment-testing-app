@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 import sys
 
@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.db.base import Base  # noqa: E402
 from app.models.appointment import Appointment, AppointmentStatus  # noqa: E402
-from app.models.availability import DoctorAvailability  # noqa: E402
 from app.models.doctor import Doctor  # noqa: E402
 from app.models.patient import Patient  # noqa: E402
 from app.repositories.appointment_repository import (  # noqa: E402
@@ -29,7 +28,8 @@ def test_appointment_tables_and_repository_round_trip():
         Base.metadata.create_all(bind=engine)
 
         table_names = set(inspect(engine).get_table_names())
-        assert {"patients", "doctor_availability", "appointments"}.issubset(table_names)
+        assert {"doctors", "patients", "appointments"}.issubset(table_names)
+        assert "doctor_availability" not in table_names
 
         appointment_columns = {
             column["name"] for column in inspect(engine).get_columns("appointments")
@@ -38,7 +38,6 @@ def test_appointment_tables_and_repository_round_trip():
             "confirmation_code",
             "doctor_id",
             "patient_id",
-            "availability_id",
             "appointment_date",
             "appointment_time",
             "appointment_type",
@@ -47,6 +46,13 @@ def test_appointment_tables_and_repository_round_trip():
             "created_at",
             "updated_at",
         }.issubset(appointment_columns)
+        assert "availability_id" not in appointment_columns
+
+        unique_constraints = inspect(engine).get_unique_constraints("appointments")
+        assert any(
+            constraint["name"] == "uq_appointments_doctor_date_time"
+            for constraint in unique_constraints
+        )
 
         with SessionLocal() as session:
             doctor = Doctor(
@@ -73,24 +79,12 @@ def test_appointment_tables_and_repository_round_trip():
             session.add_all([doctor, patient])
             session.flush()
 
-            availability = DoctorAvailability(
-                doctor_id=doctor.id,
-                available_date=date(2026, 6, 8),
-                start_time="10:30",
-                end_time="11:00",
-                appointment_type="IN_PERSON",
-                is_booked=False,
-            )
-            session.add(availability)
-            session.flush()
-
             appointment = Appointment(
                 confirmation_code="CN-TEST-0001",
                 doctor_id=doctor.id,
                 patient_id=patient.id,
-                availability_id=availability.id,
-                appointment_date=date(2026, 6, 8),
-                appointment_time="10:30",
+                appointment_date=date.today() + timedelta(days=1),
+                appointment_time="10:00",
                 appointment_type="IN_PERSON",
                 health_description="Routine checkup",
                 status=AppointmentStatus.CONFIRMED.value,

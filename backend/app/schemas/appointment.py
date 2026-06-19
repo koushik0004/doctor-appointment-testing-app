@@ -18,7 +18,6 @@ class PatientInput(BaseModel):
 
 class AppointmentCreateRequest(BaseModel):
     doctor_id: Annotated[int, Field(gt=0)]
-    availability_id: Annotated[int, Field(gt=0)]
     appointment_date: date
     start_time: TimeString
     appointment_type: AppointmentType

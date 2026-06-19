@@ -90,23 +90,21 @@ Response:
 Query params:
 
 ```txt
-date_from?: YYYY-MM-DD
-date_to?: YYYY-MM-DD
-appointment_type?: IN_PERSON | TELEMEDICINE
+date: YYYY-MM-DD
 ```
 
 Response:
 
 ```json
 {
+  "date": "2024-10-24",
   "doctor_id": 1,
-  "slots": [
+  "available_slots": [
     {
       "id": 101,
       "available_date": "2024-10-24",
       "start_time": "10:30",
       "end_time": "11:00",
-      "appointment_type": "IN_PERSON",
       "is_booked": false
     }
   ]
@@ -134,7 +132,6 @@ Request:
 ```json
 {
   "doctor_id": 1,
-  "availability_id": 101,
   "appointment_date": "2024-10-24",
   "start_time": "10:30",
   "appointment_type": "IN_PERSON",
@@ -214,4 +211,3 @@ Use a consistent error shape:
   }
 }
 ```
-

@@ -6,6 +6,7 @@ import { format } from "date-fns";
 
 import type { Doctor } from "@/features/doctors/types";
 import { cn } from "@/lib/utils";
+import { formatCurrencyInr } from "@/lib/formatters";
 
 import type {
   AppointmentType,
@@ -96,9 +97,12 @@ export function AppointmentSummary({
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className="rounded-[18px] border border-slate-100 bg-slate-50/60 p-5">
-            <SectionHeading>Appointment Date &amp; Time</SectionHeading>
+          <SectionHeading>Appointment Date &amp; Time</SectionHeading>
           <dl className="mt-4 space-y-3">
-            <InfoRow label="Date" value={format(appointmentDate, "EEEE, MMMM d, yyyy")} />
+            <InfoRow
+              label="Date"
+              value={format(appointmentDate, "EEEE, MMMM d, yyyy")}
+            />
             <InfoRow label="Time" value={formatAppointmentTime(appointmentTime)} />
             <InfoRow label="Duration" value={`${doctor.durationMinutes} minutes`} />
           </dl>
@@ -109,7 +113,10 @@ export function AppointmentSummary({
           <dl className="mt-4 space-y-3">
             <InfoRow label="Clinic" value={doctor.clinic} />
             <InfoRow label="Location" value={doctor.location} />
-            <InfoRow label="Consultation Fee" value={`$${doctor.consultationFee}`} />
+            <InfoRow
+              label="Consultation Fee"
+              value={formatCurrencyInr(doctor.consultationFee)}
+            />
           </dl>
         </section>
 
