@@ -75,12 +75,21 @@ function DoctorAvatar({ name }: { name: string }) {
 function MetaItem({
   label,
   value,
+  isSelected = false,
 }: {
   label: string;
   value: string;
+  isSelected?: boolean;
 }) {
   return (
-    <div className="rounded-[14px] border border-slate-100 bg-white px-4 py-3">
+    <div
+      className={cn(
+        "rounded-[14px] border px-4 py-3",
+        isSelected
+          ? "border-brand-100 bg-white/90"
+          : "border-slate-100 bg-slate-50/70",
+      )}
+    >
       <dt className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
         {label}
       </dt>
@@ -118,33 +127,56 @@ export function AppointmentResultCard({
           : "border-slate-100 bg-white hover:border-brand-100",
       )}
     >
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-4">
-          <DoctorAvatar name={appointment.doctor_name} />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <h3 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+      <div className="flex items-start gap-4">
+        <DoctorAvatar name={appointment.doctor_name} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-2xl">
                 {appointment.doctor_name}
               </h3>
-              <span
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                  statusStyles(appointment.status),
-                )}
-              >
-                {statusLabel(appointment.status)}
-              </span>
+              <p className="mt-1 text-sm font-medium text-brand-600 sm:text-base">
+                {appointment.doctor_specialty}
+              </p>
             </div>
-            <p className="mt-1 text-base text-brand-600">
-              {appointment.doctor_specialty}
-            </p>
-            <p className="mt-3 text-sm text-slate-500">
-              Patient:{" "}
-              <span className="font-medium text-slate-900">
-                {appointment.patient_name}
-              </span>
-            </p>
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em]",
+                statusStyles(appointment.status),
+              )}
+            >
+              {statusLabel(appointment.status)}
+            </span>
           </div>
+        </div>
+      </div>
+
+      <dl className="mt-5 grid gap-3 sm:grid-cols-3">
+        <MetaItem
+          label="Appointment Date"
+          value={formatAppointmentDate(appointment.appointment_date)}
+          isSelected={isSelected}
+        />
+        <MetaItem
+          label="Appointment Time"
+          value={formatAppointmentTime(appointment.appointment_time)}
+          isSelected={isSelected}
+        />
+        <MetaItem
+          label="Appointment Type"
+          value={appointmentTypeLabel(appointment.appointment_type)}
+          isSelected={isSelected}
+        />
+      </dl>
+
+      <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            Patient Name
+          </p>
+          <p className="mt-1 truncate text-sm font-medium text-slate-900 sm:text-base">
+            {appointment.patient_name}
+          </p>
         </div>
 
         <button
@@ -153,26 +185,16 @@ export function AppointmentResultCard({
             event.stopPropagation();
             onViewDetails?.(appointment.appointment_id);
           }}
-          className="inline-flex h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2"
+          className={cn(
+            "inline-flex h-11 items-center justify-center rounded-[14px] px-5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2",
+            isSelected
+              ? "bg-brand-600 text-white hover:bg-brand-700"
+              : "border border-brand-100 bg-brand-500 text-white hover:bg-brand-600",
+          )}
         >
           View Details
         </button>
       </div>
-
-      <dl className="mt-5 grid gap-3 sm:grid-cols-3">
-        <MetaItem
-          label="Appointment Date"
-          value={formatAppointmentDate(appointment.appointment_date)}
-        />
-        <MetaItem
-          label="Appointment Time"
-          value={formatAppointmentTime(appointment.appointment_time)}
-        />
-        <MetaItem
-          label="Appointment Type"
-          value={appointmentTypeLabel(appointment.appointment_type)}
-        />
-      </dl>
     </article>
   );
 }
