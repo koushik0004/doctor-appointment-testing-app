@@ -25,7 +25,7 @@ function statusLabel(status: AppointmentSearchResult["status"]) {
 function statusStyles(status: AppointmentSearchResult["status"]) {
   switch (status) {
     case "booked":
-      return "bg-sky-50 text-sky-700 ring-1 ring-sky-100";
+      return "bg-brand-50 text-brand-700 ring-1 ring-brand-100";
     case "completed":
       return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100";
     case "cancelled":
@@ -66,7 +66,7 @@ function getInitials(name: string) {
 
 function DoctorAvatar({ name }: { name: string }) {
   return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-sky-100 to-cyan-200 text-lg font-semibold text-sky-800 ring-1 ring-slate-200">
+    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-brand-50 to-brand-100 text-lg font-semibold text-brand-700 ring-1 ring-slate-200">
       {getInitials(name)}
     </div>
   );
@@ -132,8 +132,10 @@ export function AppointmentResultCard({
       aria-label={`Appointment ${appointment.appointment_id} with ${appointment.doctor_name}`}
       aria-pressed={isSelected}
       className={cn(
-        "grid cursor-pointer overflow-hidden rounded-[24px] border bg-white shadow-soft transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2",
-        isSelected ? "border-sky-200 ring-1 ring-sky-100" : "border-slate-200 hover:border-sky-200",
+        "grid cursor-pointer overflow-hidden rounded-[24px] border bg-white shadow-soft transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+        isSelected
+          ? "border-brand-200 ring-1 ring-brand-100 focus-visible:ring-brand-200"
+          : "border-slate-200 hover:border-brand-200 focus-visible:ring-brand-200",
       )}
     >
       <div className="grid gap-5 p-5 sm:grid-cols-[72px_minmax(0,1fr)] sm:p-6">
@@ -145,7 +147,7 @@ export function AppointmentResultCard({
               <h3 className="mt-3 text-2xl font-semibold leading-tight tracking-[-0.04em] text-slate-950">
                 {appointment.doctor_name}
               </h3>
-              <p className="mt-1 text-sm font-medium text-sky-500">
+              <p className="mt-1 text-sm font-medium text-brand-600">
                 {appointment.doctor_specialty}
               </p>
             </div>
@@ -207,7 +209,7 @@ export function AppointmentResultCard({
               event.stopPropagation();
               onViewDetails?.(appointment.appointment_id);
             }}
-            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-sky-200 hover:text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2"
+            className="inline-flex h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-brand-200 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2"
           >
             View Details
           </button>

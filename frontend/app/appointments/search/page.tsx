@@ -108,7 +108,7 @@ function SearchField({
   return (
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">{label}</span>
-      <input
+        <input
         id={inputId}
         type={type}
         name={name}
@@ -119,7 +119,7 @@ function SearchField({
         inputMode={inputMode}
         aria-invalid={Boolean(errorMessage)}
         aria-describedby={errorMessage ? errorId : undefined}
-        className="mt-2 h-12 w-full rounded-[14px] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-2 focus:ring-sky-200 focus:ring-offset-2"
+        className="mt-2 h-12 w-full rounded-[14px] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100 focus:ring-offset-2"
       />
       {errorMessage ? (
         <p id={errorId} className="mt-2 text-sm text-rose-600">
@@ -175,10 +175,7 @@ function ResultsHeader({
         </h2>
       </div>
       {count !== null ? (
-        <span
-          className="rounded-full bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 ring-1 ring-sky-100"
-          aria-live="polite"
-        >
+        <span className="rounded-full bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 ring-1 ring-brand-100" aria-live="polite">
           {count} result{count === 1 ? "" : "s"}
         </span>
       ) : null}
@@ -237,14 +234,14 @@ export default function AppointmentSearchPage() {
   return (
     <section className="py-8 lg:py-12">
       <div className="mx-auto max-w-7xl space-y-8">
-        <div className="overflow-hidden rounded-[32px] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50 shadow-soft">
+        <div className="overflow-hidden rounded-[32px] border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-slate-50 shadow-soft">
           <div className="px-6 py-10 text-center sm:px-10 lg:px-16 lg:py-14">
-            <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+            <span className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">
               Appointment search
             </span>
             <h1 className="mx-auto mt-5 max-w-5xl text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl lg:text-6xl">
               Find and review your next{" "}
-              <span className="text-sky-400">healthcare</span> appointment.
+              <span className="text-brand-500">healthcare</span> appointment.
             </h1>
             <p className="mx-auto mt-4 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
               Search by patient name, email, or phone number, then open any
@@ -326,7 +323,7 @@ export default function AppointmentSearchPage() {
               disabled={!searchIsValid || isSubmitting || isLoading}
               aria-busy={isLoading}
               className={cn(
-                "inline-flex h-12 items-center justify-center rounded-[14px] bg-sky-500 px-6 text-sm font-semibold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300",
+                "inline-flex h-12 items-center justify-center rounded-[14px] bg-brand-500 px-6 text-sm font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300",
                 isLoading ? "gap-3" : "",
               )}
             >
@@ -362,7 +359,7 @@ export default function AppointmentSearchPage() {
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2"
+              className="inline-flex h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-100 focus-visible:ring-offset-2"
             >
               Reset
             </button>

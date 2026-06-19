@@ -29,7 +29,7 @@ function statusStyles(status: AppointmentStatus) {
     case "PENDING":
       return "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
     case "CONFIRMED":
-      return "bg-sky-50 text-sky-700 ring-1 ring-sky-100";
+      return "bg-brand-50 text-brand-700 ring-1 ring-brand-100";
     case "CANCELLED":
       return "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
   }
@@ -105,7 +105,7 @@ function EmptyState() {
 
 function LoadingState() {
   return (
-    <div className="rounded-[28px] border border-sky-100 bg-white p-6 shadow-soft">
+    <div className="rounded-[28px] border border-brand-100 bg-white p-6 shadow-soft">
       <div className="h-4 w-36 animate-pulse rounded-full bg-slate-100" />
       <div className="mt-5 h-8 w-56 animate-pulse rounded-full bg-slate-100" />
       <div className="mt-8 space-y-3">
@@ -172,7 +172,7 @@ export function AppointmentDetailsPanel({
     >
       <div className="border-b border-slate-100 px-6 py-5">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-500 ring-1 ring-sky-100">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-500 ring-1 ring-brand-100">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -197,10 +197,10 @@ export function AppointmentDetailsPanel({
       </div>
 
       <div className="space-y-6 px-6 py-6">
-        <div className="rounded-[24px] bg-sky-50/60 px-4 py-3 ring-1 ring-sky-100">
+        <div className="rounded-[24px] bg-brand-50/60 px-4 py-3 ring-1 ring-brand-100">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700/80">
                 Current Status
               </p>
               <p className="mt-1 text-sm font-medium text-slate-900">
