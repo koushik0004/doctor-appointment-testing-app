@@ -55,7 +55,8 @@ GET /api/appointments/{appointment_id}/recommended-doctors
       "next_available_date": "2026-06-20",
       "next_available_slot": "06:15 PM",
       "profile_image": "/avatars/doctor-sarah.svg",
-      "clinic_name": "Riverside Family Clinic"
+      "clinic_name": "Riverside Family Clinic",
+      "recommendation_reason": "same_specialty"
     }
   ]
 }
@@ -92,6 +93,7 @@ If no recommendations are available, the API should still return `200 OK` with a
 - `next_available_slot` - first available booking slot label, if available
 - `profile_image` - doctor avatar or profile image path
 - `clinic_name` - clinic display name
+- `recommendation_reason` - `same_specialty` or `related_specialty`
 
 ## Validation Rules
 

@@ -23,6 +23,14 @@ Fields:
 - `next_available_slot: str`
 - `profile_image: str`
 - `clinic_name: str`
+- `recommendation_reason: RecommendationReason`
+
+### `RecommendationReason`
+
+Enum values:
+
+- `same_specialty`
+- `related_specialty`
 
 Notes:
 
@@ -59,7 +67,8 @@ Fields:
       "next_available_date": "2026-06-20",
       "next_available_slot": "06:15 PM",
       "profile_image": "/avatars/doctor-sarah.svg",
-      "clinic_name": "Riverside Family Clinic"
+      "clinic_name": "Riverside Family Clinic",
+      "recommendation_reason": "same_specialty"
     }
   ]
 }
