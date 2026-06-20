@@ -6,6 +6,8 @@ type DoctorCardProps = {
   doctor: Doctor;
   isSelected: boolean;
   onSelect: (doctorId: string) => void;
+  actionLabel?: string;
+  selectedActionLabel?: string;
 };
 
 function StarIcon() {
@@ -28,7 +30,13 @@ function InfoIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function DoctorCard({ doctor, isSelected, onSelect }: DoctorCardProps) {
+export function DoctorCard({
+  doctor,
+  isSelected,
+  onSelect,
+  actionLabel = "Choose time",
+  selectedActionLabel = "Selected",
+}: DoctorCardProps) {
   return (
     <article
       className={`grid overflow-hidden rounded-[20px] border bg-white transition lg:grid-cols-[minmax(0,1fr)_188px] ${
@@ -133,7 +141,7 @@ export function DoctorCard({ doctor, isSelected, onSelect }: DoctorCardProps) {
           }`}
           aria-pressed={isSelected}
         >
-          {isSelected ? "Selected" : "Choose time"}
+          {isSelected ? selectedActionLabel : actionLabel}
         </button>
       </div>
     </article>
