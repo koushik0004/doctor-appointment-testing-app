@@ -8,6 +8,7 @@ type DoctorCardProps = {
   onSelect: (doctorId: string) => void;
   actionLabel?: string;
   selectedActionLabel?: string;
+  variant?: "default" | "featured" | "compact";
 };
 
 function StarIcon() {
@@ -36,8 +37,178 @@ export function DoctorCard({
   onSelect,
   actionLabel = "Choose time",
   selectedActionLabel = "Selected",
+  variant = "default",
 }: DoctorCardProps) {
   const hasFeeRange = doctor.feeRange.min > 0 || doctor.feeRange.max > 0;
+  const buttonLabel = isSelected ? selectedActionLabel : actionLabel;
+
+  if (variant === "featured") {
+    return (
+      <article
+        className={`overflow-hidden rounded-[24px] border transition ${
+          isSelected
+            ? "border-sky-300 bg-sky-100"
+            : "border-sky-100 bg-[#dff8ff] hover:border-sky-200"
+        }`}
+      >
+        <div className="grid gap-6 p-6 sm:grid-cols-[120px_minmax(0,1fr)] sm:p-7">
+          <div className="relative h-28 w-28 overflow-hidden rounded-full bg-white/80 ring-1 ring-sky-100">
+            <Image
+              src={doctor.avatar.imageSrc}
+              alt={doctor.avatar.imageAlt}
+              fill
+              className="object-cover"
+              sizes="112px"
+            />
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-[2rem] font-semibold leading-[1.05] tracking-[-0.04em] text-slate-900">
+                  {doctor.name}
+                </h2>
+                <p className="mt-2 text-[1.05rem] font-semibold leading-tight text-sky-500">
+                  {doctor.specialty}
+                </p>
+              </div>
+
+              <span className="inline-flex h-10 items-center rounded-full bg-sky-400 px-4 text-xs font-semibold uppercase tracking-[0.14em] text-white">
+                Next Available
+              </span>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 text-[0.95rem] text-slate-600">
+              <div className="flex items-center gap-2">
+                <StarIcon />
+                <span className="font-semibold text-slate-900">
+                  {doctor.rating.toFixed(1)}
+                </span>
+                <span>({doctor.reviewCount} reviews)</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <InfoIcon>
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
+                    <path
+                      d="M10 1.75a6.75 6.75 0 0 0-6.75 6.75c0 5.04 6 9.75 6.26 9.95a.75.75 0 0 0 .98 0c.26-.2 6.26-4.91 6.26-9.95A6.75 6.75 0 0 0 10 1.75Zm0 9a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </InfoIcon>
+                <span>
+                  {doctor.clinic}, {doctor.location}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4 rounded-[18px] bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Earliest Slot
+                </p>
+                <p className="mt-1 text-[1.35rem] font-semibold tracking-[-0.03em] text-slate-900">
+                  {doctor.nextAvailable}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onSelect(doctor.id)}
+                className={`inline-flex h-12 items-center justify-center rounded-[14px] px-6 text-sm font-semibold transition sm:min-w-[156px] ${
+                  isSelected
+                    ? "bg-sky-500 text-white hover:bg-sky-600"
+                    : "bg-sky-400 text-white hover:bg-sky-500"
+                }`}
+                aria-pressed={isSelected}
+              >
+                {buttonLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  if (variant === "compact") {
+    return (
+      <article
+        className={`overflow-hidden rounded-[20px] border bg-white transition ${
+          isSelected
+            ? "border-sky-300 bg-sky-50/50"
+            : "border-slate-200 hover:border-sky-200"
+        }`}
+      >
+        <div className="p-5">
+          <div className="flex items-start gap-4">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-sky-50 ring-1 ring-slate-200">
+              <Image
+                src={doctor.avatar.imageSrc}
+                alt={doctor.avatar.imageAlt}
+                fill
+                className="object-cover"
+                sizes="64px"
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-[1.55rem] font-semibold leading-tight tracking-[-0.04em] text-slate-900">
+                {doctor.name}
+              </h3>
+              <p className="mt-1 text-base text-slate-600">{doctor.specialty}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                <div className="flex items-center gap-1.5">
+                  <StarIcon />
+                  <span className="font-semibold text-slate-900">
+                    {doctor.rating.toFixed(1)}
+                  </span>
+                  <span>({doctor.reviewCount})</span>
+                </div>
+
+                {doctor.appointmentTypes.map((type) => (
+                  <span
+                    key={type}
+                    className={`rounded-full px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.08em] ${
+                      type === "TELEMEDICINE"
+                        ? "bg-sky-50 text-sky-500"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {type === "TELEMEDICINE" ? "Telemedicine" : "In-Person"}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 border-t border-slate-200 px-5 py-4">
+          <div>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              Available
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              {doctor.nextAvailable}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onSelect(doctor.id)}
+            className={`inline-flex h-11 items-center justify-center rounded-[12px] px-5 text-sm font-semibold transition ${
+              isSelected
+                ? "bg-sky-400 text-white hover:bg-sky-500"
+                : "border border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"
+            }`}
+            aria-pressed={isSelected}
+          >
+            {buttonLabel}
+          </button>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article
@@ -145,7 +316,7 @@ export function DoctorCard({
           }`}
           aria-pressed={isSelected}
         >
-          {isSelected ? selectedActionLabel : actionLabel}
+          {buttonLabel}
         </button>
       </div>
     </article>

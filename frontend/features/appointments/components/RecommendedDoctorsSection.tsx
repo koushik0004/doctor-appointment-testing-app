@@ -204,6 +204,7 @@ export function RecommendedDoctorsSection({
   const recommendedDoctors = data.recommended_doctors.map((recommendedDoctor) =>
     toDoctorCardModel(data.appointment_id, recommendedDoctor),
   );
+  const [featuredDoctor, ...remainingDoctors] = recommendedDoctors;
 
   return (
     <section aria-labelledby="available-doctors-heading" className="border-t border-slate-100 pt-8">
@@ -224,17 +225,32 @@ export function RecommendedDoctorsSection({
         </span>
       </div>
 
-      <div className="mt-6 grid gap-5">
-        {recommendedDoctors.map((doctor) => (
-          <DoctorCard
-            key={doctor.id}
-            doctor={doctor}
-            isSelected={doctor.id === selectedDoctorId}
-            onSelect={setSelectedDoctorId}
-            actionLabel="Book"
-            selectedActionLabel="Booked"
-          />
-        ))}
+      <div className="mt-6 space-y-5">
+        <DoctorCard
+          key={featuredDoctor.id}
+          doctor={featuredDoctor}
+          isSelected={featuredDoctor.id === selectedDoctorId}
+          onSelect={setSelectedDoctorId}
+          actionLabel="Book Now"
+          selectedActionLabel="Booked"
+          variant="featured"
+        />
+
+        {remainingDoctors.length > 0 ? (
+          <div className="grid gap-5 md:grid-cols-2">
+            {remainingDoctors.map((doctor) => (
+              <DoctorCard
+                key={doctor.id}
+                doctor={doctor}
+                isSelected={doctor.id === selectedDoctorId}
+                onSelect={setSelectedDoctorId}
+                actionLabel="Book"
+                selectedActionLabel="Booked"
+                variant="compact"
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
