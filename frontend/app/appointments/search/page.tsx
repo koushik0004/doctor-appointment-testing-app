@@ -253,6 +253,26 @@ export default function AppointmentSearchPage() {
     [searchResponse?.appointments],
   );
 
+  React.useEffect(() => {
+    if (appointments.length === 0) {
+      setSelectedAppointmentId(null);
+      return;
+    }
+
+    setSelectedAppointmentId((currentSelectedAppointmentId) => {
+      const hasSelectedAppointment = appointments.some(
+        (appointment) =>
+          appointment.appointment_id === currentSelectedAppointmentId,
+      );
+
+      if (hasSelectedAppointment) {
+        return currentSelectedAppointmentId;
+      }
+
+      return appointments[0]?.appointment_id ?? null;
+    });
+  }, [appointments]);
+
   function handleReset() {
     reset(emptySearchValues);
     resetSearch();
