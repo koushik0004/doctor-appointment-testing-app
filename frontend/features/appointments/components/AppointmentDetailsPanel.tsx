@@ -4,6 +4,7 @@ import Image from "next/image";
 
 import { format, parse, parseISO } from "date-fns";
 
+import { DoctorSummaryCard } from "@/features/appointments/components/DoctorSummaryCard";
 import { useAppointmentDetails } from "@/features/appointments/hooks/use-appointment-details";
 import type {
   AppointmentDetailsResponse,
@@ -172,6 +173,12 @@ function PatientRow({
   );
 }
 
+function buildAvailableDoctors(currentDoctorName: string) {
+  const matchedDoctors = doctors.filter((doctor) => doctor.name !== currentDoctorName);
+
+  return matchedDoctors.slice(0, 3);
+}
+
 function DoctorAvatar({ doctorName }: { doctorName: string }) {
   const avatar = resolveDoctorAvatar(doctorName);
 
@@ -296,6 +303,8 @@ export function AppointmentDetailsPanel({
     return <EmptyState />;
   }
 
+  const availableDoctors = buildAvailableDoctors(data.doctor.name);
+
   return (
     <section
       className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft"
@@ -377,6 +386,20 @@ export function AppointmentDetailsPanel({
               value={data.patient.phone ?? "Not provided"}
             />
           </dl>
+        </section>
+
+        <section className="rounded-[22px] border border-slate-100 bg-slate-50/80 p-5">
+          <SectionLabel>Available Doctors</SectionLabel>
+          <div className="mt-4 grid gap-4">
+            {availableDoctors.map((doctor) => (
+              <DoctorSummaryCard
+                key={doctor.id}
+                doctor={doctor}
+                ratingLabel="Available"
+                waitTimeLabel={doctor.nextAvailable}
+              />
+            ))}
+          </div>
         </section>
       </div>
     </section>
