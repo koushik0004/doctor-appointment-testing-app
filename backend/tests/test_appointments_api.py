@@ -203,6 +203,40 @@ def test_appointment_details_endpoint_returns_404_for_missing_appointment(client
     assert response.json()["detail"] == "Appointment 999999 not found"
 
 
+def test_recommended_doctors_endpoint_returns_bookable_matches(client):
+    doctor_id = _get_doctor_id(client, "Dr. Sarah Jenkins")
+    appointment = _book_appointment(
+        client,
+        doctor_id=doctor_id,
+        appointment_date=date.today() + timedelta(days=1),
+        start_time="10:00",
+        full_name="Recommendation Test Patient",
+        email="recommendation.test@example.com",
+        phone="4444444444",
+    )
+
+    response = client.get(f"/api/appointments/{appointment['id']}/recommended-doctors")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["appointment_id"] == appointment["id"]
+    assert payload["specialty"] == "Cardiology"
+    assert payload["recommended_doctors"]
+    assert all(item["doctor_id"] != doctor_id for item in payload["recommended_doctors"])
+    assert any(
+        item["recommendation_reason"] == "same_specialty"
+        for item in payload["recommended_doctors"]
+    )
+    assert any(item["specialty"] == "Cardiology" for item in payload["recommended_doctors"])
+
+
+def test_recommended_doctors_endpoint_returns_404_for_missing_appointment(client):
+    response = client.get("/api/appointments/999999/recommended-doctors")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Appointment 999999 not found"
+
+
 def test_booking_payload_validation():
     with pytest.raises(ValidationError) as exc_info:
         AppointmentCreateRequest.model_validate(

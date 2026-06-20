@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -13,11 +13,13 @@ from app.schemas.appointment import (
     AppointmentCreateRequest,
     AppointmentCreateResponse,
 )
+from app.schemas.recommendation import RecommendedDoctorsResponse
 from app.services.appointment_service import (
     create_appointment_booking,
     get_appointment_details,
 )
 from app.services.appointment_search_service import search_appointments as search_appointment_records
+from app.services.recommendation_service import get_recommended_doctors
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -93,3 +95,22 @@ def read_appointment(
     session: Session = Depends(get_db),
 ) -> AppointmentDetailsResponse:
     return get_appointment_details(session, appointment_id)
+
+
+@router.get(
+    "/{appointment_id}/recommended-doctors",
+    response_model=RecommendedDoctorsResponse,
+    summary="Get recommended doctors",
+    description="Return doctors recommended for the appointment being viewed.",
+    responses={
+        404: {"description": "Appointment or doctor not found."},
+        500: {"description": "Unexpected server error."},
+    },
+)
+def read_recommended_doctors(
+    appointment_id: int = Path(
+        ..., gt=0, description="Identifier of the appointment being viewed."
+    ),
+    session: Session = Depends(get_db),
+) -> RecommendedDoctorsResponse:
+    return get_recommended_doctors(session, appointment_id)
