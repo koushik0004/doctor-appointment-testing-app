@@ -119,7 +119,7 @@ function SearchField({
         inputMode={inputMode}
         aria-invalid={Boolean(errorMessage)}
         aria-describedby={errorMessage ? errorId : undefined}
-        className="mt-2 h-12 w-full rounded-[14px] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-2 focus:ring-sky-200 focus:ring-offset-2"
+        className="mt-2 h-12 w-full rounded-[14px] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-300 focus:ring-2 focus:ring-brand-100 focus:ring-offset-2"
       />
       {errorMessage ? (
         <p id={errorId} className="mt-2 text-sm text-rose-600">
@@ -138,9 +138,26 @@ function EmptyStateCard({
   description: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+    <div className="rounded-[22px] border border-brand-100 bg-brand-50/55 px-5 py-8 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-brand-600 ring-1 ring-brand-100">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="h-5 w-5"
+        >
+          <rect x="3" y="5" width="18" height="16" rx="3" />
+          <path d="M16 3v4M8 3v4M3 10h18" />
+        </svg>
+      </div>
+      <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-slate-950">
+        {title}
+      </h3>
+      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
+        {description}
+      </p>
     </div>
   );
 }
@@ -173,10 +190,14 @@ function ResultsHeader({
         >
           {count === null ? "Search results will appear here" : "Matched appointments"}
         </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+          Review each booking card, then open a result to inspect the complete
+          appointment details in the booking sidebar.
+        </p>
       </div>
       {count !== null ? (
         <span
-          className="rounded-full bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 ring-1 ring-sky-100"
+          className="rounded-full bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 ring-1 ring-brand-100"
           aria-live="polite"
         >
           {count} result{count === 1 ? "" : "s"}
@@ -237,18 +258,19 @@ export default function AppointmentSearchPage() {
   return (
     <section className="py-8 lg:py-12">
       <div className="mx-auto max-w-7xl space-y-8">
-        <div className="overflow-hidden rounded-[32px] border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50 shadow-soft">
+        <div className="overflow-hidden rounded-[32px] border border-brand-100 bg-brand-50/65 shadow-soft">
           <div className="px-6 py-10 text-center sm:px-10 lg:px-16 lg:py-14">
-            <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+            <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-700 ring-1 ring-brand-100">
               Appointment search
             </span>
             <h1 className="mx-auto mt-5 max-w-5xl text-4xl font-semibold tracking-[-0.06em] text-slate-950 sm:text-5xl lg:text-6xl">
-              Find and review your next{" "}
-              <span className="text-sky-400">healthcare</span> appointment.
+              Find your{" "}
+              <span className="text-brand-500">healthcare</span> appointment.
             </h1>
             <p className="mx-auto mt-4 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
               Search by patient name, email, or phone number, then open any
-              appointment to see the full patient, doctor, and booking details.
+              booking to review the doctor, appointment, and patient details in
+              one place.
             </p>
           </div>
         </div>
@@ -258,55 +280,72 @@ export default function AppointmentSearchPage() {
           className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8"
           aria-label="Search appointments"
         >
-          <div className="grid gap-5 md:grid-cols-3">
-            <SearchField
-              label="Name"
-              name="name"
-              value={currentValues.name}
-              onChange={(field, value) =>
-                setValue(field, value, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-              placeholder="Enter patient name"
-              autoComplete="name"
-              errorMessage={errors.name?.message}
-            />
-            <SearchField
-              label="Email"
-              name="email"
-              value={currentValues.email}
-              onChange={(field, value) =>
-                setValue(field, value, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-              placeholder="Enter email address"
-              type="email"
-              autoComplete="email"
-              errorMessage={errors.email?.message}
-            />
-            <SearchField
-              label="Phone"
-              name="phone"
-              value={currentValues.phone}
-              onChange={(field, value) =>
-                setValue(field, value, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-              placeholder="Enter phone number"
-              autoComplete="tel"
-              inputMode="numeric"
-              errorMessage={errors.phone?.message}
-            />
+          <div className="rounded-[24px] border border-brand-100 bg-brand-50/45 p-5 sm:p-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
+                  Search details
+                </p>
+                <h2 className="mt-2 text-[1.75rem] font-semibold tracking-[-0.05em] text-slate-950">
+                  Look up an existing booking
+                </h2>
+              </div>
+              <p className="max-w-md text-sm leading-6 text-slate-600">
+                Provide any one patient detail. Adding more details narrows the
+                matched appointments.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-5 md:grid-cols-3">
+              <SearchField
+                label="Name"
+                name="name"
+                value={currentValues.name}
+                onChange={(field, value) =>
+                  setValue(field, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                placeholder="Enter patient name"
+                autoComplete="name"
+                errorMessage={errors.name?.message}
+              />
+              <SearchField
+                label="Email"
+                name="email"
+                value={currentValues.email}
+                onChange={(field, value) =>
+                  setValue(field, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                placeholder="Enter email address"
+                type="email"
+                autoComplete="email"
+                errorMessage={errors.email?.message}
+              />
+              <SearchField
+                label="Phone"
+                name="phone"
+                value={currentValues.phone}
+                onChange={(field, value) =>
+                  setValue(field, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                placeholder="Enter phone number"
+                autoComplete="tel"
+                inputMode="numeric"
+                errorMessage={errors.phone?.message}
+              />
+            </div>
           </div>
 
           {!searchIsValid && !hasAnySearchValue ? (
-            <p className="mt-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="mt-4 rounded-[16px] border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-900">
               Enter at least one search detail to enable Search.
             </p>
           ) : null}
@@ -326,7 +365,7 @@ export default function AppointmentSearchPage() {
               disabled={!searchIsValid || isSubmitting || isLoading}
               aria-busy={isLoading}
               className={cn(
-                "inline-flex h-12 items-center justify-center rounded-[14px] bg-sky-500 px-6 text-sm font-semibold text-white transition hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300",
+                "inline-flex h-12 items-center justify-center rounded-[14px] bg-brand-500 px-6 text-sm font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300",
                 isLoading ? "gap-3" : "",
               )}
             >
@@ -362,14 +401,14 @@ export default function AppointmentSearchPage() {
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2"
+              className="inline-flex h-12 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-100 focus-visible:ring-offset-2"
             >
               Reset
             </button>
           </div>
         </form>
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1.45fr)_minmax(380px,0.95fr)]">
           <section
             className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft lg:p-8"
             aria-labelledby="appointment-results-heading"
@@ -388,12 +427,12 @@ export default function AppointmentSearchPage() {
               ) : !hasSearched ? (
                 <EmptyStateCard
                   title="No search has been run yet"
-                  description="Use the form above to load appointment cards from the API."
+                  description="Use the form above to load matching appointment cards."
                 />
               ) : appointments.length === 0 ? (
                 <EmptyStateCard
                   title="No matching appointments"
-                  description="The API returned no appointments for the provided search details."
+                  description="No bookings matched the search details you entered."
                 />
               ) : (
                 <div className="grid gap-5">
@@ -415,10 +454,13 @@ export default function AppointmentSearchPage() {
           <aside className="space-y-5 xl:sticky xl:top-6">
             <AppointmentDetailsPanel appointmentId={selectedAppointmentId} />
 
-            <div className="rounded-[28px] border border-slate-100 bg-white p-6 shadow-soft">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-                Why book with CareNow?
+            <div className="rounded-[28px] border border-sky-100 bg-sky-50/70 p-6 shadow-soft">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-500">
+                CareNow Guarantee
               </p>
+              <h3 className="mt-3 text-[1.75rem] font-semibold tracking-[-0.05em] text-slate-950">
+                Booking support that matches the appointment flow
+              </h3>
               <ul className="mt-5 space-y-4 text-sm leading-6 text-slate-600">
                 <li className="flex items-start gap-3">
                   <svg
@@ -427,7 +469,7 @@ export default function AppointmentSearchPage() {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.8"
-                    className="mt-0.5 h-5 w-5 shrink-0 text-slate-400"
+                    className="mt-0.5 h-5 w-5 shrink-0 text-sky-500"
                   >
                     <path d="M20 6 9 17l-5-5" />
                   </svg>
@@ -440,7 +482,7 @@ export default function AppointmentSearchPage() {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.8"
-                    className="mt-0.5 h-5 w-5 shrink-0 text-slate-400"
+                    className="mt-0.5 h-5 w-5 shrink-0 text-sky-500"
                   >
                     <circle cx="12" cy="12" r="9" />
                     <path d="M12 8v4l3 2" />
@@ -454,7 +496,7 @@ export default function AppointmentSearchPage() {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.8"
-                    className="mt-0.5 h-5 w-5 shrink-0 text-slate-400"
+                    className="mt-0.5 h-5 w-5 shrink-0 text-sky-500"
                   >
                     <path d="M4 7a2 2 0 0 1 2-2h3l2 3h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
                     <path d="M9 13h6" />
