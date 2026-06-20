@@ -12,7 +12,7 @@ class Doctor(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     specialty: Mapped[str] = mapped_column(Text, nullable=False, index=True)
-    rating: Mapped[float] = mapped_column(Float, nullable=False)
+    rating: Mapped[float] = mapped_column(Float, nullable=False, index=True)
     review_count: Mapped[int] = mapped_column(Integer, nullable=False)
     clinic_name: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[str] = mapped_column(Text, nullable=False)
@@ -23,7 +23,7 @@ class Doctor(Base):
     languages: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str] = mapped_column(Text, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     @staticmethod
     def encode_list(values: list[str]) -> str:

@@ -90,21 +90,13 @@ def _fetch_candidate_doctors(
             Doctor.id != exclude_doctor_id,
             Doctor.specialty.in_(specialties),
         )
+        .order_by(
+            Doctor.rating.desc(),
+            Doctor.review_count.desc(),
+            Doctor.name.asc(),
+        )
     )
     return list(session.scalars(statement).all())
-
-
-def _sort_candidates(
-    doctors: list[tuple[Doctor, RecommendationReason, date, str]],
-) -> list[tuple[Doctor, RecommendationReason, date, str]]:
-    return sorted(
-        doctors,
-        key=lambda item: (
-            -item[0].rating,
-            -item[0].review_count,
-            item[0].name.lower(),
-        ),
-    )
 
 
 def _to_response_item(
@@ -168,7 +160,6 @@ def get_recommended_doctors(
             )
         )
 
-    sorted_candidates = _sort_candidates(scored_candidates)
     recommendations = [
         _to_response_item(
             doctor,
@@ -176,7 +167,7 @@ def get_recommended_doctors(
             next_available_date=next_available_date,
             next_available_slot=next_available_slot,
         )
-        for doctor, recommendation_reason, next_available_date, next_available_slot in sorted_candidates[
+        for doctor, recommendation_reason, next_available_date, next_available_slot in scored_candidates[
             :MAX_RECOMMENDATIONS
         ]
     ]
