@@ -13,7 +13,7 @@ Verify:
 
 Create:
 
-docs/analysis/feature-4.1/feature-4-recommended-doctors-validation-report.md
+docs/reports/feature-4.1/feature-4-recommended-doctors-validation-report.md
 
 Include:
 
