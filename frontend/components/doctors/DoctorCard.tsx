@@ -6,6 +6,7 @@ type DoctorCardProps = {
   doctor: Doctor;
   isSelected: boolean;
   onSelect: (doctorId: string) => void;
+  onAction?: (doctor: Doctor) => void;
   actionLabel?: string;
   selectedActionLabel?: string;
   variant?: "default" | "featured" | "compact";
@@ -35,12 +36,21 @@ export function DoctorCard({
   doctor,
   isSelected,
   onSelect,
+  onAction,
   actionLabel = "Choose time",
   selectedActionLabel = "Selected",
   variant = "default",
 }: DoctorCardProps) {
   const hasFeeRange = doctor.feeRange.min > 0 || doctor.feeRange.max > 0;
   const buttonLabel = isSelected ? selectedActionLabel : actionLabel;
+  const handleAction = () => {
+    if (onAction) {
+      onAction(doctor);
+      return;
+    }
+
+    onSelect(doctor.id);
+  };
 
   if (variant === "featured") {
     return (
@@ -114,7 +124,7 @@ export function DoctorCard({
 
               <button
                 type="button"
-                onClick={() => onSelect(doctor.id)}
+                onClick={handleAction}
                 className={`inline-flex h-12 items-center justify-center rounded-[14px] px-6 text-sm font-semibold transition sm:min-w-[156px] ${
                   isSelected
                     ? "bg-sky-500 text-white hover:bg-sky-600"
@@ -195,7 +205,7 @@ export function DoctorCard({
 
           <button
             type="button"
-            onClick={() => onSelect(doctor.id)}
+            onClick={handleAction}
             className={`inline-flex h-11 items-center justify-center rounded-[12px] px-5 text-sm font-semibold transition ${
               isSelected
                 ? "bg-sky-400 text-white hover:bg-sky-500"
@@ -308,7 +318,7 @@ export function DoctorCard({
         </p>
         <button
           type="button"
-          onClick={() => onSelect(doctor.id)}
+          onClick={handleAction}
           className={`mt-5 w-full rounded-[12px] px-4 py-3 text-sm font-semibold transition ${
             isSelected
               ? "bg-sky-400 text-white hover:bg-sky-500"

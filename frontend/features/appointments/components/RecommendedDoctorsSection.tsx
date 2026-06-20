@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
+import { useRouter } from "next/navigation";
 
 import { DoctorCard } from "@/components/doctors/DoctorCard";
 import { useRecommendedDoctors } from "@/features/appointments/hooks/use-recommended-doctors";
@@ -178,12 +179,8 @@ export function RecommendedDoctorsSection({
 }: {
   appointmentId: number | null;
 }) {
+  const router = useRouter();
   const { data, error, isLoading, refetch } = useRecommendedDoctors(appointmentId);
-  const [selectedDoctorId, setSelectedDoctorId] = React.useState("");
-
-  React.useEffect(() => {
-    setSelectedDoctorId("");
-  }, [appointmentId]);
 
   if (appointmentId === null) {
     return <SelectionPrompt />;
@@ -229,8 +226,11 @@ export function RecommendedDoctorsSection({
         <DoctorCard
           key={featuredDoctor.id}
           doctor={featuredDoctor}
-          isSelected={featuredDoctor.id === selectedDoctorId}
-          onSelect={setSelectedDoctorId}
+          isSelected={false}
+          onSelect={() => undefined}
+          onAction={(doctor) => {
+            router.push(`/appointments?doctorId=${doctor.backendId}`);
+          }}
           actionLabel="Book Now"
           selectedActionLabel="Booked"
           variant="featured"
@@ -242,8 +242,11 @@ export function RecommendedDoctorsSection({
               <DoctorCard
                 key={doctor.id}
                 doctor={doctor}
-                isSelected={doctor.id === selectedDoctorId}
-                onSelect={setSelectedDoctorId}
+                isSelected={false}
+                onSelect={() => undefined}
+                onAction={(selectedDoctor) => {
+                  router.push(`/appointments?doctorId=${selectedDoctor.backendId}`);
+                }}
                 actionLabel="Book"
                 selectedActionLabel="Booked"
                 variant="compact"
