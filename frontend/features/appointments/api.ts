@@ -8,6 +8,7 @@ import type {
   AppointmentCreateResponse,
   AppointmentSearchQuery,
   AppointmentSearchResponse,
+  RecommendedDoctorsResponse,
   AvailabilitySlot,
   AppointmentType,
   DoctorAvailability,
@@ -164,6 +165,18 @@ export async function searchAppointments(
 
   const response = await apiClient.get<AppointmentSearchResponse>(
     `/appointments/search${params.toString() ? `?${params.toString()}` : ""}`,
+    options,
+  );
+
+  return response;
+}
+
+export async function getRecommendedDoctors(
+  appointmentId: string | number,
+  options?: ApiRequestOptions,
+): Promise<RecommendedDoctorsResponse> {
+  const response = await apiClient.get<RecommendedDoctorsResponse>(
+    `/appointments/${appointmentId}/recommended-doctors`,
     options,
   );
 

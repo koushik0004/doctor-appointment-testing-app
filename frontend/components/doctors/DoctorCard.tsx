@@ -37,6 +37,8 @@ export function DoctorCard({
   actionLabel = "Choose time",
   selectedActionLabel = "Selected",
 }: DoctorCardProps) {
+  const hasFeeRange = doctor.feeRange.min > 0 || doctor.feeRange.max > 0;
+
   return (
     <article
       className={`grid overflow-hidden rounded-[20px] border bg-white transition lg:grid-cols-[minmax(0,1fr)_188px] ${
@@ -107,19 +109,21 @@ export function DoctorCard({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <InfoIcon>
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
-                  <path
-                    d="M5 3.25A.75.75 0 0 0 4.25 4v12A.75.75 0 0 0 5 16.75h10a.75.75 0 0 0 .75-.75V4a.75.75 0 0 0-.75-.75H5Zm3.5 2.5a.75.75 0 0 1 1.5 0V9.5H13a.75.75 0 0 1 0 1.5h-3V14a.75.75 0 0 1-1.5 0v-3H5.5a.75.75 0 0 1 0-1.5h3V5.75Z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </InfoIcon>
-              <span>
-                {formatCurrencyInr(doctor.feeRange.min)} - {formatCurrencyInr(doctor.feeRange.max)}
-              </span>
-            </div>
+            {hasFeeRange ? (
+              <div className="flex items-center gap-2">
+                <InfoIcon>
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
+                    <path
+                      d="M5 3.25A.75.75 0 0 0 4.25 4v12A.75.75 0 0 0 5 16.75h10a.75.75 0 0 0 .75-.75V4a.75.75 0 0 0-.75-.75H5Zm3.5 2.5a.75.75 0 0 1 1.5 0V9.5H13a.75.75 0 0 1 0 1.5h-3V14a.75.75 0 0 1-1.5 0v-3H5.5a.75.75 0 0 1 0-1.5h3V5.75Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </InfoIcon>
+                <span>
+                  {formatCurrencyInr(doctor.feeRange.min)} - {formatCurrencyInr(doctor.feeRange.max)}
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

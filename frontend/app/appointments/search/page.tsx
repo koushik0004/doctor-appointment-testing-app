@@ -8,9 +8,8 @@ import { z } from "zod";
 
 import { AppointmentDetailsPanel } from "@/features/appointments/components/AppointmentDetailsPanel";
 import { AppointmentResultCard } from "@/features/appointments/components/AppointmentResultCard";
+import { RecommendedDoctorsSection } from "@/features/appointments/components/RecommendedDoctorsSection";
 import { useAppointmentSearch } from "@/features/appointments/hooks/use-appointment-search";
-import { DoctorCard } from "@/components/doctors/DoctorCard";
-import { doctors } from "@/features/doctors/mock-doctors";
 import { cn } from "@/lib/utils";
 
 const searchFormSchema = z
@@ -209,14 +208,6 @@ function ResultsHeader({
   );
 }
 
-function buildAvailableDoctors(matchedDoctorNames: string[]) {
-  const matchedDoctorNameSet = new Set(matchedDoctorNames);
-
-  return doctors
-    .filter((doctor) => !matchedDoctorNameSet.has(doctor.name))
-    .slice(0, 3);
-}
-
 export default function AppointmentSearchPage() {
   const {
     handleSubmit,
@@ -242,8 +233,6 @@ export default function AppointmentSearchPage() {
   const [selectedAppointmentId, setSelectedAppointmentId] = React.useState<
     number | null
   >(null);
-  const [selectedAvailableDoctorId, setSelectedAvailableDoctorId] =
-    React.useState("");
 
   const currentValues = watch();
   const parsedCurrentValues = searchFormSchema.safeParse(currentValues);
@@ -263,17 +252,11 @@ export default function AppointmentSearchPage() {
     () => searchResponse?.appointments ?? [],
     [searchResponse?.appointments],
   );
-  const availableDoctors = React.useMemo(
-    () =>
-      buildAvailableDoctors(appointments.map((appointment) => appointment.doctor_name)),
-    [appointments],
-  );
 
   function handleReset() {
     reset(emptySearchValues);
     resetSearch();
     setSelectedAppointmentId(null);
-    setSelectedAvailableDoctorId("");
   }
 
   return (
@@ -470,43 +453,7 @@ export default function AppointmentSearchPage() {
                     ))}
                   </div>
 
-                  {availableDoctors.length > 0 ? (
-                    <section
-                      aria-labelledby="available-doctors-heading"
-                      className="border-t border-slate-100 pt-8"
-                    >
-                      <div className="flex flex-wrap items-end justify-between gap-4">
-                        <div>
-                          <h3
-                            id="available-doctors-heading"
-                            className="text-[1.75rem] font-semibold tracking-[-0.05em] text-slate-950"
-                          >
-                            Available Doctors
-                          </h3>
-                          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                            Reusing the same doctor card pattern for a simple
-                            list of other available specialists.
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 ring-1 ring-brand-100">
-                          {availableDoctors.length} available
-                        </span>
-                      </div>
-
-                      <div className="mt-6 grid gap-5">
-                        {availableDoctors.map((doctor) => (
-                          <DoctorCard
-                            key={doctor.id}
-                            doctor={doctor}
-                            isSelected={doctor.id === selectedAvailableDoctorId}
-                            onSelect={setSelectedAvailableDoctorId}
-                            actionLabel="Book"
-                            selectedActionLabel="Booked"
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ) : null}
+                  <RecommendedDoctorsSection appointmentId={selectedAppointmentId} />
                 </div>
               )}
             </div>

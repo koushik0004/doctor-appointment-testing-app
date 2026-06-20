@@ -109,6 +109,27 @@ export type AppointmentDetailsResponse = {
   created_at: string;
 };
 
+export type RecommendationReason = "same_specialty" | "related_specialty";
+
+export type RecommendedDoctor = {
+  doctor_id: number;
+  doctor_name: string;
+  specialty: string;
+  rating: number;
+  review_count: number;
+  next_available_date: string;
+  next_available_slot: string;
+  profile_image: string;
+  clinic_name: string;
+  recommendation_reason: RecommendationReason;
+};
+
+export type RecommendedDoctorsResponse = {
+  appointment_id: number;
+  specialty: string;
+  recommended_doctors: RecommendedDoctor[];
+};
+
 export type AppointmentSearchQuery = {
   name?: string;
   email?: string;
