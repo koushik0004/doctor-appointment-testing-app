@@ -30,4 +30,5 @@ export type AiWidgetRootProps = {
   adapter: AiWidgetAdapter;
   service?: AiWidgetService;
   className?: string;
+  onBookAppointment?: (doctorId: number) => void;
 };

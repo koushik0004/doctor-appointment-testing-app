@@ -6,6 +6,7 @@ import { ChatLauncher } from "@/lib/ai-widget/components/ChatLauncher";
 import { ChatWindow } from "@/lib/ai-widget/components/ChatWindow";
 import { AiWidgetProvider, useAiWidget } from "@/lib/ai-widget/core";
 import { createMockAiWidgetService } from "@/lib/ai-widget/services";
+import { createTextMessageContent } from "@/lib/ai-widget/services/chat-response-mapper";
 import { aiWidgetClassNames } from "@/lib/ai-widget/styles";
 import type { AiWidgetMessage, AiWidgetRootProps } from "@/lib/ai-widget/types";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 function AiWidgetFrame({
   adapter,
   className,
+  onBookAppointment,
   service,
 }: Omit<AiWidgetRootProps, "config">) {
   const { state, dispatch } = useAiWidget();
@@ -31,7 +33,7 @@ function AiWidgetFrame({
     const userMessage: AiWidgetMessage = {
       id: `user-${messageId}-${state.messages.length + 1}`,
       role: "user",
-      content: nextMessage,
+      content: createTextMessageContent(nextMessage),
       createdAt: new Date().toISOString(),
     };
 
@@ -68,6 +70,7 @@ function AiWidgetFrame({
           presentation={presentation}
           quickActions={quickActions}
           state={state}
+          onBookAppointment={onBookAppointment}
           onClose={() => dispatch({ type: "close" })}
           onDraftChange={(value) => dispatch({ type: "setDraft", payload: value })}
           onSubmit={handleSubmit}
@@ -88,11 +91,13 @@ export function AiWidgetRoot({
   adapter,
   service,
   className,
+  onBookAppointment,
 }: AiWidgetRootProps) {
   return (
     <AiWidgetProvider config={config}>
       <AiWidgetFrame
         adapter={adapter}
+        onBookAppointment={onBookAppointment}
         service={service}
         className={className}
       />
