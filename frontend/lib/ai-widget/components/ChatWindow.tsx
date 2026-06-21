@@ -54,9 +54,9 @@ export function ChatWindow({
         </button>
       </header>
 
-      <div className="flex flex-col gap-5 px-4 py-4 sm:px-5">
+      <div className="flex h-[32rem] flex-col px-4 py-4 sm:px-5">
         {quickActions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             {quickActions.map((action) => (
               <button
                 key={action.id}
@@ -70,13 +70,15 @@ export function ChatWindow({
           </div>
         ) : null}
 
-        <MessageList
-          messages={state.messages}
-          emptyStateLabel={presentation.emptyStateLabel}
-        />
+        <div className="min-h-0 flex-1">
+          <MessageList
+            messages={state.messages}
+            emptyStateLabel={presentation.emptyStateLabel}
+          />
+        </div>
 
         {state.errorMessage ? (
-          <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {state.errorMessage}
           </p>
         ) : null}
@@ -84,7 +86,6 @@ export function ChatWindow({
         <MessageComposer
           value={state.draft}
           placeholder={presentation.inputPlaceholder}
-          disabled
           onChange={onDraftChange}
           onSubmit={onSubmit}
         />

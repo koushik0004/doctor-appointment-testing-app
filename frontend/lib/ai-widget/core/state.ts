@@ -11,13 +11,23 @@ export type AiWidgetAction =
   | { type: "setError"; payload: string | null }
   | { type: "reset"; payload?: AiWidgetConfig };
 
+function createWelcomeMessage(): AiWidgetMessage {
+  return {
+    id: "welcome-message",
+    role: "assistant",
+    content:
+      "Hello, I am your Doctor Appointment Assistant. How can I help you today?",
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export function createInitialAiWidgetState(
   config: AiWidgetConfig = {},
 ): AiWidgetState {
   return {
     isOpen: config.initialOpen ?? false,
     status: "idle",
-    messages: config.initialMessages ?? [],
+    messages: config.initialMessages ?? [createWelcomeMessage()],
     draft: "",
     errorMessage: null,
   };
@@ -51,7 +61,7 @@ export function aiWidgetReducer(
     case "startSend":
       return {
         ...state,
-        status: "sending",
+        status: "idle",
         messages: [...state.messages, action.payload],
         draft: "",
         errorMessage: null,

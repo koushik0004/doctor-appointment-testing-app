@@ -1,34 +1,39 @@
 "use client";
 
+import { useId } from "react";
+
 import { ChatLauncher } from "@/lib/ai-widget/components/ChatLauncher";
 import { ChatWindow } from "@/lib/ai-widget/components/ChatWindow";
 import { AiWidgetProvider, useAiWidget } from "@/lib/ai-widget/core";
-import { createNoopAiWidgetService } from "@/lib/ai-widget/services/noop-service";
 import { aiWidgetClassNames } from "@/lib/ai-widget/styles";
 import type { AiWidgetRootProps } from "@/lib/ai-widget/types";
 import { cn } from "@/lib/utils";
 
 function AiWidgetFrame({
   adapter,
-  service = createNoopAiWidgetService(),
   className,
-}: Omit<AiWidgetRootProps, "config">) {
+}: Omit<AiWidgetRootProps, "config" | "service">) {
   const { state, dispatch } = useAiWidget();
   const presentation = adapter.getPresentation();
   const quickActions = adapter.getQuickActions?.() ?? [];
+  const messageId = useId();
 
   async function handleSubmit() {
-    if (!state.draft.trim()) {
+    const nextMessage = state.draft.trim();
+
+    if (!nextMessage) {
       return;
     }
 
     dispatch({
-      type: "setError",
-      payload:
-        "The chat engine is not connected yet. Wire a service implementation in a later step.",
+      type: "startSend",
+      payload: {
+        id: `user-${messageId}-${state.messages.length + 1}`,
+        role: "user",
+        content: nextMessage,
+        createdAt: new Date().toISOString(),
+      },
     });
-
-    void service;
   }
 
   return (
@@ -56,14 +61,12 @@ function AiWidgetFrame({
 export function AiWidgetRoot({
   config,
   adapter,
-  service,
   className,
 }: AiWidgetRootProps) {
   return (
     <AiWidgetProvider config={config}>
       <AiWidgetFrame
         adapter={adapter}
-        service={service}
         className={className}
       />
     </AiWidgetProvider>
