@@ -1,11 +1,15 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
+import { useRouter } from "next/navigation";
 
+import { buildAppointmentBookingUrl } from "@/lib/ai-widget/services/appointment-navigation";
 import type { AiWidgetAvailabilityCardContent } from "@/lib/ai-widget/types";
+import { cn } from "@/lib/utils";
 
 type AvailabilityMessageProps = {
   slot: AiWidgetAvailabilityCardContent;
+  onBookAppointment?: (doctorId: number) => void;
 };
 
 function TimeIcon() {
@@ -17,8 +21,22 @@ function TimeIcon() {
   );
 }
 
-export function AvailabilityMessage({ slot }: AvailabilityMessageProps) {
+export function AvailabilityMessage({
+  slot,
+  onBookAppointment,
+}: AvailabilityMessageProps) {
+  const router = useRouter();
   const formattedDate = format(parseISO(slot.availableDate), "EEEE, MMMM d, yyyy");
+  const isBookableDoctor = Number.isFinite(slot.doctorId) && slot.doctorId > 0;
+
+  function handleBookAppointment() {
+    if (!isBookableDoctor) {
+      return;
+    }
+
+    onBookAppointment?.(slot.doctorId);
+    router.push(buildAppointmentBookingUrl(slot.doctorId));
+  }
 
   return (
     <article className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
@@ -57,6 +75,20 @@ export function AvailabilityMessage({ slot }: AvailabilityMessageProps) {
             {slot.availableTime}
           </p>
         </div>
+      </div>
+
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <button
+          type="button"
+          onClick={handleBookAppointment}
+          disabled={!isBookableDoctor}
+          className={cn(
+            "inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800",
+            !isBookableDoctor && "cursor-not-allowed bg-slate-300 text-slate-500 hover:bg-slate-300",
+          )}
+        >
+          Book Appointment
+        </button>
       </div>
     </article>
   );

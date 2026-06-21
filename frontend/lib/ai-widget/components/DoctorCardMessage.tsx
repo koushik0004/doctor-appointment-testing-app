@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { formatCurrencyInr } from "@/lib/formatters";
+import { buildAppointmentBookingUrl } from "@/lib/ai-widget/services/appointment-navigation";
 import { cn } from "@/lib/utils";
 import type { AiWidgetDoctorCardContent } from "@/lib/ai-widget/types";
 
@@ -33,6 +36,18 @@ export function DoctorCardMessage({
   doctor,
   onBookAppointment,
 }: DoctorCardMessageProps) {
+  const router = useRouter();
+  const isBookableDoctor = Number.isFinite(doctor.doctorId) && doctor.doctorId > 0;
+
+  function handleBookAppointment() {
+    if (!isBookableDoctor) {
+      return;
+    }
+
+    onBookAppointment?.(doctor.doctorId);
+    router.push(buildAppointmentBookingUrl(doctor.doctorId));
+  }
+
   return (
     <article className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_14px_36px_rgba(15,23,42,0.08)]">
       <div className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(14,116,144,0.08),rgba(249,115,22,0.08))] px-4 py-4">
@@ -96,10 +111,11 @@ export function DoctorCardMessage({
       <div className="border-t border-slate-100 px-4 py-4">
         <button
           type="button"
-          onClick={() => onBookAppointment?.(doctor.doctorId)}
+          onClick={handleBookAppointment}
+          disabled={!isBookableDoctor}
           className={cn(
             "inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800",
-            !onBookAppointment && "cursor-default opacity-90",
+            !isBookableDoctor && "cursor-not-allowed bg-slate-300 text-slate-500 hover:bg-slate-300",
           )}
         >
           <InfoIcon />

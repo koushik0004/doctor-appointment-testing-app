@@ -44,8 +44,10 @@ function DoctorListContent({
 
 function AvailabilityContent({
   content,
+  onBookAppointment,
 }: {
   content: Extract<AiWidgetMessageContent, { type: "availability" }>;
+  onBookAppointment?: (doctorId: number) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -59,6 +61,7 @@ function AvailabilityContent({
           <AvailabilityMessage
             key={`${slot.doctorId}-${slot.availableDate}-${slot.availableTime}`}
             slot={slot}
+            onBookAppointment={onBookAppointment}
           />
         ))}
       </div>
@@ -94,7 +97,10 @@ export function MessageContentRenderer({
   if (message.content.type === "availability") {
     return (
       <article className={cn(assistantShellClasses, "max-w-[92%]")}>
-        <AvailabilityContent content={message.content} />
+        <AvailabilityContent
+          content={message.content}
+          onBookAppointment={onBookAppointment}
+        />
       </article>
     );
   }
