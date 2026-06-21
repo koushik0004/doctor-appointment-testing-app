@@ -4,6 +4,7 @@ import { ChatLauncher } from "@/lib/ai-widget/components/ChatLauncher";
 import { ChatWindow } from "@/lib/ai-widget/components/ChatWindow";
 import { AiWidgetProvider, useAiWidget } from "@/lib/ai-widget/core";
 import { createNoopAiWidgetService } from "@/lib/ai-widget/services/noop-service";
+import { aiWidgetClassNames } from "@/lib/ai-widget/styles";
 import type { AiWidgetRootProps } from "@/lib/ai-widget/types";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +32,7 @@ function AiWidgetFrame({
   }
 
   return (
-    <div className={cn("fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4", className)}>
+    <div className={cn(aiWidgetClassNames.root, className)}>
       {state.isOpen ? (
         <ChatWindow
           presentation={presentation}

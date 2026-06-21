@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Footer } from "@/components/layout/Footer";
+import { GlobalAiWidget } from "@/components/layout/GlobalAiWidget";
 import { Header } from "@/components/layout/Header";
 import "@/styles/globals.scss";
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
             </div>
           </main>
           <Footer />
+          <GlobalAiWidget />
         </div>
       </body>
     </html>

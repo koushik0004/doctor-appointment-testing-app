@@ -4,6 +4,7 @@ import type { AiWidgetPresentation, AiWidgetQuickAction } from "@/lib/ai-widget/
 import type { AiWidgetState } from "@/lib/ai-widget/types";
 import { MessageComposer } from "@/lib/ai-widget/components/MessageComposer";
 import { MessageList } from "@/lib/ai-widget/components/MessageList";
+import { aiWidgetClassNames } from "@/lib/ai-widget/styles";
 import { cn } from "@/lib/utils";
 
 type ChatWindowProps = {
@@ -29,11 +30,12 @@ export function ChatWindow({
     <section
       aria-label={presentation.title}
       className={cn(
-        "flex w-full max-w-sm flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]",
+        aiWidgetClassNames.panel,
         className,
       )}
     >
-      <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+      <header className="relative flex items-start justify-between gap-4 overflow-hidden border-b border-slate-100 bg-[linear-gradient(135deg,rgba(14,116,144,0.1),rgba(15,23,42,0.02)_52%,rgba(249,115,22,0.12))] px-5 py-4">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/80" />
         <div>
           <p className="text-base font-semibold text-slate-950">
             {presentation.title}
@@ -45,14 +47,14 @@ export function ChatWindow({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-white/80 text-slate-500 backdrop-blur transition hover:border-slate-300 hover:text-slate-800"
         >
           <span className="sr-only">Close chat widget</span>
           ×
         </button>
       </header>
 
-      <div className="flex flex-col gap-5 px-5 py-4">
+      <div className="flex flex-col gap-5 px-4 py-4 sm:px-5">
         {quickActions.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {quickActions.map((action) => (
