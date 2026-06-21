@@ -27,3 +27,10 @@ def invalid_booking_request(message: str) -> HTTPException:
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=message,
     )
+
+
+def chat_service_error(message: str = "Chat service is unavailable.") -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=message,
+    )
