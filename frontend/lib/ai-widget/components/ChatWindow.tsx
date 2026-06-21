@@ -86,6 +86,7 @@ export function ChatWindow({
         <MessageComposer
           value={state.draft}
           placeholder={presentation.inputPlaceholder}
+          disabled={state.status === "sending"}
           onChange={onDraftChange}
           onSubmit={onSubmit}
         />

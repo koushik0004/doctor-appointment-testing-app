@@ -5,18 +5,21 @@ import { useId } from "react";
 import { ChatLauncher } from "@/lib/ai-widget/components/ChatLauncher";
 import { ChatWindow } from "@/lib/ai-widget/components/ChatWindow";
 import { AiWidgetProvider, useAiWidget } from "@/lib/ai-widget/core";
+import { createMockAiWidgetService } from "@/lib/ai-widget/services";
 import { aiWidgetClassNames } from "@/lib/ai-widget/styles";
-import type { AiWidgetRootProps } from "@/lib/ai-widget/types";
+import type { AiWidgetMessage, AiWidgetRootProps } from "@/lib/ai-widget/types";
 import { cn } from "@/lib/utils";
 
 function AiWidgetFrame({
   adapter,
   className,
-}: Omit<AiWidgetRootProps, "config" | "service">) {
+  service,
+}: Omit<AiWidgetRootProps, "config">) {
   const { state, dispatch } = useAiWidget();
   const presentation = adapter.getPresentation();
   const quickActions = adapter.getQuickActions?.() ?? [];
   const messageId = useId();
+  const chatService = service ?? createMockAiWidgetService();
 
   async function handleSubmit() {
     const nextMessage = state.draft.trim();
@@ -25,15 +28,37 @@ function AiWidgetFrame({
       return;
     }
 
+    const userMessage: AiWidgetMessage = {
+      id: `user-${messageId}-${state.messages.length + 1}`,
+      role: "user",
+      content: nextMessage,
+      createdAt: new Date().toISOString(),
+    };
+
     dispatch({
       type: "startSend",
-      payload: {
-        id: `user-${messageId}-${state.messages.length + 1}`,
-        role: "user",
-        content: nextMessage,
-        createdAt: new Date().toISOString(),
-      },
+      payload: userMessage,
     });
+
+    try {
+      const response = await chatService.sendMessage({
+        message: nextMessage,
+        conversation: [...state.messages, userMessage],
+      });
+
+      dispatch({
+        type: "appendMessage",
+        payload: response.reply,
+      });
+    } catch (error) {
+      dispatch({
+        type: "setError",
+        payload:
+          error instanceof Error
+            ? error.message
+            : "The assistant could not reply. Please try again.",
+      });
+    }
   }
 
   return (
@@ -61,12 +86,14 @@ function AiWidgetFrame({
 export function AiWidgetRoot({
   config,
   adapter,
+  service,
   className,
 }: AiWidgetRootProps) {
   return (
     <AiWidgetProvider config={config}>
       <AiWidgetFrame
         adapter={adapter}
+        service={service}
         className={className}
       />
     </AiWidgetProvider>

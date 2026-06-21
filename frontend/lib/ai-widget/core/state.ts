@@ -61,7 +61,7 @@ export function aiWidgetReducer(
     case "startSend":
       return {
         ...state,
-        status: "idle",
+        status: "sending",
         messages: [...state.messages, action.payload],
         draft: "",
         errorMessage: null,
