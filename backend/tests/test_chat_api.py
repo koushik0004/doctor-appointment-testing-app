@@ -89,6 +89,21 @@ def test_chat_endpoint_returns_structured_availability_response(client):
     assert payload["data"][0]["available_time"] == "08:00"
 
 
+def test_chat_endpoint_returns_structured_time_filtered_availability_response(client):
+    response = client.post("/api/chat", json={"message": "Need appointment after 5 PM"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.SHOW_AVAILABLE_DOCTORS.value
+    assert payload["search_filters"]["time_preference"] == "After 5:00 PM"
+    assert payload["message"] == (
+        f"Found {len(payload['data'])} doctors available on {(date.today() + timedelta(days=1)).isoformat()}."
+    )
+    assert payload["response"] == payload["message"]
+    assert len(payload["data"]) > 0
+    assert {item["available_time"] for item in payload["data"]} == {"18:00"}
+
+
 def test_chat_endpoint_returns_structured_doctor_details_response(client):
     response = client.post("/api/chat", json={"message": "What is Dr. Sarah Jenkins fee?"})
 

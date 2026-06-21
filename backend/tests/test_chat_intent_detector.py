@@ -42,6 +42,14 @@ def test_detect_chat_intent_for_appointment_help_query():
     assert match.intent == ChatIntent.APPOINTMENT_HELP
 
 
+def test_detect_chat_intent_for_appointment_query_with_time_preference():
+    match = detect_chat_intent("Need appointment after 5 PM")
+
+    assert match.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS
+    assert match.specialty is None
+    assert match.target_date == date.today() + timedelta(days=1)
+
+
 def test_detect_chat_intent_for_unknown_query():
     match = detect_chat_intent("Need some help")
 

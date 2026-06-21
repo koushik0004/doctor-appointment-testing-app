@@ -4,7 +4,12 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from app.schemas.chat import ChatIntent
-from app.services.chat_entity_extractor import extract_specialization, extract_target_date, normalize_text
+from app.services.chat_entity_extractor import (
+    extract_specialization,
+    extract_target_date,
+    extract_time_preference,
+    normalize_text,
+)
 
 APPOINTMENT_HELP_KEYWORDS = (
     "book",
@@ -60,8 +65,15 @@ def detect_chat_intent(message: str) -> ChatIntentMatch:
     normalized_message = normalize_text(message)
     specialty = extract_specialization(normalized_message)
     target_date = extract_target_date(normalized_message)
+    time_preference = extract_time_preference(normalized_message)
 
     if _contains_keyword(normalized_message, APPOINTMENT_HELP_KEYWORDS):
+        if target_date is not None or time_preference is not None:
+            return ChatIntentMatch(
+                intent=ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                specialty=specialty,
+                target_date=target_date or (date.today() + timedelta(days=1)),
+            )
         return ChatIntentMatch(
             intent=ChatIntent.APPOINTMENT_HELP,
             specialty=specialty,
