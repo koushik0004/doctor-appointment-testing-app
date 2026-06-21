@@ -6,35 +6,24 @@ from typing import Protocol
 
 from sqlalchemy.orm import Session
 
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.schemas.chat import (
+    ChatAvailabilityCard,
+    ChatDoctorCard,
+    ChatIntent,
+    ChatRequest,
+    ChatResponse,
+)
 from app.schemas.doctor import DoctorResponse
+from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_intent
 from app.services.availability_service import get_available_slots
 from app.services.doctor_service import list_doctors
 
+GREETING_KEYWORDS = ("hello", "hi", "hey")
+
 
 class ChatResponder(Protocol):
-    def generate(self, message: str) -> str:
+    def generate(self, message: str) -> ChatResponse:
         ...
-
-
-SPECIALTY_ALIASES = {
-    "cardiologist": "Cardiology",
-    "cardiologists": "Cardiology",
-    "cardiology": "Cardiology",
-    "dermatologist": "Dermatology",
-    "dermatologists": "Dermatology",
-    "dermatology": "Dermatology",
-    "pediatrician": "Pediatrics",
-    "pediatricians": "Pediatrics",
-    "pediatrics": "Pediatrics",
-    "general practitioner": "General Practice",
-    "general practitioners": "General Practice",
-    "general practice": "General Practice",
-    "gp": "General Practice",
-    "internal medicine": "Internal Medicine",
-    "internist": "Internal Medicine",
-    "internists": "Internal Medicine",
-}
 
 
 def _normalize_text(value: str) -> str:
@@ -47,132 +36,239 @@ def _format_fee_range(doctor: DoctorResponse) -> str:
     return f"${doctor.consultation_fee_min}-${doctor.consultation_fee_max}"
 
 
-def _format_doctor_summary(doctor: DoctorResponse) -> str:
-    return (
-        f"{doctor.name} ({doctor.specialty}) - fee {_format_fee_range(doctor)}, "
-        f"next available {doctor.next_available_slot}"
+def _doctor_to_card(doctor: DoctorResponse) -> ChatDoctorCard:
+    return ChatDoctorCard(
+        doctor_id=doctor.id,
+        doctor_name=doctor.name,
+        specialty=doctor.specialty,
+        consultation_fee_min=doctor.consultation_fee_min,
+        consultation_fee_max=doctor.consultation_fee_max,
+        next_available_slot=doctor.next_available_slot,
+        clinic_name=doctor.clinic_name,
+        location=doctor.location,
+    )
+
+
+def _doctor_matches_query(doctor: DoctorResponse, message: str) -> bool:
+    normalized_message = _normalize_text(message)
+    normalized_full_name = _normalize_text(doctor.name)
+    normalized_name_without_prefix = _normalize_text(
+        doctor.name.removeprefix("Dr. ").removeprefix("Dr ")
+    )
+
+    normalized_tokens = set(normalized_message.split())
+    full_name_tokens = set(normalized_full_name.split())
+    bare_name_tokens = set(normalized_name_without_prefix.split())
+
+    if normalized_full_name and normalized_full_name in normalized_message:
+        return True
+    if normalized_name_without_prefix and normalized_name_without_prefix in normalized_message:
+        return True
+    if bare_name_tokens and bare_name_tokens.issubset(normalized_tokens):
+        return True
+    if full_name_tokens and full_name_tokens.issubset(normalized_tokens):
+        return True
+
+    return False
+
+
+def _find_matching_doctor(message: str, doctors: list[DoctorResponse]) -> DoctorResponse | None:
+    for doctor in sorted(doctors, key=lambda item: len(item.name), reverse=True):
+        if _doctor_matches_query(doctor, message):
+            return doctor
+    return None
+
+
+def _available_doctor_cards(
+    session: Session,
+    doctors: list[DoctorResponse],
+    slot_date: date,
+) -> list[ChatAvailabilityCard]:
+    cards: list[ChatAvailabilityCard] = []
+    for doctor in doctors:
+        slots = get_available_slots(
+            session,
+            doctor.id,
+            available_date=slot_date,
+        )
+        if not slots:
+            continue
+
+        for slot in slots:
+            cards.append(
+                ChatAvailabilityCard(
+                    doctor_id=doctor.id,
+                    doctor_name=doctor.name,
+                    specialty=doctor.specialty,
+                    available_date=slot_date,
+                    available_time=str(slot["start_time"]),
+                )
+            )
+    return cards
+
+
+def _build_response(
+    intent: ChatIntent,
+    message: str,
+    data: list[ChatDoctorCard | ChatAvailabilityCard] | None = None,
+) -> ChatResponse:
+    return ChatResponse(
+        intent=intent,
+        message=message,
+        data=data or [],
     )
 
 
 class RuleBasedChatResponder:
     def __init__(self, session: Session) -> None:
         self._session = session
-        self._reply_rules: tuple[tuple[tuple[str, ...], str], ...] = (
-            (("hello", "hi", "hey"), "Hello, I am your AI Assistant."),
-            (
-                ("book", "appointment"),
-                "I can help you book an appointment with an available doctor.",
-            ),
-        )
 
     def _list_all_doctors(self) -> list[DoctorResponse]:
         return list_doctors(self._session).items
 
-    def _extract_specialty(self, message: str, doctors: list[DoctorResponse]) -> str | None:
-        normalized_message = _normalize_text(message)
-        for alias, specialty in SPECIALTY_ALIASES.items():
-            if alias in normalized_message:
-                return specialty
-
-        for doctor in doctors:
-            if doctor.specialty.lower() in normalized_message:
-                return doctor.specialty
-
-        return None
-
-    def _extract_doctor(self, message: str, doctors: list[DoctorResponse]) -> DoctorResponse | None:
-        normalized_message = _normalize_text(message)
-        normalized_tokens = set(normalized_message.split())
-
-        for doctor in sorted(doctors, key=lambda item: len(item.name), reverse=True):
-            full_name = _normalize_text(doctor.name)
-            name_without_prefix = _normalize_text(doctor.name.removeprefix("Dr. "))
-            full_name_tokens = set(full_name.split())
-            bare_name_tokens = set(name_without_prefix.split())
-
-            if full_name and full_name in normalized_message:
-                return doctor
-            if name_without_prefix and name_without_prefix in normalized_message:
-                return doctor
-            if bare_name_tokens and bare_name_tokens.issubset(normalized_tokens):
-                return doctor
-            if full_name_tokens and full_name_tokens.issubset(normalized_tokens):
-                return doctor
-
-        return None
-
-    def _respond_with_specialties(self, doctors: list[DoctorResponse]) -> str:
-        specialties = sorted({doctor.specialty for doctor in doctors})
-        return "Available specializations: " + ", ".join(specialties) + "."
-
-    def _respond_with_doctors(self, doctors: list[DoctorResponse], specialty: str | None = None) -> str:
+    def _respond_with_specialties(self, specialty: str, doctors: list[DoctorResponse]) -> ChatResponse:
         if not doctors:
-            if specialty:
-                return f"No available doctors were found for {specialty}."
-            return "No available doctors were found."
+            return _build_response(
+                ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
+                f"No doctors were found for {specialty}.",
+            )
 
-        intro = (
-            f"Available {specialty} doctors: "
-            if specialty
-            else "Available doctors: "
-        )
-        return intro + "; ".join(_format_doctor_summary(doctor) for doctor in doctors[:5]) + "."
-
-    def _respond_with_fee(self, doctor: DoctorResponse | None) -> str:
-        if not doctor:
-            return "Please mention the doctor's name to check the consultation fee."
-        return f"{doctor.name} charges {_format_fee_range(doctor)} for a consultation."
-
-    def _respond_with_slots(self, doctor: DoctorResponse | None) -> str:
-        if not doctor:
-            doctors = self._list_all_doctors()[:5]
-            return "Next available appointment slots: " + "; ".join(
-                f"{item.name}: {item.next_available_slot}" for item in doctors
-            ) + "."
-
-        slot_date = date.today() + timedelta(days=1)
-        slots = get_available_slots(
-            self._session,
-            doctor.id,
-            available_date=slot_date,
-        )
-        if not slots:
-            return f"No open appointment slots were found for {doctor.name} on {slot_date.isoformat()}."
-
-        slot_times = ", ".join(slot["start_time"] for slot in slots[:5])
-        return (
-            f"Available appointment slots for {doctor.name} on {slot_date.isoformat()}: "
-            f"{slot_times}."
+        return _build_response(
+            ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
+            f"Found {len(doctors)} doctors for {specialty}.",
+            data=[_doctor_to_card(doctor) for doctor in doctors],
         )
 
-    def generate(self, message: str) -> str:
-        normalized_message = message.strip().lower()
+    def _respond_with_availability(
+        self,
+        message: str,
+        intent_match: ChatIntentMatch,
+        doctors: list[DoctorResponse],
+    ) -> ChatResponse:
+        matched_doctor = _find_matching_doctor(message, doctors)
+        selected_doctors = [matched_doctor] if matched_doctor is not None else doctors
+        if intent_match.specialty is not None:
+            selected_doctors = [
+                doctor for doctor in selected_doctors if doctor.specialty == intent_match.specialty
+            ]
 
-        for keywords, reply in self._reply_rules:
-            if any(keyword in normalized_message for keyword in keywords):
-                return reply
+        slot_date = intent_match.target_date or (date.today() + timedelta(days=1))
+        data = _available_doctor_cards(self._session, selected_doctors, slot_date)
 
+        if not data:
+            if matched_doctor is not None:
+                return _build_response(
+                    ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                    f"No open appointment slots were found for {matched_doctor.name} on {slot_date.isoformat()}.",
+                )
+
+            if intent_match.specialty is not None:
+                return _build_response(
+                    ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                    f"No {intent_match.specialty.lower()} doctors were available on {slot_date.isoformat()}.",
+                )
+
+            return _build_response(
+                ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                f"No doctors were available on {slot_date.isoformat()}.",
+            )
+
+        if matched_doctor is not None:
+            return _build_response(
+                ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                f"Found {len(data)} available slots for {matched_doctor.name} on {slot_date.isoformat()}.",
+                data=data,
+            )
+
+        if intent_match.specialty is not None:
+            return _build_response(
+                ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                f"Found {len(data)} {intent_match.specialty.lower()} doctors available on {slot_date.isoformat()}.",
+                data=data,
+            )
+
+        return _build_response(
+            ChatIntent.SHOW_AVAILABLE_DOCTORS,
+            f"Found {len(data)} doctors available on {slot_date.isoformat()}.",
+            data=data,
+        )
+
+    def _respond_with_doctor_details(self, message: str, doctors: list[DoctorResponse]) -> ChatResponse:
+        doctor = _find_matching_doctor(message, doctors)
+        if doctor is None:
+            return _build_response(
+                ChatIntent.SHOW_DOCTOR_DETAILS,
+                "Please mention the doctor's name to check the consultation fee.",
+            )
+
+        return _build_response(
+            ChatIntent.SHOW_DOCTOR_DETAILS,
+            (
+                f"{doctor.name} consultation fee is {_format_fee_range(doctor)}. "
+                f"Next available slot: {doctor.next_available_slot}."
+            ),
+            data=[_doctor_to_card(doctor)],
+        )
+
+    def _respond_with_appointment_help(self) -> ChatResponse:
+        return _build_response(
+            ChatIntent.APPOINTMENT_HELP,
+            "I can help you book an appointment. Share a doctor, preferred date, time, and appointment type.",
+        )
+
+    def _respond_with_greeting(self) -> ChatResponse:
+        return _build_response(
+            ChatIntent.UNKNOWN,
+            "Hello, I am your AI Assistant.",
+        )
+
+    def _respond_with_unknown(self) -> ChatResponse:
+        return _build_response(
+            ChatIntent.UNKNOWN,
+            "I can help with available doctors, specializations, consultation fees, and appointment slots.",
+        )
+
+    def _respond_with_specialty_overview(self) -> ChatResponse:
+        specialties = sorted({doctor.specialty for doctor in self._list_all_doctors()})
+        return _build_response(
+            ChatIntent.UNKNOWN,
+            "Available specializations: " + ", ".join(specialties) + ".",
+        )
+
+    def generate(self, message: str) -> ChatResponse:
+        intent_match = detect_chat_intent(message)
         doctors = self._list_all_doctors()
-        specialty = self._extract_specialty(message, doctors)
-        doctor = self._extract_doctor(message, doctors)
+
+        normalized_message = _normalize_text(message)
+        if any(keyword in normalized_message for keyword in GREETING_KEYWORDS):
+            return self._respond_with_greeting()
 
         if any(keyword in normalized_message for keyword in ("specialization", "specializations", "specialty", "specialties")):
-            return self._respond_with_specialties(doctors)
+            return self._respond_with_specialty_overview()
 
-        if any(keyword in normalized_message for keyword in ("fee", "fees", "consultation cost", "consultation fee", "price", "cost")):
-            return self._respond_with_fee(doctor)
+        if intent_match.intent == ChatIntent.APPOINTMENT_HELP:
+            return self._respond_with_appointment_help()
 
-        if any(keyword in normalized_message for keyword in ("slot", "slots", "schedule", "available time", "appointment time")):
-            return self._respond_with_slots(doctor)
+        if intent_match.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS:
+            return self._respond_with_availability(message, intent_match, doctors)
 
-        if specialty:
-            matching_doctors = [item for item in doctors if item.specialty == specialty]
-            return self._respond_with_doctors(matching_doctors, specialty=specialty)
+        if intent_match.intent == ChatIntent.SHOW_DOCTOR_DETAILS:
+            return self._respond_with_doctor_details(message, doctors)
 
-        if "available doctors" in normalized_message or "show doctors" in normalized_message:
-            return self._respond_with_doctors(doctors)
+        if intent_match.intent == ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION and intent_match.specialty is not None:
+            specialty_doctors = [
+                doctor for doctor in doctors if doctor.specialty == intent_match.specialty
+            ]
+            return self._respond_with_specialties(intent_match.specialty, specialty_doctors)
 
-        return "I can help with available doctors, specializations, consultation fees, and appointment slots."
+        if "show doctors" in normalized_message or "find doctors" in normalized_message or "find doctor" in normalized_message:
+            fallback_match = ChatIntentMatch(
+                intent=ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                target_date=date.today() + timedelta(days=1),
+            )
+            return self._respond_with_availability(message, fallback_match, doctors)
+
+        return self._respond_with_unknown()
 
 
 def create_chat_response(
@@ -181,4 +277,4 @@ def create_chat_response(
     responder: ChatResponder | None = None,
 ) -> ChatResponse:
     chat_responder = responder or RuleBasedChatResponder(session)
-    return ChatResponse(response=chat_responder.generate(request.message))
+    return chat_responder.generate(request.message)

@@ -1,4 +1,17 @@
-from pydantic import BaseModel, ConfigDict, Field
+from __future__ import annotations
+
+from enum import Enum
+from datetime import date
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class ChatIntent(str, Enum):
+    SHOW_DOCTORS_BY_SPECIALIZATION = "SHOW_DOCTORS_BY_SPECIALIZATION"
+    SHOW_AVAILABLE_DOCTORS = "SHOW_AVAILABLE_DOCTORS"
+    SHOW_DOCTOR_DETAILS = "SHOW_DOCTOR_DETAILS"
+    APPOINTMENT_HELP = "APPOINTMENT_HELP"
+    UNKNOWN = "UNKNOWN"
 
 
 class ChatRequest(BaseModel):
@@ -9,5 +22,33 @@ class ChatRequest(BaseModel):
     )
 
 
+class ChatDoctorCard(BaseModel):
+    doctor_id: int
+    doctor_name: str
+    specialty: str
+    consultation_fee_min: int
+    consultation_fee_max: int
+    next_available_slot: str
+    clinic_name: str
+    location: str
+
+
+class ChatAvailabilityCard(BaseModel):
+    doctor_id: int
+    doctor_name: str
+    specialty: str
+    available_date: date
+    available_time: str
+
+
 class ChatResponse(BaseModel):
-    response: str
+    intent: ChatIntent
+    message: str
+    data: list[ChatDoctorCard | ChatAvailabilityCard] = Field(default_factory=list)
+    response: str = ""
+
+    @model_validator(mode="after")
+    def _sync_legacy_response(self) -> "ChatResponse":
+        if not self.response:
+            self.response = self.message
+        return self

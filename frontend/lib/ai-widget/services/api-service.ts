@@ -2,36 +2,24 @@ import { ApiError, apiClient } from "@/lib/api-client";
 import type {
   AiWidgetChatRequest,
   AiWidgetChatResponse,
-  AiWidgetMessage,
   AiWidgetService,
 } from "@/lib/ai-widget/types";
-
-type ChatApiResponse = {
-  response: string;
-};
-
-function createAssistantReply(
-  content: string,
-  conversationLength: number,
-): AiWidgetMessage {
-  return {
-    id: `assistant-reply-${conversationLength + 1}`,
-    role: "assistant",
-    content,
-    createdAt: new Date().toISOString(),
-  };
-}
+import type { AiWidgetChatResponsePayload } from "@/lib/ai-widget/types";
+import { createAssistantMessageFromChatResponse } from "@/lib/ai-widget/services/chat-response-mapper";
 
 export function createApiAiWidgetService(): AiWidgetService {
   return {
     async sendMessage(request: AiWidgetChatRequest): Promise<AiWidgetChatResponse> {
       try {
-        const payload = await apiClient.post<ChatApiResponse>("/chat", {
+        const payload = await apiClient.post<AiWidgetChatResponsePayload>("/chat", {
           message: request.message,
         });
 
         return {
-          reply: createAssistantReply(payload.response, request.conversation.length),
+          reply: createAssistantMessageFromChatResponse(
+            payload,
+            request.conversation.length,
+          ),
         };
       } catch (error) {
         if (error instanceof ApiError) {

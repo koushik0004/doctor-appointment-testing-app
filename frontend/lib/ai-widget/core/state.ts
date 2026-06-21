@@ -1,5 +1,6 @@
 import type { AiWidgetMessage } from "@/lib/ai-widget/types/message";
 import type { AiWidgetConfig, AiWidgetState } from "@/lib/ai-widget/types/widget";
+import { createTextMessageContent } from "@/lib/ai-widget/services/chat-response-mapper";
 
 export type AiWidgetAction =
   | { type: "toggle" }
@@ -15,8 +16,9 @@ function createWelcomeMessage(): AiWidgetMessage {
   return {
     id: "welcome-message",
     role: "assistant",
-    content:
+    content: createTextMessageContent(
       "Hello, I am your Doctor Appointment Assistant. How can I help you today?",
+    ),
     createdAt: new Date().toISOString(),
   };
 }

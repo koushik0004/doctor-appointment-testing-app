@@ -12,6 +12,7 @@ type ChatWindowProps = {
   quickActions: AiWidgetQuickAction[];
   state: AiWidgetState;
   className?: string;
+  onBookAppointment?: (doctorId: number) => void;
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
@@ -22,6 +23,7 @@ export function ChatWindow({
   quickActions,
   state,
   className,
+  onBookAppointment,
   onClose,
   onDraftChange,
   onSubmit,
@@ -71,10 +73,11 @@ export function ChatWindow({
         ) : null}
 
         <div className="min-h-0 flex-1">
-          <MessageList
-            messages={state.messages}
-            emptyStateLabel={presentation.emptyStateLabel}
-          />
+        <MessageList
+          messages={state.messages}
+          emptyStateLabel={presentation.emptyStateLabel}
+          onBookAppointment={onBookAppointment}
+        />
         </div>
 
         {state.status === "sending" ? (
