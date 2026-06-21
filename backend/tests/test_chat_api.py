@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 import pytest
+from sqlalchemy.orm import Session
 
 
 TEST_DB = Path(__file__).resolve().parent / "test_chat_api.sqlite3"
@@ -39,6 +40,10 @@ def client():
         TEST_DB.unlink()
 
 
+def _session() -> Session:
+    return database_module.get_session_factory()()
+
+
 def test_chat_endpoint_returns_expected_response(client):
     response = client.post("/api/chat", json={"message": "Hello"})
 
@@ -46,11 +51,33 @@ def test_chat_endpoint_returns_expected_response(client):
     assert response.json() == {"response": "Hello, I am your AI Assistant."}
 
 
-def test_chat_endpoint_supports_versioned_route(client):
-    response = client.post("/api/v1/chat", json={"message": "Find cardiologist"})
+def test_chat_endpoint_lists_matching_specialists(client):
+    response = client.post("/api/v1/chat", json={"message": "Show cardiologists"})
 
     assert response.status_code == 200
-    assert response.json() == {"response": "I can help you find a cardiologist."}
+    payload = response.json()["response"]
+    assert "Available Cardiology doctors:" in payload
+    assert "Dr. Sarah Jenkins" in payload
+    assert "Dr. Daniel Park" in payload
+
+
+def test_chat_endpoint_returns_consultation_fee(client):
+    response = client.post("/api/chat", json={"message": "What is Dr. Sarah Jenkins fee?"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "response": "Dr. Sarah Jenkins charges $120-$200 for a consultation."
+    }
+
+
+def test_chat_endpoint_returns_available_slots(client):
+    response = client.post("/api/chat", json={"message": "What slots does Dr. Sarah Jenkins have?"})
+
+    assert response.status_code == 200
+    payload = response.json()["response"]
+    assert "Available appointment slots for Dr. Sarah Jenkins on" in payload
+    assert "08:00" in payload
+    assert "10:00" in payload
 
 
 def test_chat_endpoint_rejects_blank_messages(client):
@@ -62,7 +89,21 @@ def test_chat_endpoint_rejects_blank_messages(client):
     assert error["type"] == "string_too_short"
 
 
-def test_chat_service_returns_default_fallback():
-    result = create_chat_response(ChatRequest(message="Need some help"))
+def test_chat_service_returns_available_specialties(client):
+    with _session() as session:
+        result = create_chat_response(session, ChatRequest(message="What specializations are available?"))
 
-    assert result.response == "I can help with doctors, schedules, and booking questions."
+    assert result.response == (
+        "Available specializations: Cardiology, Dermatology, General Practice, "
+        "Internal Medicine, Pediatrics."
+    )
+
+
+def test_chat_service_returns_default_fallback(client):
+    with _session() as session:
+        result = create_chat_response(session, ChatRequest(message="Need some help"))
+
+    assert result.response == (
+        "I can help with available doctors, specializations, consultation fees, "
+        "and appointment slots."
+    )
