@@ -16,6 +16,16 @@ export type AiWidgetChatDoctorCard = {
   location: string;
 };
 
+export type AiWidgetChatSearchFilters = {
+  specialization?: string;
+  gender?: string;
+  minimum_fee?: number;
+  maximum_fee?: number;
+  date?: string;
+  time_preference?: string;
+  clinic_location?: string;
+};
+
 export type AiWidgetChatAvailabilityCard = {
   doctor_id: number;
   doctor_name: string;
@@ -28,5 +38,6 @@ export type AiWidgetChatResponsePayload = {
   intent: AiWidgetChatIntent;
   message: string;
   data: Array<AiWidgetChatDoctorCard | AiWidgetChatAvailabilityCard>;
+  search_filters?: AiWidgetChatSearchFilters;
   response?: string;
 };

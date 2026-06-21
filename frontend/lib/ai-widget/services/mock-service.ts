@@ -72,6 +72,11 @@ const mockReplyRules: MockReplyRule[] = [
       intent: "SHOW_AVAILABLE_DOCTORS",
       message: "Here are the doctors with openings for tomorrow.",
       data: sampleAvailabilityData,
+      search_filters: {
+        specialization: "Cardiology",
+        gender: "Female",
+        date: "2026-06-22",
+      },
       response: "Here are the doctors with openings for tomorrow.",
     }),
   },
@@ -81,6 +86,9 @@ const mockReplyRules: MockReplyRule[] = [
       intent: "SHOW_DOCTORS_BY_SPECIALIZATION",
       message: "I found 2 cardiologists who can help.",
       data: sampleDoctorData,
+      search_filters: {
+        specialization: "Cardiology",
+      },
       response: "I found 2 cardiologists who can help.",
     }),
   },
