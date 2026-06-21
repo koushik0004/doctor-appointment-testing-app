@@ -77,8 +77,17 @@ export function ChatWindow({
           />
         </div>
 
+        {state.status === "sending" ? (
+          <p className="mb-4 mt-4 text-sm text-slate-500" aria-live="polite">
+            Assistant is replying...
+          </p>
+        ) : null}
+
         {state.errorMessage ? (
-          <p className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p
+            className="mb-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
+            aria-live="polite"
+          >
             {state.errorMessage}
           </p>
         ) : null}
@@ -87,6 +96,7 @@ export function ChatWindow({
           value={state.draft}
           placeholder={presentation.inputPlaceholder}
           disabled={state.status === "sending"}
+          isSending={state.status === "sending"}
           onChange={onDraftChange}
           onSubmit={onSubmit}
         />

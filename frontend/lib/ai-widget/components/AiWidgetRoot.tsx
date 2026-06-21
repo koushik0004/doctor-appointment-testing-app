@@ -56,7 +56,7 @@ function AiWidgetFrame({
         payload:
           error instanceof Error
             ? error.message
-            : "The assistant could not reply. Please try again.",
+            : "The assistant could not reply. Please try again in a moment.",
       });
     }
   }
