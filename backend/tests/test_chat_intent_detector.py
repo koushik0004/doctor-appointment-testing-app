@@ -12,6 +12,14 @@ def test_detect_chat_intent_for_specialization_query():
     assert match.target_date is None
 
 
+def test_detect_chat_intent_for_filtered_specialty_query():
+    match = detect_chat_intent("Need a female cardiologist tomorrow")
+
+    assert match.intent == ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION
+    assert match.specialty == "Cardiology"
+    assert match.target_date == date.today() + timedelta(days=1)
+
+
 def test_detect_chat_intent_for_availability_query():
     match = detect_chat_intent("Who is available tomorrow?")
 

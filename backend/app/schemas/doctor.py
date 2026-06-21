@@ -12,6 +12,7 @@ class DoctorResponse(BaseModel):
     id: int
     name: str
     specialty: str
+    gender: str
     rating: float
     review_count: int
     clinic_name: str

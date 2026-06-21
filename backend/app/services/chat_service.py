@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Protocol
 
 from sqlalchemy.orm import Session
@@ -12,10 +12,12 @@ from app.schemas.chat import (
     ChatIntent,
     ChatRequest,
     ChatResponse,
+    ChatSearchFilters,
 )
 from app.schemas.doctor import DoctorResponse
-from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_intent
 from app.services.availability_service import get_available_slots
+from app.services.chat_entity_extractor import extract_chat_search_filters, normalize_text
+from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_intent
 from app.services.doctor_service import list_doctors
 
 GREETING_KEYWORDS = ("hello", "hi", "hey")
@@ -24,10 +26,6 @@ GREETING_KEYWORDS = ("hello", "hi", "hey")
 class ChatResponder(Protocol):
     def generate(self, message: str) -> ChatResponse:
         ...
-
-
-def _normalize_text(value: str) -> str:
-    return re.sub(r"[^a-z0-9\s]", " ", value.lower()).strip()
 
 
 def _format_fee_range(doctor: DoctorResponse) -> str:
@@ -41,6 +39,7 @@ def _doctor_to_card(doctor: DoctorResponse) -> ChatDoctorCard:
         doctor_id=doctor.id,
         doctor_name=doctor.name,
         specialty=doctor.specialty,
+        gender=doctor.gender or "Unspecified",
         consultation_fee_min=doctor.consultation_fee_min,
         consultation_fee_max=doctor.consultation_fee_max,
         next_available_slot=doctor.next_available_slot,
@@ -50,9 +49,9 @@ def _doctor_to_card(doctor: DoctorResponse) -> ChatDoctorCard:
 
 
 def _doctor_matches_query(doctor: DoctorResponse, message: str) -> bool:
-    normalized_message = _normalize_text(message)
-    normalized_full_name = _normalize_text(doctor.name)
-    normalized_name_without_prefix = _normalize_text(
+    normalized_message = normalize_text(message)
+    normalized_full_name = normalize_text(doctor.name)
+    normalized_name_without_prefix = normalize_text(
         doctor.name.removeprefix("Dr. ").removeprefix("Dr ")
     )
 
@@ -79,10 +78,120 @@ def _find_matching_doctor(message: str, doctors: list[DoctorResponse]) -> Doctor
     return None
 
 
+def _describe_search_filters(search_filters: ChatSearchFilters) -> str:
+    parts: list[str] = []
+    if search_filters.specialization:
+        parts.append(search_filters.specialization)
+    if search_filters.gender:
+        parts.append(search_filters.gender)
+    if search_filters.minimum_fee is not None and search_filters.maximum_fee is not None:
+        parts.append(f"between ${search_filters.minimum_fee} and ${search_filters.maximum_fee}")
+    elif search_filters.minimum_fee is not None:
+        parts.append(f"from ${search_filters.minimum_fee}")
+    elif search_filters.maximum_fee is not None:
+        parts.append(f"under ${search_filters.maximum_fee}")
+    if search_filters.clinic_location:
+        parts.append(f"in {search_filters.clinic_location}")
+    if search_filters.date:
+        parts.append(search_filters.date.isoformat())
+    if search_filters.time_preference:
+        parts.append(search_filters.time_preference)
+    return ", ".join(parts)
+
+
+def _doctor_matches_filters(doctor: DoctorResponse, search_filters: ChatSearchFilters) -> bool:
+    if search_filters.specialization and doctor.specialty != search_filters.specialization:
+        return False
+    if search_filters.gender and doctor.gender != search_filters.gender:
+        return False
+    if search_filters.clinic_location:
+        location_value = search_filters.clinic_location.lower()
+        if location_value not in doctor.location.lower() and location_value not in doctor.clinic_name.lower():
+            return False
+    if search_filters.minimum_fee is not None and search_filters.maximum_fee is not None:
+        if doctor.consultation_fee_max < search_filters.minimum_fee:
+            return False
+        if doctor.consultation_fee_min > search_filters.maximum_fee:
+            return False
+    elif search_filters.minimum_fee is not None:
+        if doctor.consultation_fee_min < search_filters.minimum_fee:
+            return False
+    elif search_filters.maximum_fee is not None:
+        if doctor.consultation_fee_max > search_filters.maximum_fee:
+            return False
+    return True
+
+
+def _filter_doctors(doctors: list[DoctorResponse], search_filters: ChatSearchFilters) -> list[DoctorResponse]:
+    return [doctor for doctor in doctors if _doctor_matches_filters(doctor, search_filters)]
+
+
+def _parse_time_value(value: str) -> time | None:
+    match = re.search(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", value.lower())
+    if not match:
+        return None
+
+    hour = int(match.group(1))
+    minute = int(match.group(2) or "0")
+    meridiem = match.group(3)
+
+    if meridiem == "pm" and hour != 12:
+        hour += 12
+    if meridiem == "am" and hour == 12:
+        hour = 0
+    return time(hour=hour, minute=minute)
+
+
+def _time_in_preference_window(slot_time: str, time_preference: str | None) -> bool:
+    if not time_preference:
+        return True
+
+    parsed_slot_time = datetime.strptime(slot_time, "%H:%M").time()
+    normalized = time_preference.lower()
+
+    if normalized == "morning":
+        return time(6, 0) <= parsed_slot_time < time(12, 0)
+    if normalized == "afternoon":
+        return time(12, 0) <= parsed_slot_time < time(17, 0)
+    if normalized == "evening":
+        return time(17, 0) <= parsed_slot_time < time(21, 0)
+    if normalized == "night":
+        return time(21, 0) <= parsed_slot_time <= time(23, 59)
+
+    after_match = re.match(r"^after\s+(.+)$", normalized)
+    if after_match:
+        threshold = _parse_time_value(after_match.group(1))
+        if threshold:
+            return parsed_slot_time >= threshold
+        return True
+
+    before_match = re.match(r"^before\s+(.+)$", normalized)
+    if before_match:
+        threshold = _parse_time_value(before_match.group(1))
+        if threshold:
+            return parsed_slot_time <= threshold
+        return True
+
+    between_match = re.match(r"^between\s+(.+)\s+and\s+(.+)$", normalized)
+    if between_match:
+        start = _parse_time_value(between_match.group(1))
+        end = _parse_time_value(between_match.group(2))
+        if start and end:
+            return start <= parsed_slot_time <= end
+        return True
+
+    exact_time = _parse_time_value(normalized)
+    if exact_time:
+        return parsed_slot_time == exact_time
+
+    return True
+
+
 def _available_doctor_cards(
     session: Session,
     doctors: list[DoctorResponse],
     slot_date: date,
+    time_preference: str | None = None,
 ) -> list[ChatAvailabilityCard]:
     cards: list[ChatAvailabilityCard] = []
     for doctor in doctors:
@@ -95,13 +204,16 @@ def _available_doctor_cards(
             continue
 
         for slot in slots:
+            slot_time = str(slot["start_time"])
+            if not _time_in_preference_window(slot_time, time_preference):
+                continue
             cards.append(
                 ChatAvailabilityCard(
                     doctor_id=doctor.id,
                     doctor_name=doctor.name,
                     specialty=doctor.specialty,
                     available_date=slot_date,
-                    available_time=str(slot["start_time"]),
+                    available_time=slot_time,
                 )
             )
     return cards
@@ -111,11 +223,13 @@ def _build_response(
     intent: ChatIntent,
     message: str,
     data: list[ChatDoctorCard | ChatAvailabilityCard] | None = None,
+    search_filters: ChatSearchFilters | None = None,
 ) -> ChatResponse:
     return ChatResponse(
         intent=intent,
         message=message,
         data=data or [],
+        search_filters=search_filters,
     )
 
 
@@ -126,51 +240,66 @@ class RuleBasedChatResponder:
     def _list_all_doctors(self) -> list[DoctorResponse]:
         return list_doctors(self._session).items
 
-    def _respond_with_specialties(self, specialty: str, doctors: list[DoctorResponse]) -> ChatResponse:
+    def _respond_with_specialties(
+        self,
+        specialty: str,
+        doctors: list[DoctorResponse],
+        search_filters: ChatSearchFilters | None = None,
+    ) -> ChatResponse:
         if not doctors:
             return _build_response(
                 ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
                 f"No doctors were found for {specialty}.",
+                search_filters=search_filters,
             )
 
         return _build_response(
             ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
             f"Found {len(doctors)} doctors for {specialty}.",
             data=[_doctor_to_card(doctor) for doctor in doctors],
+            search_filters=search_filters,
         )
 
     def _respond_with_availability(
         self,
         message: str,
         intent_match: ChatIntentMatch,
+        search_filters: ChatSearchFilters,
         doctors: list[DoctorResponse],
     ) -> ChatResponse:
-        matched_doctor = _find_matching_doctor(message, doctors)
-        selected_doctors = [matched_doctor] if matched_doctor is not None else doctors
-        if intent_match.specialty is not None:
-            selected_doctors = [
-                doctor for doctor in selected_doctors if doctor.specialty == intent_match.specialty
-            ]
+        selected_doctors = _filter_doctors(doctors, search_filters)
+        matched_doctor = _find_matching_doctor(message, selected_doctors)
+        if matched_doctor is None and len(selected_doctors) == 1:
+            matched_doctor = selected_doctors[0]
+        slot_doctors = [matched_doctor] if matched_doctor is not None else selected_doctors
 
-        slot_date = intent_match.target_date or (date.today() + timedelta(days=1))
-        data = _available_doctor_cards(self._session, selected_doctors, slot_date)
+        slot_date = intent_match.target_date or search_filters.date or (date.today() + timedelta(days=1))
+        data = _available_doctor_cards(
+            self._session,
+            slot_doctors,
+            slot_date,
+            time_preference=search_filters.time_preference,
+        )
 
         if not data:
             if matched_doctor is not None:
                 return _build_response(
                     ChatIntent.SHOW_AVAILABLE_DOCTORS,
                     f"No open appointment slots were found for {matched_doctor.name} on {slot_date.isoformat()}.",
+                    search_filters=search_filters,
                 )
 
-            if intent_match.specialty is not None:
+            if search_filters.specialization is not None:
                 return _build_response(
                     ChatIntent.SHOW_AVAILABLE_DOCTORS,
-                    f"No {intent_match.specialty.lower()} doctors were available on {slot_date.isoformat()}.",
+                    f"No {search_filters.specialization.lower()} doctors were available on {slot_date.isoformat()}.",
+                    search_filters=search_filters,
                 )
 
             return _build_response(
                 ChatIntent.SHOW_AVAILABLE_DOCTORS,
                 f"No doctors were available on {slot_date.isoformat()}.",
+                search_filters=search_filters,
             )
 
         if matched_doctor is not None:
@@ -178,27 +307,44 @@ class RuleBasedChatResponder:
                 ChatIntent.SHOW_AVAILABLE_DOCTORS,
                 f"Found {len(data)} available slots for {matched_doctor.name} on {slot_date.isoformat()}.",
                 data=data,
+                search_filters=search_filters,
             )
 
-        if intent_match.specialty is not None:
+        if search_filters.specialization is not None:
             return _build_response(
                 ChatIntent.SHOW_AVAILABLE_DOCTORS,
-                f"Found {len(data)} {intent_match.specialty.lower()} doctors available on {slot_date.isoformat()}.",
+                f"Found {len(data)} {search_filters.specialization.lower()} doctors available on {slot_date.isoformat()}.",
                 data=data,
+                search_filters=search_filters,
             )
 
         return _build_response(
             ChatIntent.SHOW_AVAILABLE_DOCTORS,
             f"Found {len(data)} doctors available on {slot_date.isoformat()}.",
             data=data,
+            search_filters=search_filters,
         )
 
-    def _respond_with_doctor_details(self, message: str, doctors: list[DoctorResponse]) -> ChatResponse:
-        doctor = _find_matching_doctor(message, doctors)
+    def _respond_with_doctor_details(
+        self,
+        message: str,
+        search_filters: ChatSearchFilters,
+        doctors: list[DoctorResponse],
+    ) -> ChatResponse:
+        candidate_doctors = _filter_doctors(doctors, search_filters)
+        doctor = _find_matching_doctor(message, candidate_doctors) or _find_matching_doctor(message, doctors)
         if doctor is None:
+            if candidate_doctors:
+                return _build_response(
+                    ChatIntent.SHOW_DOCTOR_DETAILS,
+                    f"Found {len(candidate_doctors)} matching doctors.",
+                    data=[_doctor_to_card(candidate_doctor) for candidate_doctor in candidate_doctors],
+                    search_filters=search_filters,
+                )
             return _build_response(
                 ChatIntent.SHOW_DOCTOR_DETAILS,
                 "Please mention the doctor's name to check the consultation fee.",
+                search_filters=search_filters,
             )
 
         return _build_response(
@@ -208,12 +354,14 @@ class RuleBasedChatResponder:
                 f"Next available slot: {doctor.next_available_slot}."
             ),
             data=[_doctor_to_card(doctor)],
+            search_filters=search_filters,
         )
 
-    def _respond_with_appointment_help(self) -> ChatResponse:
+    def _respond_with_appointment_help(self, search_filters: ChatSearchFilters | None = None) -> ChatResponse:
         return _build_response(
             ChatIntent.APPOINTMENT_HELP,
             "I can help you book an appointment. Share a doctor, preferred date, time, and appointment type.",
+            search_filters=search_filters,
         )
 
     def _respond_with_greeting(self) -> ChatResponse:
@@ -238,8 +386,9 @@ class RuleBasedChatResponder:
     def generate(self, message: str) -> ChatResponse:
         intent_match = detect_chat_intent(message)
         doctors = self._list_all_doctors()
+        search_filters = extract_chat_search_filters(message)
 
-        normalized_message = _normalize_text(message)
+        normalized_message = normalize_text(message)
         if any(keyword in normalized_message for keyword in GREETING_KEYWORDS):
             return self._respond_with_greeting()
 
@@ -247,26 +396,59 @@ class RuleBasedChatResponder:
             return self._respond_with_specialty_overview()
 
         if intent_match.intent == ChatIntent.APPOINTMENT_HELP:
-            return self._respond_with_appointment_help()
+            return self._respond_with_appointment_help(search_filters)
 
-        if intent_match.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS:
-            return self._respond_with_availability(message, intent_match, doctors)
+        if intent_match.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS or search_filters.date is not None or search_filters.time_preference is not None:
+            return self._respond_with_availability(message, intent_match, search_filters, doctors)
 
         if intent_match.intent == ChatIntent.SHOW_DOCTOR_DETAILS:
-            return self._respond_with_doctor_details(message, doctors)
+            return self._respond_with_doctor_details(message, search_filters, doctors)
 
         if intent_match.intent == ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION and intent_match.specialty is not None:
             specialty_doctors = [
                 doctor for doctor in doctors if doctor.specialty == intent_match.specialty
             ]
-            return self._respond_with_specialties(intent_match.specialty, specialty_doctors)
+            specialty_doctors = _filter_doctors(specialty_doctors, search_filters)
+            return self._respond_with_specialties(intent_match.specialty, specialty_doctors, search_filters)
 
-        if "show doctors" in normalized_message or "find doctors" in normalized_message or "find doctor" in normalized_message:
-            fallback_match = ChatIntentMatch(
-                intent=ChatIntent.SHOW_AVAILABLE_DOCTORS,
-                target_date=date.today() + timedelta(days=1),
+        if any(
+            keyword in normalized_message
+            for keyword in ("show doctors", "find doctors", "find doctor", "doctor search", "search doctors")
+        ) or any(
+            value is not None
+            for value in (
+                search_filters.specialization,
+                search_filters.gender,
+                search_filters.minimum_fee,
+                search_filters.maximum_fee,
+                search_filters.clinic_location,
             )
-            return self._respond_with_availability(message, fallback_match, doctors)
+        ):
+            matching_doctors = _filter_doctors(doctors, search_filters)
+            filter_summary = _describe_search_filters(search_filters)
+            if matching_doctors:
+                message_text = f"Found {len(matching_doctors)} matching doctors."
+                if filter_summary:
+                    message_text = f"Found {len(matching_doctors)} matching doctors for {filter_summary}."
+                return _build_response(
+                    ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
+                    message_text,
+                    data=[_doctor_to_card(doctor) for doctor in matching_doctors],
+                    search_filters=search_filters,
+                )
+
+            if filter_summary:
+                return _build_response(
+                    ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
+                    f"No matching doctors were found for {filter_summary}.",
+                    search_filters=search_filters,
+                )
+
+            return _build_response(
+                ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
+                "I can help you search for doctors by specialization, location, fee, or availability.",
+                search_filters=search_filters,
+            )
 
         return self._respond_with_unknown()
 

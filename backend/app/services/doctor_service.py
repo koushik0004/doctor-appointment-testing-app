@@ -13,6 +13,7 @@ def _to_doctor_response(doctor) -> DoctorResponse:
         id=doctor.id,
         name=doctor.name,
         specialty=doctor.specialty,
+        gender=doctor.gender or "Unspecified",
         rating=doctor.rating,
         review_count=doctor.review_count,
         clinic_name=doctor.clinic_name,
@@ -31,9 +32,21 @@ def list_doctors(
     session: Session,
     specialty: str | None = None,
     appointment_type: AppointmentType | None = None,
+    gender: str | None = None,
+    location: str | None = None,
+    minimum_fee: int | None = None,
+    maximum_fee: int | None = None,
 ) -> DoctorListResponse:
     specialty_value = specialty.strip() if specialty else None
-    doctors = get_doctors_by_filters(session, specialty_value, appointment_type)
+    doctors = get_doctors_by_filters(
+        session,
+        specialty=specialty_value,
+        appointment_type=appointment_type,
+        gender=gender,
+        location=location,
+        minimum_fee=minimum_fee,
+        maximum_fee=maximum_fee,
+    )
     return DoctorListResponse(
         items=[_to_doctor_response(doctor) for doctor in doctors],
         total=len(doctors),

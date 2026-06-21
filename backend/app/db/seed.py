@@ -7,6 +7,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Sarah Jenkins",
         "specialty": "Cardiology",
+        "gender": "Female",
         "rating": 4.9,
         "review_count": 128,
         "clinic_name": "CareNow Central Clinic",
@@ -22,6 +23,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Marcus Chen",
         "specialty": "Pediatrics",
+        "gender": "Male",
         "rating": 4.8,
         "review_count": 94,
         "clinic_name": "Green Valley Pediatrics",
@@ -37,6 +39,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Elena Rodriguez",
         "specialty": "Dermatology",
+        "gender": "Female",
         "rating": 5.0,
         "review_count": 215,
         "clinic_name": "Skin & Beauty Clinic",
@@ -52,6 +55,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. James Wilson",
         "specialty": "Internal Medicine",
+        "gender": "Male",
         "rating": 4.7,
         "review_count": 82,
         "clinic_name": "City Health Partners",
@@ -67,6 +71,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Aisha Khan",
         "specialty": "General Practice",
+        "gender": "Female",
         "rating": 4.9,
         "review_count": 171,
         "clinic_name": "Riverside Family Clinic",
@@ -82,6 +87,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Daniel Park",
         "specialty": "Cardiology",
+        "gender": "Male",
         "rating": 4.6,
         "review_count": 67,
         "clinic_name": "Harbor Heart Institute",
@@ -97,6 +103,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Lucy Bennett",
         "specialty": "Pediatrics",
+        "gender": "Female",
         "rating": 4.8,
         "review_count": 143,
         "clinic_name": "Little Oaks Pediatric Hub",
@@ -112,6 +119,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Noah Turner",
         "specialty": "Internal Medicine",
+        "gender": "Male",
         "rating": 4.7,
         "review_count": 109,
         "clinic_name": "North Bridge Medical",
@@ -127,6 +135,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Priya Nair",
         "specialty": "General Practice",
+        "gender": "Female",
         "rating": 4.8,
         "review_count": 156,
         "clinic_name": "Harbour Family Practice",
@@ -142,6 +151,7 @@ DOCTOR_SEED_DATA = [
     {
         "name": "Dr. Sofia Martinez",
         "specialty": "Dermatology",
+        "gender": "Female",
         "rating": 4.9,
         "review_count": 188,
         "clinic_name": "Lumen Skin Center",
@@ -168,6 +178,7 @@ def seed_doctors(session: Session) -> None:
             Doctor(
                 name=doctor_data["name"],
                 specialty=doctor_data["specialty"],
+                gender=doctor_data["gender"],
                 rating=doctor_data["rating"],
                 review_count=doctor_data["review_count"],
                 clinic_name=doctor_data["clinic_name"],

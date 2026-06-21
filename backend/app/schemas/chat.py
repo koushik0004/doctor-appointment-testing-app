@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from datetime import date
+from datetime import date as Date
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -12,6 +12,16 @@ class ChatIntent(str, Enum):
     SHOW_DOCTOR_DETAILS = "SHOW_DOCTOR_DETAILS"
     APPOINTMENT_HELP = "APPOINTMENT_HELP"
     UNKNOWN = "UNKNOWN"
+
+
+class ChatSearchFilters(BaseModel):
+    specialization: str | None = None
+    gender: str | None = None
+    minimum_fee: int | None = None
+    maximum_fee: int | None = None
+    date: Date | None = None
+    time_preference: str | None = None
+    clinic_location: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -26,6 +36,7 @@ class ChatDoctorCard(BaseModel):
     doctor_id: int
     doctor_name: str
     specialty: str
+    gender: str
     consultation_fee_min: int
     consultation_fee_max: int
     next_available_slot: str
@@ -37,7 +48,7 @@ class ChatAvailabilityCard(BaseModel):
     doctor_id: int
     doctor_name: str
     specialty: str
-    available_date: date
+    available_date: Date
     available_time: str
 
 
@@ -45,6 +56,7 @@ class ChatResponse(BaseModel):
     intent: ChatIntent
     message: str
     data: list[ChatDoctorCard | ChatAvailabilityCard] = Field(default_factory=list)
+    search_filters: ChatSearchFilters | None = None
     response: str = ""
 
     @model_validator(mode="after")
