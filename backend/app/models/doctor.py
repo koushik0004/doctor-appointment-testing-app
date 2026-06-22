@@ -12,6 +12,7 @@ class Doctor(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     specialty: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    gender: Mapped[str | None] = mapped_column(Text, nullable=True, index=True, default=None)
     rating: Mapped[float] = mapped_column(Float, nullable=False)
     review_count: Mapped[int] = mapped_column(Integer, nullable=False)
     clinic_name: Mapped[str] = mapped_column(Text, nullable=False)

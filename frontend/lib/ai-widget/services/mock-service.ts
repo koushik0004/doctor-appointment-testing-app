@@ -42,18 +42,38 @@ const sampleAvailabilityData = [
     doctor_name: "Dr. Sarah Jenkins",
     specialty: "Cardiology",
     available_date: "2026-06-22",
-    available_time: "10:00 AM",
+    available_time: "6:00 PM",
   },
   {
     doctor_id: 2,
     doctor_name: "Dr. Marcus Lee",
     specialty: "Cardiology",
     available_date: "2026-06-22",
-    available_time: "2:30 PM",
+    available_time: "6:30 PM",
   },
 ];
 
 const mockReplyRules: MockReplyRule[] = [
+  {
+    test: (message) =>
+      message.includes("available") ||
+      message.includes("tomorrow") ||
+      message.includes("schedule") ||
+      message.includes("after 5 pm") ||
+      message.includes("after 5pm"),
+    createResponse: () => ({
+      intent: "SHOW_AVAILABLE_DOCTORS",
+      message: "Here are the doctors with openings after 5 PM tomorrow.",
+      data: sampleAvailabilityData,
+      search_filters: {
+        specialization: "Cardiology",
+        gender: "Female",
+        date: "2026-06-22",
+        time_preference: "After 5:00 PM",
+      },
+      response: "Here are the doctors with openings after 5 PM tomorrow.",
+    }),
+  },
   {
     test: (message) => message.includes("appointment") || message.includes("book"),
     createResponse: () => ({
@@ -66,21 +86,14 @@ const mockReplyRules: MockReplyRule[] = [
     }),
   },
   {
-    test: (message) =>
-      message.includes("available") || message.includes("tomorrow") || message.includes("schedule"),
-    createResponse: () => ({
-      intent: "SHOW_AVAILABLE_DOCTORS",
-      message: "Here are the doctors with openings for tomorrow.",
-      data: sampleAvailabilityData,
-      response: "Here are the doctors with openings for tomorrow.",
-    }),
-  },
-  {
     test: (message) => message.includes("cardiologist") || message.includes("cardiology"),
     createResponse: () => ({
       intent: "SHOW_DOCTORS_BY_SPECIALIZATION",
       message: "I found 2 cardiologists who can help.",
       data: sampleDoctorData,
+      search_filters: {
+        specialization: "Cardiology",
+      },
       response: "I found 2 cardiologists who can help.",
     }),
   },

@@ -25,6 +25,7 @@ database_module.get_session_factory.cache_clear()
 
 @pytest.fixture()
 def client():
+    os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB}"
     if TEST_DB.exists():
         TEST_DB.unlink()
     database_module.get_engine.cache_clear()
@@ -58,6 +59,22 @@ def test_chat_endpoint_returns_structured_specialty_response(client):
     assert payload["data"][1]["doctor_name"] == "Dr. Daniel Park"
 
 
+def test_chat_endpoint_returns_structured_filtered_search_response(client):
+    response = client.post("/api/chat", json={"message": "Need a female cardiologist tomorrow"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.SHOW_AVAILABLE_DOCTORS.value
+    assert payload["search_filters"]["specialization"] == "Cardiology"
+    assert payload["search_filters"]["gender"] == "Female"
+    assert payload["search_filters"]["date"] == (date.today() + timedelta(days=1)).isoformat()
+    assert payload["message"] == f"Found 6 available slots for Dr. Sarah Jenkins on {(date.today() + timedelta(days=1)).isoformat()}."
+    assert payload["response"] == payload["message"]
+    assert len(payload["data"]) == 6
+    assert payload["data"][0]["doctor_name"] == "Dr. Sarah Jenkins"
+    assert payload["data"][0]["available_date"] == (date.today() + timedelta(days=1)).isoformat()
+
+
 def test_chat_endpoint_returns_structured_availability_response(client):
     response = client.post("/api/v1/chat", json={"message": "What slots does Dr. Sarah Jenkins have?"})
 
@@ -72,6 +89,21 @@ def test_chat_endpoint_returns_structured_availability_response(client):
     assert payload["data"][0]["available_time"] == "08:00"
 
 
+def test_chat_endpoint_returns_structured_time_filtered_availability_response(client):
+    response = client.post("/api/chat", json={"message": "Need appointment after 5 PM"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.SHOW_AVAILABLE_DOCTORS.value
+    assert payload["search_filters"]["time_preference"] == "After 5:00 PM"
+    assert payload["message"] == (
+        f"Found {len(payload['data'])} doctors available on {(date.today() + timedelta(days=1)).isoformat()}."
+    )
+    assert payload["response"] == payload["message"]
+    assert len(payload["data"]) > 0
+    assert {item["available_time"] for item in payload["data"]} == {"18:00"}
+
+
 def test_chat_endpoint_returns_structured_doctor_details_response(client):
     response = client.post("/api/chat", json={"message": "What is Dr. Sarah Jenkins fee?"})
 
@@ -84,6 +116,20 @@ def test_chat_endpoint_returns_structured_doctor_details_response(client):
     assert payload["data"][0]["doctor_name"] == "Dr. Sarah Jenkins"
     assert payload["data"][0]["consultation_fee_min"] == 120
     assert payload["data"][0]["consultation_fee_max"] == 200
+
+
+def test_doctor_list_endpoint_supports_gender_and_fee_filters(client):
+    response = client.get("/api/doctors", params={"gender": "Female", "maximum_fee": 200})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 4
+    assert {item["name"] for item in payload["items"]} == {
+        "Dr. Sarah Jenkins",
+        "Dr. Aisha Khan",
+        "Dr. Lucy Bennett",
+        "Dr. Priya Nair",
+    }
 
 
 def test_chat_endpoint_returns_appointment_help_response(client):

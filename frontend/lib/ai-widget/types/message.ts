@@ -26,11 +26,22 @@ export type AiWidgetAvailabilityCardContent = {
   availableTime: string;
 };
 
+export type AiWidgetSearchFilterChip = {
+  label: string;
+  value: string;
+};
+
+export type AiWidgetSearchSummary = {
+  countLabel: string;
+  filters: AiWidgetSearchFilterChip[];
+};
+
 export type AiWidgetDoctorListMessageContent = {
   type: "doctor_list";
   title: string;
   summary: string;
   doctors: AiWidgetDoctorCardContent[];
+  searchSummary?: AiWidgetSearchSummary;
 };
 
 export type AiWidgetAvailabilityMessageContent = {
@@ -38,6 +49,7 @@ export type AiWidgetAvailabilityMessageContent = {
   title: string;
   summary: string;
   slots: AiWidgetAvailabilityCardContent[];
+  searchSummary?: AiWidgetSearchSummary;
 };
 
 export type AiWidgetAppointmentHelpMessageContent = {

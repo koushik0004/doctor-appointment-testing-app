@@ -7,3 +7,4 @@ export * from "@/lib/ai-widget/components/DoctorCardMessage";
 export * from "@/lib/ai-widget/components/MessageContentRenderer";
 export * from "@/lib/ai-widget/components/MessageComposer";
 export * from "@/lib/ai-widget/components/MessageList";
+export * from "@/lib/ai-widget/components/SearchFilterSummary";

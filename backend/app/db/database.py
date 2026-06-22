@@ -14,6 +14,7 @@ DOCTORS_REQUIRED_COLUMNS = {
     "id",
     "name",
     "specialty",
+    "gender",
     "rating",
     "review_count",
     "clinic_name",

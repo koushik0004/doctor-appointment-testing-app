@@ -1,30 +1,15 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 from app.schemas.chat import ChatIntent
-
-
-SPECIALTY_ALIASES = {
-    "cardiologist": "Cardiology",
-    "cardiologists": "Cardiology",
-    "cardiology": "Cardiology",
-    "dermatologist": "Dermatology",
-    "dermatologists": "Dermatology",
-    "dermatology": "Dermatology",
-    "pediatrician": "Pediatrics",
-    "pediatricians": "Pediatrics",
-    "pediatrics": "Pediatrics",
-    "general practitioner": "General Practice",
-    "general practitioners": "General Practice",
-    "general practice": "General Practice",
-    "gp": "General Practice",
-    "internal medicine": "Internal Medicine",
-    "internist": "Internal Medicine",
-    "internists": "Internal Medicine",
-}
+from app.services.chat_entity_extractor import (
+    extract_specialization,
+    extract_target_date,
+    extract_time_preference,
+    normalize_text,
+)
 
 APPOINTMENT_HELP_KEYWORDS = (
     "book",
@@ -72,38 +57,23 @@ class ChatIntentMatch:
     target_date: date | None = None
 
 
-def _normalize_text(value: str) -> str:
-    return re.sub(r"[^a-z0-9\s]", " ", value.lower()).strip()
-
-
-def _extract_specialty(normalized_message: str) -> str | None:
-    for alias, specialty in SPECIALTY_ALIASES.items():
-        if alias in normalized_message:
-            return specialty
-    return None
-
-
-def _extract_target_date(normalized_message: str) -> date | None:
-    today = date.today()
-    if "day after tomorrow" in normalized_message:
-        return today + timedelta(days=2)
-    if "tomorrow" in normalized_message:
-        return today + timedelta(days=1)
-    if "today" in normalized_message:
-        return today
-    return None
-
-
 def _contains_keyword(normalized_message: str, keywords: tuple[str, ...]) -> bool:
     return any(keyword in normalized_message for keyword in keywords)
 
 
 def detect_chat_intent(message: str) -> ChatIntentMatch:
-    normalized_message = _normalize_text(message)
-    specialty = _extract_specialty(normalized_message)
-    target_date = _extract_target_date(normalized_message)
+    normalized_message = normalize_text(message)
+    specialty = extract_specialization(normalized_message)
+    target_date = extract_target_date(normalized_message)
+    time_preference = extract_time_preference(normalized_message)
 
     if _contains_keyword(normalized_message, APPOINTMENT_HELP_KEYWORDS):
+        if target_date is not None or time_preference is not None:
+            return ChatIntentMatch(
+                intent=ChatIntent.SHOW_AVAILABLE_DOCTORS,
+                specialty=specialty,
+                target_date=target_date or (date.today() + timedelta(days=1)),
+            )
         return ChatIntentMatch(
             intent=ChatIntent.APPOINTMENT_HELP,
             specialty=specialty,

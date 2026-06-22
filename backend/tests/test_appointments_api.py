@@ -25,6 +25,7 @@ database_module.get_session_factory.cache_clear()
 
 @pytest.fixture()
 def client():
+    os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB}"
     if TEST_DB.exists():
         TEST_DB.unlink()
     database_module.get_engine.cache_clear()

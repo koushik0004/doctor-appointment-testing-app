@@ -3,6 +3,8 @@ import type {
   AiWidgetAvailabilityMessageContent,
   AiWidgetDoctorCardContent,
   AiWidgetDoctorListMessageContent,
+  AiWidgetSearchFilterChip,
+  AiWidgetSearchSummary,
   AiWidgetMessage,
   AiWidgetMessageContent,
   AiWidgetAppointmentHelpMessageContent,
@@ -11,13 +13,134 @@ import type {
 import type {
   AiWidgetChatAvailabilityCard,
   AiWidgetChatDoctorCard,
+  AiWidgetChatSearchFilters,
   AiWidgetChatResponsePayload,
 } from "@/lib/ai-widget/types";
+import { addDays, format, isSameDay, parseISO, startOfDay } from "date-fns";
+
+import { formatCurrencyInr } from "@/lib/formatters";
 
 function createTextContent(text: string): AiWidgetTextMessageContent {
   return {
     type: "text",
     text,
+  };
+}
+
+function countUniqueDoctors(
+  items: AiWidgetChatResponsePayload["data"],
+): number {
+  return new Set(items.map((item) => item.doctor_id)).size;
+}
+
+function formatSearchDate(value: string): string {
+  const parsedDate = parseISO(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+
+  if (isSameDay(parsedDate, today)) {
+    return "Today";
+  }
+
+  if (isSameDay(parsedDate, tomorrow)) {
+    return "Tomorrow";
+  }
+
+  return format(parsedDate, "MMM d, yyyy");
+}
+
+function formatFeeRange(
+  minimumFee?: number,
+  maximumFee?: number,
+): string | null {
+  if (minimumFee == null && maximumFee == null) {
+    return null;
+  }
+
+  if (minimumFee != null && maximumFee != null) {
+    return `${formatCurrencyInr(minimumFee)} - ${formatCurrencyInr(maximumFee)}`;
+  }
+
+  if (minimumFee != null) {
+    return `From ${formatCurrencyInr(minimumFee)}`;
+  }
+
+  return `Up to ${formatCurrencyInr(maximumFee ?? 0)}`;
+}
+
+function buildSearchFilters(
+  filters?: AiWidgetChatSearchFilters,
+): AiWidgetSearchFilterChip[] {
+  if (!filters) {
+    return [];
+  }
+
+  const chips: AiWidgetSearchFilterChip[] = [];
+  const feeRange = formatFeeRange(filters.minimum_fee, filters.maximum_fee);
+
+  if (filters.specialization) {
+    chips.push({
+      label: "Specialization",
+      value: filters.specialization,
+    });
+  }
+
+  if (filters.gender) {
+    chips.push({
+      label: "Gender",
+      value: filters.gender,
+    });
+  }
+
+  if (feeRange) {
+    chips.push({
+      label: "Fee",
+      value: feeRange,
+    });
+  }
+
+  if (filters.date) {
+    chips.push({
+      label: "Date",
+      value: formatSearchDate(filters.date),
+    });
+  }
+
+  if (filters.time_preference) {
+    chips.push({
+      label: "Time",
+      value: filters.time_preference,
+    });
+  }
+
+  if (filters.clinic_location) {
+    chips.push({
+      label: "Location",
+      value: filters.clinic_location,
+    });
+  }
+
+  return chips;
+}
+
+function buildSearchSummary(
+  payload: AiWidgetChatResponsePayload,
+  itemLabel: string,
+): AiWidgetSearchSummary | undefined {
+  const filters = buildSearchFilters(payload.search_filters);
+  const count = countUniqueDoctors(payload.data);
+
+  if (count === 0 && filters.length === 0) {
+    return undefined;
+  }
+
+  return {
+    countLabel: `Found ${count} ${itemLabel}${count === 1 ? "" : "s"}.`,
+    filters,
   };
 }
 
@@ -69,6 +192,11 @@ function mapAvailabilityCards(
 function createDoctorListContent(
   payload: AiWidgetChatResponsePayload,
 ): AiWidgetDoctorListMessageContent {
+  const searchSummary =
+    payload.intent === "SHOW_DOCTOR_DETAILS"
+      ? undefined
+      : buildSearchSummary(payload, "matching doctor");
+
   return {
     type: "doctor_list",
     title:
@@ -77,6 +205,7 @@ function createDoctorListContent(
         : "Doctor matches",
     summary: payload.message,
     doctors: mapDoctorCards(payload.data),
+    searchSummary,
   };
 }
 
@@ -88,6 +217,7 @@ function createAvailabilityContent(
     title: "Available appointments",
     summary: payload.message,
     slots: mapAvailabilityCards(payload.data),
+    searchSummary: buildSearchSummary(payload, "matching doctor"),
   };
 }
 

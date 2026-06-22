@@ -22,10 +22,21 @@ database_module.get_session_factory.cache_clear()
 
 @pytest.fixture()
 def client():
+    os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB}"
+    if TEST_DB.exists():
+        TEST_DB.unlink()
+    database_module.get_engine.cache_clear()
+    database_module.get_session_factory.cache_clear()
+
     app_main_module = importlib.reload(importlib.import_module("app.main"))
 
     with TestClient(app_main_module.app) as test_client:
         yield test_client
+
+    database_module.get_engine.cache_clear()
+    database_module.get_session_factory.cache_clear()
+    if TEST_DB.exists():
+        TEST_DB.unlink()
 
 
 def test_health_endpoint(client):

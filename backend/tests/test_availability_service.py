@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import sys
 
@@ -62,7 +62,7 @@ def test_availability_service_returns_available_slots_for_single_date():
             session.add(patient)
             session.flush()
 
-            future_date = date(2026, 6, 20)
+            future_date = date.today() + timedelta(days=1)
             booked_appointment = Appointment(
                 confirmation_code="CN-TEST-0001",
                 doctor_id=doctor.id,
@@ -87,7 +87,7 @@ def test_availability_service_returns_available_slots_for_single_date():
                 slot_date=future_date,
             )
             assert availability == {
-                "date": "2026-06-20",
+                "date": future_date.isoformat(),
                 "doctor_id": doctor.id,
                 "available_slots": slots,
             }

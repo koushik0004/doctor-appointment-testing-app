@@ -4,6 +4,7 @@ import type { AiWidgetMessage, AiWidgetMessageContent } from "@/lib/ai-widget/ty
 import { AppointmentHelpMessage } from "@/lib/ai-widget/components/AppointmentHelpMessage";
 import { AvailabilityMessage } from "@/lib/ai-widget/components/AvailabilityMessage";
 import { DoctorCardMessage } from "@/lib/ai-widget/components/DoctorCardMessage";
+import { SearchFilterSummary } from "@/lib/ai-widget/components/SearchFilterSummary";
 import { cn } from "@/lib/utils";
 
 type MessageContentRendererProps = {
@@ -28,6 +29,13 @@ function DoctorListContent({
         <p className="text-sm font-semibold text-slate-950">{content.title}</p>
         <p className="text-sm leading-6 text-slate-600">{content.summary}</p>
       </div>
+
+      {content.searchSummary ? (
+        <SearchFilterSummary
+          countLabel={content.searchSummary.countLabel}
+          filters={content.searchSummary.filters}
+        />
+      ) : null}
 
       <div className="space-y-3">
         {content.doctors.map((doctor) => (
@@ -55,6 +63,13 @@ function AvailabilityContent({
         <p className="text-sm font-semibold text-slate-950">{content.title}</p>
         <p className="text-sm leading-6 text-slate-600">{content.summary}</p>
       </div>
+
+      {content.searchSummary ? (
+        <SearchFilterSummary
+          countLabel={content.searchSummary.countLabel}
+          filters={content.searchSummary.filters}
+        />
+      ) : null}
 
       <div className="space-y-3">
         {content.slots.map((slot) => (
