@@ -56,6 +56,7 @@ export type AiWidgetAppointmentHelpMessageContent = {
   type: "appointment_help";
   title: string;
   text: string;
+  steps?: string[];
 };
 
 export type AiWidgetMessageContent =

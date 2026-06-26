@@ -11,14 +11,22 @@ from app.services.chat_entity_extractor import (
     normalize_text,
 )
 
-APPOINTMENT_HELP_KEYWORDS = (
-    "book",
-    "booking",
+BOOKING_KEYWORDS = (
     "appointment",
     "appointments",
+    "book",
+    "booking",
+    "consult",
+    "consultation",
+    "reserve",
     "schedule",
-    "reschedule",
+)
+
+CANCELLATION_KEYWORDS = (
     "cancel",
+    "cancellation",
+    "cancel booking",
+    "cancel consultation",
 )
 
 AVAILABILITY_KEYWORDS = (
@@ -38,6 +46,10 @@ AVAILABILITY_KEYWORDS = (
 DOCTOR_DETAILS_KEYWORDS = (
     "consultation fee",
     "consultation fees",
+    "consultation charges",
+    "doctor charges",
+    "doctor fee",
+    "doctor fees",
     "fee",
     "fees",
     "price",
@@ -67,7 +79,21 @@ def detect_chat_intent(message: str) -> ChatIntentMatch:
     target_date = extract_target_date(normalized_message)
     time_preference = extract_time_preference(normalized_message)
 
-    if _contains_keyword(normalized_message, APPOINTMENT_HELP_KEYWORDS):
+    if _contains_keyword(normalized_message, CANCELLATION_KEYWORDS):
+        return ChatIntentMatch(
+            intent=ChatIntent.CANCEL_APPOINTMENT_HELP,
+            specialty=specialty,
+            target_date=target_date,
+        )
+
+    if _contains_keyword(normalized_message, DOCTOR_DETAILS_KEYWORDS):
+        return ChatIntentMatch(
+            intent=ChatIntent.SHOW_DOCTOR_DETAILS,
+            specialty=specialty,
+            target_date=target_date,
+        )
+
+    if _contains_keyword(normalized_message, BOOKING_KEYWORDS):
         if target_date is not None or time_preference is not None:
             return ChatIntentMatch(
                 intent=ChatIntent.SHOW_AVAILABLE_DOCTORS,
@@ -85,13 +111,6 @@ def detect_chat_intent(message: str) -> ChatIntentMatch:
             intent=ChatIntent.SHOW_AVAILABLE_DOCTORS,
             specialty=specialty,
             target_date=target_date or (date.today() + timedelta(days=1)),
-        )
-
-    if _contains_keyword(normalized_message, DOCTOR_DETAILS_KEYWORDS):
-        return ChatIntentMatch(
-            intent=ChatIntent.SHOW_DOCTOR_DETAILS,
-            specialty=specialty,
-            target_date=target_date,
         )
 
     if specialty is not None:

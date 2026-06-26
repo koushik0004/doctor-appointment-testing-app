@@ -226,8 +226,12 @@ function createAppointmentHelpContent(
 ): AiWidgetAppointmentHelpMessageContent {
   return {
     type: "appointment_help",
-    title: "Appointment help",
+    title:
+      payload.intent === "CANCEL_APPOINTMENT_HELP"
+        ? "Cancellation help"
+        : "Appointment help",
     text: payload.message,
+    steps: payload.help_steps,
   };
 }
 
@@ -241,6 +245,7 @@ export function mapChatResponseToContent(
     case "SHOW_AVAILABLE_DOCTORS":
       return createAvailabilityContent(payload);
     case "APPOINTMENT_HELP":
+    case "CANCEL_APPOINTMENT_HELP":
       return createAppointmentHelpContent(payload);
     case "UNKNOWN":
     default:

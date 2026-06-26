@@ -138,9 +138,44 @@ def test_chat_endpoint_returns_appointment_help_response(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["intent"] == ChatIntent.APPOINTMENT_HELP.value
+    assert payload["message"] == "Here is how to book an appointment in the app."
+    assert payload["response"] == payload["message"]
+    assert payload["data"] == []
+    assert payload["help_steps"] == [
+        "Choose a doctor.",
+        "Select an available date.",
+        "Choose a time slot.",
+        "Enter patient details.",
+        "Confirm the appointment.",
+    ]
+
+
+def test_chat_endpoint_returns_cancellation_help_response(client):
+    response = client.post("/api/chat", json={"message": "How do I cancel my booking?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.CANCEL_APPOINTMENT_HELP.value
     assert payload["message"] == (
-        "I can help you book an appointment. Share a doctor, preferred date, time, and appointment type."
+        "Appointment cancellation is not supported through AI chat. Please use the app's existing cancellation flow or contact support for help."
     )
+    assert payload["response"] == payload["message"]
+    assert payload["data"] == []
+    assert payload["help_steps"] == [
+        "Open the existing cancellation flow in the app.",
+        "Find your booked appointment details.",
+        "Follow the cancellation instructions shown there.",
+        "If you cannot access the booking, contact support.",
+    ]
+
+
+def test_chat_endpoint_clarifies_fee_query_without_doctor_name(client):
+    response = client.post("/api/chat", json={"message": "Consultation fee"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.SHOW_DOCTOR_DETAILS.value
+    assert payload["message"] == "Which doctor's consultation fee would you like to know?"
     assert payload["response"] == payload["message"]
     assert payload["data"] == []
 

@@ -224,12 +224,14 @@ def _build_response(
     message: str,
     data: list[ChatDoctorCard | ChatAvailabilityCard] | None = None,
     search_filters: ChatSearchFilters | None = None,
+    help_steps: list[str] | None = None,
 ) -> ChatResponse:
     return ChatResponse(
         intent=intent,
         message=message,
         data=data or [],
         search_filters=search_filters,
+        help_steps=help_steps or [],
     )
 
 
@@ -334,16 +336,9 @@ class RuleBasedChatResponder:
         candidate_doctors = _filter_doctors(doctors, search_filters)
         doctor = _find_matching_doctor(message, candidate_doctors) or _find_matching_doctor(message, doctors)
         if doctor is None:
-            if candidate_doctors:
-                return _build_response(
-                    ChatIntent.SHOW_DOCTOR_DETAILS,
-                    f"Found {len(candidate_doctors)} matching doctors.",
-                    data=[_doctor_to_card(candidate_doctor) for candidate_doctor in candidate_doctors],
-                    search_filters=search_filters,
-                )
             return _build_response(
                 ChatIntent.SHOW_DOCTOR_DETAILS,
-                "Please mention the doctor's name to check the consultation fee.",
+                "Which doctor's consultation fee would you like to know?",
                 search_filters=search_filters,
             )
 
@@ -360,8 +355,31 @@ class RuleBasedChatResponder:
     def _respond_with_appointment_help(self, search_filters: ChatSearchFilters | None = None) -> ChatResponse:
         return _build_response(
             ChatIntent.APPOINTMENT_HELP,
-            "I can help you book an appointment. Share a doctor, preferred date, time, and appointment type.",
+            "Here is how to book an appointment in the app.",
             search_filters=search_filters,
+            help_steps=[
+                "Choose a doctor.",
+                "Select an available date.",
+                "Choose a time slot.",
+                "Enter patient details.",
+                "Confirm the appointment.",
+            ],
+        )
+
+    def _respond_with_cancellation_help(
+        self,
+        search_filters: ChatSearchFilters | None = None,
+    ) -> ChatResponse:
+        return _build_response(
+            ChatIntent.CANCEL_APPOINTMENT_HELP,
+            "Appointment cancellation is not supported through AI chat. Please use the app's existing cancellation flow or contact support for help.",
+            search_filters=search_filters,
+            help_steps=[
+                "Open the existing cancellation flow in the app.",
+                "Find your booked appointment details.",
+                "Follow the cancellation instructions shown there.",
+                "If you cannot access the booking, contact support.",
+            ],
         )
 
     def _respond_with_greeting(self) -> ChatResponse:
@@ -397,6 +415,9 @@ class RuleBasedChatResponder:
 
         if intent_match.intent == ChatIntent.APPOINTMENT_HELP:
             return self._respond_with_appointment_help(search_filters)
+
+        if intent_match.intent == ChatIntent.CANCEL_APPOINTMENT_HELP:
+            return self._respond_with_cancellation_help(search_filters)
 
         if intent_match.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS or search_filters.date is not None or search_filters.time_preference is not None:
             return self._respond_with_availability(message, intent_match, search_filters, doctors)

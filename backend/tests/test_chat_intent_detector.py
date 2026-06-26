@@ -42,6 +42,26 @@ def test_detect_chat_intent_for_appointment_help_query():
     assert match.intent == ChatIntent.APPOINTMENT_HELP
 
 
+def test_detect_chat_intent_for_appointment_process_query():
+    match = detect_chat_intent("What is the booking process?")
+
+    assert match.intent == ChatIntent.APPOINTMENT_HELP
+
+
+def test_detect_chat_intent_for_cancellation_help_query():
+    match = detect_chat_intent("How do I cancel my booking?")
+
+    assert match.intent == ChatIntent.CANCEL_APPOINTMENT_HELP
+
+
+def test_detect_chat_intent_for_fee_query_without_doctor_name():
+    match = detect_chat_intent("Consultation charges")
+
+    assert match.intent == ChatIntent.SHOW_DOCTOR_DETAILS
+    assert match.specialty is None
+    assert match.target_date is None
+
+
 def test_detect_chat_intent_for_appointment_query_with_time_preference():
     match = detect_chat_intent("Need appointment after 5 PM")
 

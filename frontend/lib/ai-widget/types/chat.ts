@@ -3,6 +3,7 @@ export type AiWidgetChatIntent =
   | "SHOW_AVAILABLE_DOCTORS"
   | "SHOW_DOCTOR_DETAILS"
   | "APPOINTMENT_HELP"
+  | "CANCEL_APPOINTMENT_HELP"
   | "UNKNOWN";
 
 export type AiWidgetChatDoctorCard = {
@@ -39,5 +40,6 @@ export type AiWidgetChatResponsePayload = {
   message: string;
   data: Array<AiWidgetChatDoctorCard | AiWidgetChatAvailabilityCard>;
   search_filters?: AiWidgetChatSearchFilters;
+  help_steps?: string[];
   response?: string;
 };
