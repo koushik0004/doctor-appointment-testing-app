@@ -95,4 +95,22 @@ Recommend the next planned phase:
 
 **Vector-less RAG + Appointment Workflow Engine**
 
+----------------------------------------
+Output Requirements
+----------------------------------------
+
+Generate a single Markdown report.
+
+Save it under:
+
+docs/reports/feature-8-chatbot-fix/report-faq-enhancements.md
+
+Use an appropriate file name following the existing project naming convention.
+
+Create the directory if it does not exist.
+
+Overwrite the previous report for the same feature if requested.
+
+Do not generate duplicate reports.
+
 The report should be detailed, technical, and business-friendly, following the same format as previous implementation reports. Also include the intent behind every significant code change to help future developers understand not just what changed, but why it changed.
