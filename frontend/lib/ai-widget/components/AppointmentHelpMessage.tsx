@@ -26,6 +26,13 @@ export function AppointmentHelpMessage({ content }: AppointmentHelpMessageProps)
             {content.title}
           </p>
           <p className="mt-2 text-sm leading-6 text-amber-950">{content.text}</p>
+          {content.steps?.length ? (
+            <ol className="mt-3 space-y-2 pl-5 text-sm leading-6 text-amber-950 list-decimal">
+              {content.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          ) : null}
         </div>
       </div>
     </article>

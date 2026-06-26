@@ -75,14 +75,36 @@ const mockReplyRules: MockReplyRule[] = [
     }),
   },
   {
+    test: (message) => message.includes("cancel"),
+    createResponse: () => ({
+      intent: "CANCEL_APPOINTMENT_HELP",
+      message:
+        "Appointment cancellation is not supported through AI chat. Please use the app's existing cancellation flow or contact support for help.",
+      data: [],
+      help_steps: [
+        "Open the existing cancellation flow in the app.",
+        "Find your booked appointment details.",
+        "Follow the cancellation instructions shown there.",
+        "If you cannot access the booking, contact support.",
+      ],
+      response:
+        "Appointment cancellation is not supported through AI chat. Please use the app's existing cancellation flow or contact support for help.",
+    }),
+  },
+  {
     test: (message) => message.includes("appointment") || message.includes("book"),
     createResponse: () => ({
       intent: "APPOINTMENT_HELP",
-      message:
-        "I can help you book an appointment by checking doctor availability, selecting a time, and confirming the visit details.",
+      message: "Here is how to book an appointment in the app.",
       data: [],
-      response:
-        "I can help you book an appointment by checking doctor availability, selecting a time, and confirming the visit details.",
+      help_steps: [
+        "Choose a doctor.",
+        "Select an available date.",
+        "Choose a time slot.",
+        "Enter patient details.",
+        "Confirm the appointment.",
+      ],
+      response: "Here is how to book an appointment in the app.",
     }),
   },
   {
