@@ -11,6 +11,7 @@ class ChatIntent(str, Enum):
     SHOW_AVAILABLE_DOCTORS = "SHOW_AVAILABLE_DOCTORS"
     SHOW_DOCTOR_DETAILS = "SHOW_DOCTOR_DETAILS"
     APPOINTMENT_HELP = "APPOINTMENT_HELP"
+    CANCEL_APPOINTMENT_HELP = "CANCEL_APPOINTMENT_HELP"
     UNKNOWN = "UNKNOWN"
 
 
@@ -57,6 +58,7 @@ class ChatResponse(BaseModel):
     message: str
     data: list[ChatDoctorCard | ChatAvailabilityCard] = Field(default_factory=list)
     search_filters: ChatSearchFilters | None = None
+    help_steps: list[str] = Field(default_factory=list)
     response: str = ""
 
     @model_validator(mode="after")
