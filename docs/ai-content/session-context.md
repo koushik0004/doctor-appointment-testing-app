@@ -1,0 +1,60 @@
+# Session Context
+
+## Project Summary
+
+Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQLite database. Core implemented flows are doctor listing, appointment booking, booking confirmation, appointment search, and a rule-based AI chat assistant.
+
+## Current Architecture
+
+- `frontend/`: Next.js App Router app with feature APIs, booking UI, doctor UI, and the global AI widget.
+- `backend/`: FastAPI app with thin routes, service-layer business logic, SQLAlchemy models/repositories, and SQLite persistence.
+- Request path: frontend UI -> `frontend/lib/api-client.ts` -> `frontend/app/api/[...path]/route.ts` -> backend API/services -> SQLite.
+
+## Boundaries
+
+- Keep frontend UI/state/proxy logic in `frontend/`.
+- Keep backend routes, business rules, schemas, and DB logic in `backend/`.
+- Do not mix frontend and backend logic in the same change.
+
+## Context Loading Rules
+
+- Read only AI context files first.
+- Do not scan the full repo unless the task requires it.
+- Prefer summaries over full reports.
+
+## Read First
+
+1. `docs/ai-content/current-task.md`
+2. `docs/ai-content/important-files.md`
+3. `docs/ai-content/feature-map.md`
+4. `docs/ai-content/report-index.md`
+5. `docs/ai-content/project-map.md` when architecture context is needed
+
+## Important Runtime Files
+
+- Frontend shell/proxy: `frontend/app/layout.tsx`, `frontend/app/api/[...path]/route.ts`, `frontend/lib/api-client.ts`
+- Booking flow: `frontend/app/appointments/page.tsx`, `frontend/features/appointments/api.ts`, `frontend/stores/booking-store.ts`
+- Backend entry/router: `backend/app/main.py`, `backend/app/api/router.py`, `backend/app/db/database.py`
+- Booking/chat services: `backend/app/services/availability_service.py`, `backend/app/services/appointment_service.py`, `backend/app/services/chat_service.py`
+
+## Commands To Run
+
+- No canonical dev/test command list is recorded in the current AI context files.
+- Prefer task-specific commands already captured in reports when validating the same feature area.
+
+## Report Loading Rule
+
+- Use `docs/ai-content/report-index.md` first.
+- Read a full file under `docs/reports/` only when the task directly matches that report, the summary says deeper context is needed, or implementation is blocked.
+
+## Known Gaps
+
+- `current-task.md` is currently empty.
+- Confirmation email is documented but not evident as an active backend feature.
+- AI chat is implemented, but frontend automation/navigation remains limited.
+
+## Task Resume Rule
+
+- Check `docs/ai-content/current-task.md` first for active work.
+- Then read files listed there plus the relevant entries from `important-files.md` and `feature-map.md`.
+- Restart broader analysis only if the recorded task context is missing or stale.
