@@ -1,0 +1,12 @@
+context_directory: docs/ai-content
+startup_files:
+  - session-context.md
+  - current-task.md
+  - important-files.md
+  - feature-map.md
+  - report-index.md
+optional_files:
+  - project-map.md
+  - decision-log.md
+full_reports_directory: docs/reports
+rule: Read summaries first. Read full reports only when task requires them.

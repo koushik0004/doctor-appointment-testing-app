@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.chat import (
     ChatAvailabilityCard,
+    ChatConversationContext,
     ChatDoctorCard,
     ChatIntent,
     ChatRequest,
@@ -21,10 +22,32 @@ from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_inten
 from app.services.doctor_service import list_doctors
 
 GREETING_KEYWORDS = ("hello", "hi", "hey")
+EXPLICIT_DOCTOR_DETAIL_KEYWORDS = (
+    "consultation fee",
+    "consultation fees",
+    "consultation charges",
+    "doctor charges",
+    "doctor fee",
+    "doctor fees",
+    "fee",
+    "fees",
+    "price",
+    "prices",
+    "cost",
+    "costs",
+)
 
 
 class ChatResponder(Protocol):
-    def generate(self, message: str) -> ChatResponse:
+    def generate(
+        self,
+        message: str,
+        *,
+        intent_match: ChatIntentMatch | None = None,
+        search_filters: ChatSearchFilters | None = None,
+        selected_doctor_name: str | None = None,
+        conversation_context: ChatConversationContext | None = None,
+    ) -> ChatResponse:
         ...
 
 
@@ -76,6 +99,10 @@ def _find_matching_doctor(message: str, doctors: list[DoctorResponse]) -> Doctor
         if _doctor_matches_query(doctor, message):
             return doctor
     return None
+
+
+def _has_explicit_doctor_detail_keyword(normalized_message: str) -> bool:
+    return any(keyword in normalized_message for keyword in EXPLICIT_DOCTOR_DETAIL_KEYWORDS)
 
 
 def _describe_search_filters(search_filters: ChatSearchFilters) -> str:
@@ -268,9 +295,15 @@ class RuleBasedChatResponder:
         intent_match: ChatIntentMatch,
         search_filters: ChatSearchFilters,
         doctors: list[DoctorResponse],
+        selected_doctor_name: str | None = None,
     ) -> ChatResponse:
         selected_doctors = _filter_doctors(doctors, search_filters)
         matched_doctor = _find_matching_doctor(message, selected_doctors)
+        if matched_doctor is None and selected_doctor_name:
+            matched_doctor = _find_matching_doctor(selected_doctor_name, selected_doctors) or _find_matching_doctor(
+                selected_doctor_name,
+                doctors,
+            )
         if matched_doctor is None and len(selected_doctors) == 1:
             matched_doctor = selected_doctors[0]
         slot_doctors = [matched_doctor] if matched_doctor is not None else selected_doctors
@@ -332,9 +365,15 @@ class RuleBasedChatResponder:
         message: str,
         search_filters: ChatSearchFilters,
         doctors: list[DoctorResponse],
+        selected_doctor_name: str | None = None,
     ) -> ChatResponse:
         candidate_doctors = _filter_doctors(doctors, search_filters)
         doctor = _find_matching_doctor(message, candidate_doctors) or _find_matching_doctor(message, doctors)
+        if doctor is None and selected_doctor_name:
+            doctor = _find_matching_doctor(selected_doctor_name, candidate_doctors) or _find_matching_doctor(
+                selected_doctor_name,
+                doctors,
+            )
         if doctor is None:
             return _build_response(
                 ChatIntent.SHOW_DOCTOR_DETAILS,
@@ -401,10 +440,20 @@ class RuleBasedChatResponder:
             "Available specializations: " + ", ".join(specialties) + ".",
         )
 
-    def generate(self, message: str) -> ChatResponse:
-        intent_match = detect_chat_intent(message)
+    def generate(
+        self,
+        message: str,
+        *,
+        intent_match: ChatIntentMatch | None = None,
+        search_filters: ChatSearchFilters | None = None,
+        selected_doctor_name: str | None = None,
+        conversation_context: ChatConversationContext | None = None,
+    ) -> ChatResponse:
+        del conversation_context
+
+        resolved_intent_match = intent_match or detect_chat_intent(message)
         doctors = self._list_all_doctors()
-        search_filters = extract_chat_search_filters(message)
+        resolved_search_filters = search_filters or extract_chat_search_filters(message)
 
         normalized_message = normalize_text(message)
         if any(keyword in normalized_message for keyword in GREETING_KEYWORDS):
@@ -413,24 +462,53 @@ class RuleBasedChatResponder:
         if any(keyword in normalized_message for keyword in ("specialization", "specializations", "specialty", "specialties")):
             return self._respond_with_specialty_overview()
 
-        if intent_match.intent == ChatIntent.APPOINTMENT_HELP:
-            return self._respond_with_appointment_help(search_filters)
+        if resolved_intent_match.intent == ChatIntent.APPOINTMENT_HELP:
+            return self._respond_with_appointment_help(resolved_search_filters)
 
-        if intent_match.intent == ChatIntent.CANCEL_APPOINTMENT_HELP:
-            return self._respond_with_cancellation_help(search_filters)
+        if resolved_intent_match.intent == ChatIntent.CANCEL_APPOINTMENT_HELP:
+            return self._respond_with_cancellation_help(resolved_search_filters)
 
-        if intent_match.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS or search_filters.date is not None or search_filters.time_preference is not None:
-            return self._respond_with_availability(message, intent_match, search_filters, doctors)
+        if (
+            resolved_intent_match.intent == ChatIntent.SHOW_DOCTOR_DETAILS
+            and (
+                _has_explicit_doctor_detail_keyword(normalized_message)
+                or selected_doctor_name is not None
+                or _find_matching_doctor(message, doctors) is not None
+            )
+        ):
+            return self._respond_with_doctor_details(
+                message,
+                resolved_search_filters,
+                doctors,
+                selected_doctor_name=selected_doctor_name,
+            )
 
-        if intent_match.intent == ChatIntent.SHOW_DOCTOR_DETAILS:
-            return self._respond_with_doctor_details(message, search_filters, doctors)
+        if (
+            resolved_intent_match.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS
+            or resolved_search_filters.date is not None
+            or resolved_search_filters.time_preference is not None
+        ):
+            return self._respond_with_availability(
+                message,
+                resolved_intent_match,
+                resolved_search_filters,
+                doctors,
+                selected_doctor_name=selected_doctor_name,
+            )
 
-        if intent_match.intent == ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION and intent_match.specialty is not None:
+        if (
+            resolved_intent_match.intent == ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION
+            and (
+                resolved_intent_match.specialty is not None
+                or resolved_search_filters.specialization is not None
+            )
+        ):
+            specialty = resolved_intent_match.specialty or resolved_search_filters.specialization
             specialty_doctors = [
-                doctor for doctor in doctors if doctor.specialty == intent_match.specialty
+                doctor for doctor in doctors if doctor.specialty == specialty
             ]
-            specialty_doctors = _filter_doctors(specialty_doctors, search_filters)
-            return self._respond_with_specialties(intent_match.specialty, specialty_doctors, search_filters)
+            specialty_doctors = _filter_doctors(specialty_doctors, resolved_search_filters)
+            return self._respond_with_specialties(specialty or "", specialty_doctors, resolved_search_filters)
 
         if any(
             keyword in normalized_message
@@ -438,15 +516,15 @@ class RuleBasedChatResponder:
         ) or any(
             value is not None
             for value in (
-                search_filters.specialization,
-                search_filters.gender,
-                search_filters.minimum_fee,
-                search_filters.maximum_fee,
-                search_filters.clinic_location,
+                resolved_search_filters.specialization,
+                resolved_search_filters.gender,
+                resolved_search_filters.minimum_fee,
+                resolved_search_filters.maximum_fee,
+                resolved_search_filters.clinic_location,
             )
         ):
-            matching_doctors = _filter_doctors(doctors, search_filters)
-            filter_summary = _describe_search_filters(search_filters)
+            matching_doctors = _filter_doctors(doctors, resolved_search_filters)
+            filter_summary = _describe_search_filters(resolved_search_filters)
             if matching_doctors:
                 message_text = f"Found {len(matching_doctors)} matching doctors."
                 if filter_summary:
@@ -455,20 +533,20 @@ class RuleBasedChatResponder:
                     ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
                     message_text,
                     data=[_doctor_to_card(doctor) for doctor in matching_doctors],
-                    search_filters=search_filters,
+                    search_filters=resolved_search_filters,
                 )
 
             if filter_summary:
                 return _build_response(
                     ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
                     f"No matching doctors were found for {filter_summary}.",
-                    search_filters=search_filters,
+                    search_filters=resolved_search_filters,
                 )
 
             return _build_response(
                 ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
                 "I can help you search for doctors by specialization, location, fee, or availability.",
-                search_filters=search_filters,
+                search_filters=resolved_search_filters,
             )
 
         return self._respond_with_unknown()
@@ -479,5 +557,11 @@ def create_chat_response(
     request: ChatRequest,
     responder: ChatResponder | None = None,
 ) -> ChatResponse:
+    from app.services.conversation_manager import ConversationManager
+
     chat_responder = responder or RuleBasedChatResponder(session)
-    return chat_responder.generate(request.message)
+    manager = ConversationManager(
+        session,
+        deterministic_engine=chat_responder,
+    )
+    return manager.handle(request)

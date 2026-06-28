@@ -265,6 +265,7 @@ export function createAssistantMessageFromChatResponse(
     metadata: {
       intent: payload.intent,
       response: payload.response ?? payload.message,
+      conversation: payload.conversation,
     },
   };
 }
