@@ -9,6 +9,8 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - `frontend/`: Next.js App Router app with feature APIs, booking UI, doctor UI, and the global AI widget.
 - `backend/`: FastAPI app with thin routes, service-layer business logic, SQLAlchemy models/repositories, and SQLite persistence.
 - Request path: frontend UI -> `frontend/lib/api-client.ts` -> `frontend/app/api/[...path]/route.ts` -> backend API/services -> SQLite.
+- AI assistant master reference: `docs/hybrid-ai-assistant-master-architecture.md`.
+- AI execution decision record: `docs/adr-001-deterministic-ai-engine-primary.md`.
 
 ## Boundaries
 
@@ -49,7 +51,6 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 
 ## Known Gaps
 
-- `current-task.md` is currently empty.
 - Confirmation email is documented but not evident as an active backend feature.
 - AI chat is implemented, but frontend automation/navigation remains limited.
 

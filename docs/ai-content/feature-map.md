@@ -115,6 +115,12 @@
 
 - `frontend/app/api/[...path]/route.ts` forwards all frontend API requests to FastAPI.
 
+### AI architecture reference documentation
+
+- `docs/hybrid-ai-assistant-master-architecture.md`
+- `docs/adr-001-deterministic-ai-engine-primary.md`
+- These documents define the current layered architecture, boundaries, request flow, and incremental migration path for the AI assistant without changing runtime behavior.
+
 ### Database initialization and seed data
 
 - `backend/app/db/database.py` initializes schema and runs seeding on app startup.

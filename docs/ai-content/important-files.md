@@ -93,6 +93,8 @@ These files define the persistence and API contracts. Any API change should be c
 ## High-Value Docs
 
 - `docs/architecture.md`
+- `docs/hybrid-ai-assistant-master-architecture.md`
+- `docs/adr-001-deterministic-ai-engine-primary.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`
