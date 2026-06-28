@@ -9,7 +9,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - `frontend/`: Next.js App Router app with feature APIs, booking UI, doctor UI, and the global AI widget.
 - `backend/`: FastAPI app with thin routes, service-layer business logic, SQLAlchemy models/repositories, and SQLite persistence.
 - Request path: frontend UI -> `frontend/lib/api-client.ts` -> `frontend/app/api/[...path]/route.ts` -> backend API/services -> SQLite.
-- Chat orchestration path: `backend/app/api/chat.py` -> `backend/app/services/conversation_manager.py` -> deterministic `backend/app/services/chat_service.py`.
+- Chat orchestration path: `backend/app/api/chat.py` -> `backend/app/services/conversation_manager.py` -> `backend/app/services/workflow_engine.py` -> deterministic fallback in `backend/app/services/chat_service.py`.
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
 - AI execution decision record: `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`.
 
@@ -38,7 +38,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Frontend shell/proxy: `frontend/app/layout.tsx`, `frontend/app/api/[...path]/route.ts`, `frontend/lib/api-client.ts`
 - Booking flow: `frontend/app/appointments/page.tsx`, `frontend/features/appointments/api.ts`, `frontend/stores/booking-store.ts`
 - Backend entry/router: `backend/app/main.py`, `backend/app/api/router.py`, `backend/app/db/database.py`
-- Booking/chat services: `backend/app/services/availability_service.py`, `backend/app/services/appointment_service.py`, `backend/app/services/conversation_manager.py`, `backend/app/services/chat_service.py`
+- Booking/chat services: `backend/app/services/availability_service.py`, `backend/app/services/appointment_service.py`, `backend/app/services/conversation_manager.py`, `backend/app/services/workflow_engine.py`, `backend/app/services/chat_service.py`
 
 ## Commands To Run
 
@@ -54,7 +54,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 
 - Confirmation email is documented but not evident as an active backend feature.
 - AI chat is implemented, but frontend automation/navigation remains limited.
-- Conversation context is request-scoped and transported through chat metadata; there is no persisted conversation store yet.
+- Conversation and workflow context are request-scoped and transported through chat metadata; there is no persisted conversation store yet.
 
 ## Task Resume Rule
 

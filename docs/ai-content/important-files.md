@@ -51,13 +51,15 @@
 - `backend/app/api/chat.py`
   - Chat endpoints for `/api/chat` and `/api/v1/chat`.
 - `backend/app/services/conversation_manager.py`
-  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, and centralizes routing.
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, and routes between workflow execution and deterministic fallback.
+- `backend/app/services/workflow_engine.py`
+  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, and missing-field validation.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
   - Computes bookable slots from schedule rules plus booked appointments.
 - `backend/app/services/appointment_service.py`
-  - Main booking rules: slot validation, patient upsert, conflict handling, and confirmation payloads.
+  - Main booking rules plus cancellation and confirmation lookup business APIs reused by chat workflows.
 - `backend/app/services/appointment_search_service.py`
   - Appointment search behavior across patient and doctor joins.
 - `backend/app/services/chat_service.py`
@@ -79,7 +81,7 @@
 - `backend/app/schemas/appointment.py`
 - `backend/app/schemas/appointment_search.py`
 - `backend/app/schemas/chat.py`
-  - Chat request/response contracts including optional conversation metadata.
+  - Chat request/response contracts including optional conversation metadata and workflow state/result metadata.
 
 These files define the persistence and API contracts. Any API change should be checked against both the frontend feature API files and these backend schemas/models.
 

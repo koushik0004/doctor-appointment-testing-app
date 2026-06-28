@@ -23,14 +23,15 @@ The AI assistant is implemented as a rule-based chat experience embedded in the 
 - Find date-based and time-filtered availability.
 - Return structured doctor cards and availability cards.
 - Maintain multi-turn conversation context through a backend conversation manager.
-- Link users into the existing manual booking flow.
+- Execute request-scoped booking, cancellation, and confirmation workflows through backend services.
+- Still link users into the existing manual booking flow when a workflow is not executed.
 
 It does not currently:
 
 - Execute browser automation.
-- Perform bookings through chat.
 - Use an LLM.
 - Introduce a separate workflow engine process.
+- Persist conversation or workflow state beyond request metadata.
 
 ## Layer Model
 
@@ -93,7 +94,7 @@ Boundaries:
 
 ### 3. AI Layer
 
-Primary responsibility: deterministic interpretation and response generation.
+Primary responsibility: deterministic interpretation, context normalization, and safe routing.
 
 Current modules:
 
@@ -108,44 +109,45 @@ Responsibilities:
 - Detect intent from free-text messages.
 - Extract structured entities such as specialization, gender, fee range, date, time preference, and location.
 - Maintain canonical conversation context, lifecycle, and routing state.
-- Resolve the response path for doctor search, availability search, doctor detail lookup, booking help, and cancellation help.
+- Decide whether a message should continue an active workflow, start a new workflow, or fall back to deterministic chat.
 - Build the canonical chat response contract.
 
 Boundaries:
 
 - No direct UI rendering.
 - No browser automation.
-- No workflow execution outside deterministic service calls.
 - No prompt-based reasoning or LLM dependency.
 
 ### 4. Workflow Layer
 
-Primary responsibility: translate assistant outcomes into safe user actions and controlled handoffs.
+Primary responsibility: execute validated business workflows by reusing existing backend services.
 
 Current modules and seams:
 
-- `frontend/lib/ai-widget/services/appointment-navigation.ts`
-- `frontend/lib/ai-widget/adapters/noop-adapter.ts`
 - `backend/app/services/conversation_manager.py`
+- `backend/app/services/workflow_engine.py`
+- `backend/app/services/appointment_service.py`
+- `frontend/lib/ai-widget/services/appointment-navigation.ts`
 - booking entry route `/appointments?doctorId=...`
 
 Current behavior:
 
-- The workflow layer is intentionally minimal.
-- The assistant can recommend actions and deep-link the user into the manual booking flow.
-- The frontend adapter is a noop presentation adapter, which means the assistant is informational and navigational rather than operational.
-- The Conversation Manager routes every live request to the deterministic engine and reserves the workflow seam for future phases.
+- The Conversation Manager normalizes request-scoped conversation state and consults the Workflow Engine first.
+- The Workflow Engine validates required fields for booking, cancellation, and confirmation workflows.
+- When workflow inputs are complete, the Workflow Engine calls the existing appointment services and returns structured workflow results.
+- When workflow inputs are incomplete, the Workflow Engine returns missing fields and preserves draft state in chat metadata.
+- If no workflow is active, doctor search, availability search, doctor detail lookup, booking help, and cancellation help still route through the deterministic responder.
 
 Architectural role:
 
-- Preserve a dedicated seam where future phases can introduce orchestrated actions.
-- Prevent chat response generation from being tightly coupled to browser automation or booking-side effects.
+- Keep state-changing business execution out of the deterministic text responder.
+- Preserve a dedicated seam where future phases can add richer workflow steps without changing public chat endpoints.
 
 Boundaries:
 
-- No autonomous booking execution.
-- No hidden user actions.
-- No mutation of booking state outside existing manual flows.
+- No browser automation.
+- No hidden side effects outside explicit workflow messages.
+- No business rule duplication outside the existing appointment service layer.
 
 ### 5. Knowledge Layer
 
@@ -215,13 +217,13 @@ backend/app/api/chat.py validates ChatRequest and calls create_chat_response()
   ->
 ConversationManager loads conversation context, merges entities, and selects routing target
   ->
-chat_intent_detector.py classifies intent
+chat_intent_detector.py classifies intent and chat_entity_extractor.py extracts structured filters
   ->
-chat_entity_extractor.py extracts structured filters
+workflow_engine.py validates workflow inputs and either executes appointment_service.py or returns missing fields
   ->
-chat_service.py queries doctor_service and availability_service as needed
+If no workflow matches, chat_service.py queries doctor_service and availability_service as needed
   ->
-ChatResponse is returned with intent + message + structured data + conversation metadata
+ChatResponse is returned with intent + message + structured data + workflow metadata + conversation metadata
   ->
 chat-response-mapper.ts maps payload to widget message content
   ->
@@ -257,7 +259,8 @@ User completes patient details and confirms booking manually
 - `chat.py` is a thin transport endpoint.
 - `create_chat_response()` is the stable entry point for assistant behavior.
 - `ConversationManager` is the single orchestration entry point for all chat requests.
-- `detect_chat_intent()` decides the initial route category.
+- `WorkflowEngine` is the single business execution layer for chat-originated workflows.
+- `detect_chat_intent()` decides the deterministic fallback route category.
 - `extract_chat_search_filters()` derives structured filters independently from transport.
 - `ConversationManager` merges prior context with current-turn entities and tracks routing state.
 - `RuleBasedChatResponder` remains the deterministic execution engine and coordinates read-only domain service calls plus response assembly.
