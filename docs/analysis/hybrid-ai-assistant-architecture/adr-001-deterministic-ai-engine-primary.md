@@ -96,4 +96,4 @@ Rejected because:
 
 ## Related Document
 
-- `docs/hybrid-ai-assistant-master-architecture.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`

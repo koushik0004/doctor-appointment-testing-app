@@ -3,28 +3,29 @@
 ## Active Work
 
 - Status: completed
-- Task: document the master architecture for the existing Doctor Appointment AI Assistant without changing runtime behavior
+- Task: introduce a Conversation Manager as the single orchestration entry point for chat while preserving deterministic assistant behavior
 - Completed on: 2026-06-28
 
 ## Outcome
 
-- Added `docs/hybrid-ai-assistant-master-architecture.md` as the reference blueprint for the current assistant and future incremental AI phases.
-- Added `docs/adr-001-deterministic-ai-engine-primary.md` to record why the deterministic backend engine remains the primary execution layer.
+- Added `backend/app/services/conversation_manager.py` as the single orchestration entry point for all chat requests.
+- Extended backend and frontend chat contracts with optional conversation metadata while keeping plain `message` requests valid.
+- Preserved deterministic doctor search, availability, FAQ, booking-help, and cancellation-help behavior.
+- Updated `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md` to reflect the new orchestration path.
 
 ## Required Files for This Task
 
-- `docs/hybrid-ai-assistant-master-architecture.md`
-- `docs/adr-001-deterministic-ai-engine-primary.md`
-- `frontend/components/layout/GlobalAiWidget.tsx`
+- `backend/app/services/conversation_manager.py`
+- `backend/app/schemas/chat.py`
+- `backend/app/services/chat_service.py`
+- `backend/app/api/chat.py`
 - `frontend/lib/ai-widget/services/api-service.ts`
 - `frontend/lib/ai-widget/services/chat-response-mapper.ts`
-- `frontend/app/api/[...path]/route.ts`
-- `backend/app/api/chat.py`
-- `backend/app/services/chat_service.py`
-- `backend/app/services/chat_intent_detector.py`
-- `backend/app/services/chat_entity_extractor.py`
+- `frontend/lib/ai-widget/types/chat.ts`
+- `backend/tests/test_chat_api.py`
+- `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 
 ## Notes
 
-- This was a documentation-only task.
-- No business logic, APIs, database schema, or runtime modules were modified.
+- No database schema changes were required.
+- Existing `/api/chat` and `/api/v1/chat` behavior remains backward-compatible.

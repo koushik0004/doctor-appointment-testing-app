@@ -15,7 +15,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import get_settings  # noqa: E402
 from app.db import database as database_module  # noqa: E402
-from app.schemas.chat import ChatIntent, ChatRequest  # noqa: E402
+from app.schemas.chat import (  # noqa: E402
+    ChatConversationRequest,
+    ChatConversationStatus,
+    ChatIntent,
+    ChatRequest,
+    ChatRoutingTarget,
+    ChatSearchFilters,
+)
 from app.services.chat_service import create_chat_response  # noqa: E402
 
 get_settings.cache_clear()
@@ -57,6 +64,8 @@ def test_chat_endpoint_returns_structured_specialty_response(client):
     assert len(payload["data"]) == 2
     assert payload["data"][0]["doctor_name"] == "Dr. Sarah Jenkins"
     assert payload["data"][1]["doctor_name"] == "Dr. Daniel Park"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.DETERMINISTIC_ENGINE.value
+    assert payload["conversation"]["status"] == ChatConversationStatus.ACTIVE.value
 
 
 def test_chat_endpoint_returns_structured_filtered_search_response(client):
@@ -210,6 +219,100 @@ def test_chat_service_returns_available_specialties(client):
     )
     assert result.response == result.message
     assert result.data == []
+    assert result.conversation is not None
+    assert result.conversation.routed_to == ChatRoutingTarget.DETERMINISTIC_ENGINE
+
+
+def test_chat_service_maintains_conversation_filters_across_turns(client):
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Show cardiologists"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="What about female doctors tomorrow?",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Show cardiologists",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters,
+                        },
+                        {
+                            "role": "user",
+                            "text": "What about female doctors tomorrow?",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+    assert second_result.intent == ChatIntent.SHOW_AVAILABLE_DOCTORS
+    assert second_result.search_filters is not None
+    assert second_result.search_filters.specialization == "Cardiology"
+    assert second_result.search_filters.gender == "Female"
+    assert second_result.search_filters.date == date.today() + timedelta(days=1)
+    assert second_result.message == (
+        f"Found 6 available slots for Dr. Sarah Jenkins on {(date.today() + timedelta(days=1)).isoformat()}."
+    )
+    assert second_result.conversation is not None
+    assert second_result.conversation.active_filters is not None
+    assert second_result.conversation.active_filters.specialization == "Cardiology"
+    assert second_result.conversation.turn_count == 2
+
+
+def test_chat_service_resolves_follow_up_doctor_reference_from_conversation_context(client):
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Need a female cardiologist tomorrow"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="What is the consultation fee?",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "What is the consultation fee?",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+    assert first_result.conversation is not None
+    assert first_result.conversation.selected_doctor_name == "Dr. Sarah Jenkins"
+    assert second_result.intent == ChatIntent.SHOW_DOCTOR_DETAILS
+    assert second_result.message == "Dr. Sarah Jenkins consultation fee is $120-$200. Next available slot: Today, 10:30 AM."
+    assert second_result.conversation is not None
+    assert second_result.conversation.selected_doctor_name == "Dr. Sarah Jenkins"
 
 
 def test_chat_service_returns_default_fallback(client):

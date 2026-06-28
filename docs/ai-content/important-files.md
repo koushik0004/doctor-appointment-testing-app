@@ -50,6 +50,8 @@
   - Appointment creation, appointment details, and appointment search API surface.
 - `backend/app/api/chat.py`
   - Chat endpoints for `/api/chat` and `/api/v1/chat`.
+- `backend/app/services/conversation_manager.py`
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, and centralizes routing.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
@@ -59,7 +61,7 @@
 - `backend/app/services/appointment_search_service.py`
   - Appointment search behavior across patient and doctor joins.
 - `backend/app/services/chat_service.py`
-  - Rule-based AI assistant behavior and structured chat responses.
+  - Deterministic execution engine for the AI assistant and structured chat responses.
 - `backend/app/services/chat_intent_detector.py`
   - Intent classification entry point for chat behavior.
 - `backend/app/services/chat_entity_extractor.py`
@@ -77,6 +79,7 @@
 - `backend/app/schemas/appointment.py`
 - `backend/app/schemas/appointment_search.py`
 - `backend/app/schemas/chat.py`
+  - Chat request/response contracts including optional conversation metadata.
 
 These files define the persistence and API contracts. Any API change should be checked against both the frontend feature API files and these backend schemas/models.
 
@@ -93,8 +96,8 @@ These files define the persistence and API contracts. Any API change should be c
 ## High-Value Docs
 
 - `docs/architecture.md`
-- `docs/hybrid-ai-assistant-master-architecture.md`
-- `docs/adr-001-deterministic-ai-engine-primary.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

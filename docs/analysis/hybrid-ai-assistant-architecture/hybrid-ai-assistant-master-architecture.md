@@ -22,6 +22,7 @@ The AI assistant is implemented as a rule-based chat experience embedded in the 
 - Search doctors by specialization, gender, fee, and location.
 - Find date-based and time-filtered availability.
 - Return structured doctor cards and availability cards.
+- Maintain multi-turn conversation context through a backend conversation manager.
 - Link users into the existing manual booking flow.
 
 It does not currently:
@@ -96,14 +97,17 @@ Primary responsibility: deterministic interpretation and response generation.
 
 Current modules:
 
+- `backend/app/services/conversation_manager.py`
 - `backend/app/services/chat_service.py`
 - `backend/app/services/chat_intent_detector.py`
 - `backend/app/services/chat_entity_extractor.py`
 
 Responsibilities:
 
+- Centralize request orchestration through the Conversation Manager.
 - Detect intent from free-text messages.
 - Extract structured entities such as specialization, gender, fee range, date, time preference, and location.
+- Maintain canonical conversation context, lifecycle, and routing state.
 - Resolve the response path for doctor search, availability search, doctor detail lookup, booking help, and cancellation help.
 - Build the canonical chat response contract.
 
@@ -122,6 +126,7 @@ Current modules and seams:
 
 - `frontend/lib/ai-widget/services/appointment-navigation.ts`
 - `frontend/lib/ai-widget/adapters/noop-adapter.ts`
+- `backend/app/services/conversation_manager.py`
 - booking entry route `/appointments?doctorId=...`
 
 Current behavior:
@@ -129,6 +134,7 @@ Current behavior:
 - The workflow layer is intentionally minimal.
 - The assistant can recommend actions and deep-link the user into the manual booking flow.
 - The frontend adapter is a noop presentation adapter, which means the assistant is informational and navigational rather than operational.
+- The Conversation Manager routes every live request to the deterministic engine and reserves the workflow seam for future phases.
 
 Architectural role:
 
@@ -207,13 +213,15 @@ frontend/app/api/[...path]/route.ts proxies request to FastAPI
   ->
 backend/app/api/chat.py validates ChatRequest and calls create_chat_response()
   ->
+ConversationManager loads conversation context, merges entities, and selects routing target
+  ->
 chat_intent_detector.py classifies intent
   ->
 chat_entity_extractor.py extracts structured filters
   ->
 chat_service.py queries doctor_service and availability_service as needed
   ->
-ChatResponse is returned with intent + message + structured data
+ChatResponse is returned with intent + message + structured data + conversation metadata
   ->
 chat-response-mapper.ts maps payload to widget message content
   ->
@@ -248,9 +256,11 @@ User completes patient details and confirms booking manually
 
 - `chat.py` is a thin transport endpoint.
 - `create_chat_response()` is the stable entry point for assistant behavior.
+- `ConversationManager` is the single orchestration entry point for all chat requests.
 - `detect_chat_intent()` decides the initial route category.
 - `extract_chat_search_filters()` derives structured filters independently from transport.
-- `RuleBasedChatResponder` coordinates read-only domain service calls and response assembly.
+- `ConversationManager` merges prior context with current-turn entities and tracks routing state.
+- `RuleBasedChatResponder` remains the deterministic execution engine and coordinates read-only domain service calls plus response assembly.
 - `doctor_service.py` provides doctor search data.
 - `availability_service.py` provides slot visibility using appointment-backed schedule generation.
 
@@ -296,7 +306,7 @@ This is especially important because the current assistant’s value is mostly r
 
 ## ADR Summary
 
-See `docs/adr-001-deterministic-ai-engine-primary.md`.
+See `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`.
 
 Decision summary:
 
@@ -336,7 +346,8 @@ The intended evolution path is incremental and backward-compatible.
 
 - `/api/chat` remains supported.
 - `/api/v1/chat` remains supported.
-- `ChatResponse` continues to expose `message`, `intent`, `data`, `search_filters`, and `help_steps`.
+- `ChatRequest` continues to accept a plain `message` without requiring conversation metadata.
+- `ChatResponse` continues to expose `message`, `intent`, `data`, `search_filters`, and `help_steps`, while adding optional `conversation` metadata.
 - Frontend widget message mapping remains contract-driven rather than inference-driven.
 - Manual booking routes remain the only supported appointment mutation path.
 
@@ -369,6 +380,7 @@ Any future AI architecture phase should preserve these constraints unless a new 
 - `backend/app/api/chat.py`
 - `backend/app/api/router.py`
 - `backend/app/main.py`
+- `backend/app/services/conversation_manager.py`
 - `backend/app/services/chat_service.py`
 - `backend/app/services/chat_intent_detector.py`
 - `backend/app/services/chat_entity_extractor.py`

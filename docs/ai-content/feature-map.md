@@ -98,6 +98,7 @@
   - `frontend/lib/ai-widget/services/appointment-navigation.ts`
 - Backend ownership:
   - `backend/app/api/chat.py`
+  - `backend/app/services/conversation_manager.py`
   - `backend/app/services/chat_service.py`
   - `backend/app/services/chat_intent_detector.py`
   - `backend/app/services/chat_entity_extractor.py`
@@ -106,8 +107,10 @@
   - Answers greetings and help flows.
   - Returns structured doctor lists, doctor details, and availability cards.
   - Understands specialization, gender, fee, location, date, and time preference cues.
+  - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
+  - Conversation state is not persisted beyond the request metadata loop used by the current widget.
 
 ## Platform / Cross-Cutting Features
 
@@ -117,8 +120,8 @@
 
 ### AI architecture reference documentation
 
-- `docs/hybrid-ai-assistant-master-architecture.md`
-- `docs/adr-001-deterministic-ai-engine-primary.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
 - These documents define the current layered architecture, boundaries, request flow, and incremental migration path for the AI assistant without changing runtime behavior.
 
 ### Database initialization and seed data
