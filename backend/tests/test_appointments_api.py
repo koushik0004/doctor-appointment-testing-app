@@ -143,8 +143,8 @@ def test_search_appointments_endpoint_filters_and_orders_results(client):
         client,
         doctor_id=doctor_id,
         appointment_date=tomorrow,
-        start_time="10:00",
-        full_name="John Doe",
+        start_time="12:00",
+        full_name="Avery Riverton",
         email="john.one@example.com",
         phone="1111111111",
     )
@@ -152,8 +152,8 @@ def test_search_appointments_endpoint_filters_and_orders_results(client):
         client,
         doctor_id=doctor_id,
         appointment_date=day_after_tomorrow,
-        start_time="12:00",
-        full_name="Johnathan Doe",
+        start_time="14:00",
+        full_name="Maya Riverton",
         email="john.two@example.com",
         phone="2222222222",
     )
@@ -161,13 +161,13 @@ def test_search_appointments_endpoint_filters_and_orders_results(client):
         client,
         doctor_id=doctor_id,
         appointment_date=day_after_tomorrow,
-        start_time="14:00",
+        start_time="16:00",
         full_name="Jane Smith",
         email="jane.smith@example.com",
         phone="3333333333",
     )
 
-    response = client.get("/api/appointments/search", params={"name": "  john  "})
+    response = client.get("/api/appointments/search", params={"name": "  riverton  "})
     assert response.status_code == 200
 
     payload = response.json()
@@ -176,8 +176,8 @@ def test_search_appointments_endpoint_filters_and_orders_results(client):
         second["id"],
         first["id"],
     ]
-    assert payload["appointments"][0]["patient_name"] == "Johnathan Doe"
-    assert payload["appointments"][1]["patient_name"] == "John Doe"
+    assert payload["appointments"][0]["patient_name"] == "Maya Riverton"
+    assert payload["appointments"][1]["patient_name"] == "Avery Riverton"
     assert payload["appointments"][0]["status"] == "booked"
 
 

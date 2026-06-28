@@ -22,7 +22,12 @@ from app.schemas.chat import (  # noqa: E402
     ChatRequest,
     ChatRoutingTarget,
     ChatSearchFilters,
+    ChatWorkflowStatus,
+    ChatWorkflowType,
 )
+from app.schemas.appointment import AppointmentCreateRequest, PatientInput  # noqa: E402
+from app.schemas.doctor import AppointmentType  # noqa: E402
+from app.services.appointment_service import create_appointment_booking  # noqa: E402
 from app.services.chat_service import create_chat_response  # noqa: E402
 
 get_settings.cache_clear()
@@ -313,6 +318,174 @@ def test_chat_service_resolves_follow_up_doctor_reference_from_conversation_cont
     assert second_result.message == "Dr. Sarah Jenkins consultation fee is $120-$200. Next available slot: Today, 10:30 AM."
     assert second_result.conversation is not None
     assert second_result.conversation.selected_doctor_name == "Dr. Sarah Jenkins"
+
+
+def test_chat_service_detects_missing_booking_workflow_fields(client):
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Need a female cardiologist tomorrow"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Book this appointment",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+    assert second_result.intent == ChatIntent.BOOK_APPOINTMENT
+    assert second_result.workflow is not None
+    assert second_result.workflow.workflow_type == ChatWorkflowType.BOOK_APPOINTMENT
+    assert second_result.workflow.status == ChatWorkflowStatus.INPUT_REQUIRED
+    assert second_result.workflow.missing_fields == [
+        "start_time",
+        "patient_full_name",
+        "patient_email",
+    ]
+    assert second_result.conversation is not None
+    assert second_result.conversation.routed_to == ChatRoutingTarget.WORKFLOW_ENGINE
+    assert second_result.conversation.current_workflow is not None
+    assert second_result.conversation.current_workflow.status == ChatWorkflowStatus.INPUT_REQUIRED
+
+
+def test_chat_service_books_appointment_through_workflow(client):
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Need a female cardiologist tomorrow"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message=(
+                    "Book 10:00 AM. My name is John Doe. "
+                    "john.doe@example.com. Phone 9999999999."
+                ),
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book 10:00 AM. My name is John Doe. john.doe@example.com. Phone 9999999999.",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+    assert second_result.intent == ChatIntent.BOOK_APPOINTMENT
+    assert second_result.workflow is not None
+    assert second_result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert second_result.workflow.appointment is not None
+    assert second_result.workflow.appointment.confirmation_code.startswith("CN-")
+    assert second_result.workflow.appointment.patient_name == "John Doe"
+    assert second_result.conversation is not None
+    assert second_result.conversation.routed_to == ChatRoutingTarget.WORKFLOW_ENGINE
+    assert second_result.conversation.current_workflow is not None
+    assert second_result.conversation.current_workflow.status == ChatWorkflowStatus.COMPLETED
+
+
+def test_chat_service_cancels_appointment_through_workflow(client):
+    with _session() as session:
+        created = create_appointment_booking(
+            session,
+            AppointmentCreateRequest(
+                doctor_id=1,
+                appointment_date=date.today() + timedelta(days=1),
+                start_time="10:00",
+                appointment_type=AppointmentType.IN_PERSON,
+                patient=PatientInput(
+                    full_name="Jane Doe",
+                    email="jane.doe@example.com",
+                    phone="8888888888",
+                ),
+                health_description="Routine checkup.",
+            ),
+        )
+
+        result = create_chat_response(
+            session,
+            ChatRequest(message=f"Cancel appointment {created.id}"),
+        )
+
+    assert result.intent == ChatIntent.CANCEL_APPOINTMENT
+    assert result.workflow is not None
+    assert result.workflow.workflow_type == ChatWorkflowType.CANCEL_APPOINTMENT
+    assert result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert result.workflow.appointment is not None
+    assert result.workflow.appointment.status == "CANCELLED"
+    assert "has been cancelled" in result.message
+    assert result.conversation is not None
+    assert result.conversation.routed_to == ChatRoutingTarget.WORKFLOW_ENGINE
+
+
+def test_chat_service_returns_confirmation_through_workflow(client):
+    with _session() as session:
+        created = create_appointment_booking(
+            session,
+            AppointmentCreateRequest(
+                doctor_id=1,
+                appointment_date=date.today() + timedelta(days=1),
+                start_time="10:00",
+                appointment_type=AppointmentType.IN_PERSON,
+                patient=PatientInput(
+                    full_name="Alex Doe",
+                    email="alex.doe@example.com",
+                    phone="7777777777",
+                ),
+                health_description="Routine checkup.",
+            ),
+        )
+
+        result = create_chat_response(
+            session,
+            ChatRequest(message=f"Show my appointment confirmation for {created.confirmation_code}"),
+        )
+
+    assert result.intent == ChatIntent.APPOINTMENT_CONFIRMATION
+    assert result.workflow is not None
+    assert result.workflow.workflow_type == ChatWorkflowType.APPOINTMENT_CONFIRMATION
+    assert result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert result.workflow.appointment is not None
+    assert result.workflow.appointment.confirmation_code == created.confirmation_code
+    assert "is confirmed" in result.message
 
 
 def test_chat_service_returns_default_fallback(client):
