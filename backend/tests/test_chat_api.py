@@ -445,6 +445,237 @@ def test_chat_service_books_appointment_through_workflow(client):
     assert second_result.conversation.current_workflow.status == ChatWorkflowStatus.COMPLETED
 
 
+def test_chat_service_continues_booking_workflow_across_incremental_turns(client):
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Need a female cardiologist tomorrow"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Book this appointment",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+        third_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="10:00 AM",
+                conversation=ChatConversationRequest(
+                    conversation_id=second_result.conversation.conversation_id if second_result.conversation else None,
+                    context=second_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": second_result.message,
+                            "intent": second_result.intent,
+                            "search_filters": second_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": second_result.conversation.selected_doctor_id if second_result.conversation else None,
+                            "selected_doctor_name": second_result.conversation.selected_doctor_name if second_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "10:00 AM",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+        fourth_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="John Doe",
+                conversation=ChatConversationRequest(
+                    conversation_id=third_result.conversation.conversation_id if third_result.conversation else None,
+                    context=third_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": second_result.message,
+                            "intent": second_result.intent,
+                            "search_filters": second_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": second_result.conversation.selected_doctor_id if second_result.conversation else None,
+                            "selected_doctor_name": second_result.conversation.selected_doctor_name if second_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "10:00 AM",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": third_result.message,
+                            "intent": third_result.intent,
+                            "search_filters": third_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": third_result.conversation.selected_doctor_id if third_result.conversation else None,
+                            "selected_doctor_name": third_result.conversation.selected_doctor_name if third_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "John Doe",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+        final_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="john.doe@example.com",
+                conversation=ChatConversationRequest(
+                    conversation_id=fourth_result.conversation.conversation_id if fourth_result.conversation else None,
+                    context=fourth_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": second_result.message,
+                            "intent": second_result.intent,
+                            "search_filters": second_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": second_result.conversation.selected_doctor_id if second_result.conversation else None,
+                            "selected_doctor_name": second_result.conversation.selected_doctor_name if second_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "10:00 AM",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": third_result.message,
+                            "intent": third_result.intent,
+                            "search_filters": third_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": third_result.conversation.selected_doctor_id if third_result.conversation else None,
+                            "selected_doctor_name": third_result.conversation.selected_doctor_name if third_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "John Doe",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": fourth_result.message,
+                            "intent": fourth_result.intent,
+                            "search_filters": fourth_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": fourth_result.conversation.selected_doctor_id if fourth_result.conversation else None,
+                            "selected_doctor_name": fourth_result.conversation.selected_doctor_name if fourth_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "john.doe@example.com",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+    assert second_result.workflow is not None
+    assert second_result.workflow.status == ChatWorkflowStatus.INPUT_REQUIRED
+    assert second_result.workflow.missing_fields == [
+        "start_time",
+        "patient_full_name",
+        "patient_email",
+    ]
+
+    assert third_result.intent == ChatIntent.BOOK_APPOINTMENT
+    assert third_result.workflow is not None
+    assert third_result.workflow.status == ChatWorkflowStatus.INPUT_REQUIRED
+    assert third_result.workflow.draft.start_time == "10:00"
+    assert third_result.workflow.missing_fields == [
+        "patient_full_name",
+        "patient_email",
+    ]
+
+    assert fourth_result.intent == ChatIntent.BOOK_APPOINTMENT
+    assert fourth_result.workflow is not None
+    assert fourth_result.workflow.status == ChatWorkflowStatus.INPUT_REQUIRED
+    assert fourth_result.workflow.draft.start_time == "10:00"
+    assert fourth_result.workflow.draft.patient_full_name == "John Doe"
+    assert fourth_result.workflow.missing_fields == ["patient_email"]
+    assert fourth_result.conversation is not None
+    assert fourth_result.conversation.routed_to == ChatRoutingTarget.WORKFLOW_ENGINE
+    assert fourth_result.conversation.current_workflow is not None
+    assert fourth_result.conversation.current_workflow.draft.patient_full_name == "John Doe"
+
+    assert final_result.intent == ChatIntent.BOOK_APPOINTMENT
+    assert final_result.workflow is not None
+    assert final_result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert final_result.workflow.appointment is not None
+    assert final_result.workflow.appointment.patient_name == "John Doe"
+    assert final_result.workflow.appointment.confirmation_code.startswith("CN-")
+
+
 def test_chat_service_cancels_appointment_through_workflow(client):
     with _session() as session:
         created = create_appointment_booking(

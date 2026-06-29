@@ -15,6 +15,7 @@ from app.schemas.chat import (
     ChatRoutingTarget,
     ChatSearchFilters,
     ChatWorkflowState,
+    ChatWorkflowStatus,
 )
 from app.services.chat_entity_extractor import extract_chat_search_filters
 from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_intent
@@ -130,6 +131,24 @@ def _build_context_from_request(conversation: ChatConversationRequest | None) ->
     )
 
 
+def _next_workflow_state(
+    response: ChatResponse,
+    base_context: ChatConversationContext,
+) -> ChatWorkflowState | None:
+    if response.workflow is not None:
+        return ChatWorkflowState(
+            workflow_type=response.workflow.workflow_type,
+            status=response.workflow.status,
+            missing_fields=response.workflow.missing_fields,
+            draft=response.workflow.draft,
+        )
+
+    if base_context.current_workflow and base_context.current_workflow.status != ChatWorkflowStatus.COMPLETED:
+        return base_context.current_workflow
+
+    return None
+
+
 def _resolve_selected_doctor(
     response: ChatResponse,
     fallback_doctor_id: int | None,
@@ -169,13 +188,13 @@ class ConversationManager:
         base_context = _build_context_from_request(request.conversation)
         current_filters = extract_chat_search_filters(request.message)
         resolved_filters = _merge_search_filters(base_context.active_filters, current_filters)
-        intent_match = detect_chat_intent(request.message)
         response = self._workflow_engine.handle(
             request.message,
             conversation_context=base_context,
             search_filters=resolved_filters,
         )
         if response is None:
+            intent_match = detect_chat_intent(request.message)
             response = self._deterministic_engine.generate(
                 request.message,
                 intent_match=intent_match,
@@ -192,16 +211,7 @@ class ConversationManager:
         )
         history_turn_count = _count_user_turns(request.conversation.history) if request.conversation else 0
         next_turn_count = history_turn_count if history_turn_count > 0 else base_context.turn_count + 1
-        next_workflow: ChatWorkflowState | None = (
-            ChatWorkflowState(
-                workflow_type=response.workflow.workflow_type,
-                status=response.workflow.status,
-                missing_fields=response.workflow.missing_fields,
-                draft=response.workflow.draft,
-            )
-            if response.workflow is not None
-            else base_context.current_workflow
-        )
+        next_workflow = _next_workflow_state(response, base_context)
 
         response.conversation = ChatConversationContext(
             conversation_id=base_context.conversation_id,

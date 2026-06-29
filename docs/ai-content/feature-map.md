@@ -110,7 +110,8 @@
   - Resolves doctor-details/profile prompts for partial `Dr. <first-name>` mentions when the name uniquely matches a seeded doctor.
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
-  - Can execute booking, cancellation, and confirmation lookup workflows through existing backend appointment services when enough information is present.
+  - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
+  - Redirects successful chat-driven bookings into the existing appointment confirmation page.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.

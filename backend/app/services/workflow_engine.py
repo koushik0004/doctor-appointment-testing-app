@@ -37,6 +37,7 @@ CONFIRMATION_ACTION_KEYWORDS = (
     "show my appointment",
     "my appointment",
 )
+WORKFLOW_SWITCH_KEYWORDS = ("start over", "switch", "something else", "different question")
 
 
 def _contains_keyword(normalized_message: str, keywords: tuple[str, ...]) -> bool:
@@ -78,6 +79,17 @@ def _extract_patient_name(message: str) -> str | None:
         if match:
             return " ".join(part.capitalize() for part in match.group(1).split())
     return None
+
+
+def _extract_bare_patient_name(message: str) -> str | None:
+    stripped_message = message.strip()
+    if not stripped_message or "@" in stripped_message or any(character.isdigit() for character in stripped_message):
+        return None
+    if len(stripped_message.split()) < 2 or len(stripped_message.split()) > 4:
+        return None
+    if re.search(r"[^A-Za-z\s'’-]", stripped_message):
+        return None
+    return " ".join(part.capitalize() for part in stripped_message.replace("’", "'").split())
 
 
 def _extract_health_description(message: str) -> str | None:
@@ -152,6 +164,10 @@ def _resolve_doctor_from_context(
     return conversation_context.selected_doctor_id, conversation_context.selected_doctor_name
 
 
+def _missing_name_from_workflow(current_workflow: ChatWorkflowState | None) -> bool:
+    return current_workflow is not None and "patient_full_name" in current_workflow.missing_fields
+
+
 def _build_draft(
     message: str,
     *,
@@ -169,6 +185,10 @@ def _build_draft(
     )
 
     normalized_message = normalize_text(message)
+    patient_name = _extract_patient_name(message)
+    if patient_name is None and _missing_name_from_workflow(current_workflow):
+        patient_name = _extract_bare_patient_name(message)
+
     return ChatWorkflowDraft(
         doctor_id=doctor_id,
         doctor_name=doctor_name,
@@ -184,7 +204,7 @@ def _build_draft(
             or existing.appointment_type
             or AppointmentType.IN_PERSON.value
         ),
-        patient_full_name=_extract_patient_name(message) or existing.patient_full_name,
+        patient_full_name=patient_name or existing.patient_full_name,
         patient_email=_extract_patient_email(message) or existing.patient_email,
         patient_phone=_extract_patient_phone(message) or existing.patient_phone,
         health_description=_extract_health_description(message) or existing.health_description,
@@ -207,8 +227,10 @@ def _looks_like_workflow_follow_up(message: str) -> bool:
             _extract_patient_email(message),
             _extract_patient_phone(message),
             _extract_patient_name(message),
+            _extract_bare_patient_name(message),
             _extract_start_time(message),
             extract_target_date(normalized_message),
+            _extract_health_description(message),
         )
     )
 
@@ -221,18 +243,15 @@ def _resolve_workflow_type(
     normalized_message = normalize_text(message)
 
     if current_workflow is not None and current_workflow.status != ChatWorkflowStatus.COMPLETED:
-        if _looks_like_workflow_follow_up(message) or any(
-            keyword in normalized_message
-            for keyword in (
-                "book",
-                "schedule",
-                "reserve",
-                "cancel",
-                "confirmation",
-                "confirm",
-                "appointment details",
-            )
-        ):
+        if any(keyword in normalized_message for keyword in WORKFLOW_SWITCH_KEYWORDS):
+            return None
+        if _contains_keyword(normalized_message, CANCELLATION_ACTION_KEYWORDS) and not _is_help_request(normalized_message):
+            return ChatWorkflowType.CANCEL_APPOINTMENT
+        if _contains_keyword(normalized_message, CONFIRMATION_ACTION_KEYWORDS) and not _is_help_request(normalized_message):
+            return ChatWorkflowType.APPOINTMENT_CONFIRMATION
+        if current_workflow.workflow_type == ChatWorkflowType.BOOK_APPOINTMENT:
+            return current_workflow.workflow_type
+        if _looks_like_workflow_follow_up(message):
             return current_workflow.workflow_type
 
     if _contains_keyword(normalized_message, CANCELLATION_ACTION_KEYWORDS) and not _is_help_request(normalized_message):

@@ -36,7 +36,7 @@
 - `frontend/app/appointments/confirmation/page.tsx`
   - Confirmation page fed by backend appointment details.
 - `frontend/components/layout/GlobalAiWidget.tsx`
-  - Single mount point for the AI assistant UI.
+  - Single mount point for the AI assistant UI and the chat-booking confirmation redirect hook.
 - `frontend/lib/ai-widget/services/api-service.ts`
   - Bridges widget requests to the backend chat API.
 
@@ -53,7 +53,7 @@
 - `backend/app/services/conversation_manager.py`
   - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, and routes between workflow execution and deterministic fallback.
 - `backend/app/services/workflow_engine.py`
-  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, and missing-field validation.
+  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`

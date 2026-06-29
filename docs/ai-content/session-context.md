@@ -11,6 +11,8 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Request path: frontend UI -> `frontend/lib/api-client.ts` -> `frontend/app/api/[...path]/route.ts` -> backend API/services -> SQLite.
 - Chat orchestration path: `backend/app/api/chat.py` -> `backend/app/services/conversation_manager.py` -> `backend/app/services/workflow_engine.py` -> deterministic fallback in `backend/app/services/chat_service.py`.
 - Doctor-details chat routing now explicitly handles partial `Dr. <first-name>` mentions and `Who is Dr. ...` profile queries in the deterministic fallback path.
+- Active booking chat workflows now retain ownership across incremental turns, preserve merged draft fields in conversation metadata, and auto-complete booking once all mandatory fields are present.
+- The frontend AI widget now redirects directly to `/appointments/confirmation` after a successful chat booking using the returned workflow payload plus the existing booking store.
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
 - AI execution decision record: `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`.
 
@@ -40,6 +42,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Booking flow: `frontend/app/appointments/page.tsx`, `frontend/features/appointments/api.ts`, `frontend/stores/booking-store.ts`
 - Backend entry/router: `backend/app/main.py`, `backend/app/api/router.py`, `backend/app/db/database.py`
 - Booking/chat services: `backend/app/services/availability_service.py`, `backend/app/services/appointment_service.py`, `backend/app/services/conversation_manager.py`, `backend/app/services/workflow_engine.py`, `backend/app/services/chat_service.py`
+- Chat booking frontend handoff: `frontend/components/layout/GlobalAiWidget.tsx`, `frontend/stores/booking-store.ts`
 
 ## Commands To Run
 
