@@ -99,6 +99,7 @@
 - Backend ownership:
   - `backend/app/api/chat.py`
   - `backend/app/services/conversation_manager.py`
+  - `backend/app/services/workflow_engine.py`
   - `backend/app/services/chat_service.py`
   - `backend/app/services/chat_intent_detector.py`
   - `backend/app/services/chat_entity_extractor.py`
@@ -106,11 +107,14 @@
 - Current capability:
   - Answers greetings and help flows.
   - Returns structured doctor lists, doctor details, and availability cards.
+  - Resolves doctor-details/profile prompts for partial `Dr. <first-name>` mentions when the name uniquely matches a seeded doctor.
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
+  - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
+  - Redirects successful chat-driven bookings into the existing appointment confirmation page.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
-  - Conversation state is not persisted beyond the request metadata loop used by the current widget.
+  - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
 
 ## Platform / Cross-Cutting Features
 

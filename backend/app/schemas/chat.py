@@ -13,6 +13,9 @@ class ChatIntent(str, Enum):
     SHOW_DOCTOR_DETAILS = "SHOW_DOCTOR_DETAILS"
     APPOINTMENT_HELP = "APPOINTMENT_HELP"
     CANCEL_APPOINTMENT_HELP = "CANCEL_APPOINTMENT_HELP"
+    BOOK_APPOINTMENT = "BOOK_APPOINTMENT"
+    CANCEL_APPOINTMENT = "CANCEL_APPOINTMENT"
+    APPOINTMENT_CONFIRMATION = "APPOINTMENT_CONFIRMATION"
     UNKNOWN = "UNKNOWN"
 
 
@@ -34,6 +37,59 @@ class ChatRoutingTarget(str, Enum):
 
 class ChatConversationStatus(str, Enum):
     ACTIVE = "ACTIVE"
+
+
+class ChatWorkflowType(str, Enum):
+    BOOK_APPOINTMENT = "BOOK_APPOINTMENT"
+    CANCEL_APPOINTMENT = "CANCEL_APPOINTMENT"
+    APPOINTMENT_CONFIRMATION = "APPOINTMENT_CONFIRMATION"
+
+
+class ChatWorkflowStatus(str, Enum):
+    INPUT_REQUIRED = "INPUT_REQUIRED"
+    READY = "READY"
+    COMPLETED = "COMPLETED"
+
+
+class ChatWorkflowDraft(BaseModel):
+    doctor_id: int | None = None
+    doctor_name: str | None = None
+    appointment_date: Date | None = None
+    start_time: str | None = None
+    appointment_type: str | None = None
+    patient_full_name: str | None = None
+    patient_email: str | None = None
+    patient_phone: str | None = None
+    health_description: str | None = None
+    appointment_id: int | None = None
+    confirmation_code: str | None = None
+
+
+class ChatWorkflowAppointmentSummary(BaseModel):
+    appointment_id: int
+    confirmation_code: str
+    status: str
+    doctor_name: str
+    appointment_date: Date
+    start_time: str
+    end_time: str
+    appointment_type: str
+    patient_name: str
+
+
+class ChatWorkflowState(BaseModel):
+    workflow_type: ChatWorkflowType
+    status: ChatWorkflowStatus
+    missing_fields: list[str] = Field(default_factory=list)
+    draft: ChatWorkflowDraft = Field(default_factory=ChatWorkflowDraft)
+
+
+class ChatWorkflowResult(BaseModel):
+    workflow_type: ChatWorkflowType
+    status: ChatWorkflowStatus
+    missing_fields: list[str] = Field(default_factory=list)
+    draft: ChatWorkflowDraft = Field(default_factory=ChatWorkflowDraft)
+    appointment: ChatWorkflowAppointmentSummary | None = None
 
 
 class ChatConversationHistoryMessage(BaseModel):
@@ -60,6 +116,7 @@ class ChatConversationContext(BaseModel):
     last_user_message: str | None = None
     last_assistant_message: str | None = None
     routed_to: ChatRoutingTarget = ChatRoutingTarget.DETERMINISTIC_ENGINE
+    current_workflow: ChatWorkflowState | None = None
 
 
 class ChatConversationRequest(BaseModel):
@@ -105,6 +162,7 @@ class ChatResponse(BaseModel):
     help_steps: list[str] = Field(default_factory=list)
     response: str = ""
     conversation: ChatConversationContext | None = None
+    workflow: ChatWorkflowResult | None = None
 
     @model_validator(mode="after")
     def _sync_legacy_response(self) -> "ChatResponse":

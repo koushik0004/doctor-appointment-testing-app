@@ -35,7 +35,17 @@ EXPLICIT_DOCTOR_DETAIL_KEYWORDS = (
     "prices",
     "cost",
     "costs",
+    "profile",
 )
+
+
+def _extract_doctor_name_fragments(normalized_message: str) -> list[set[str]]:
+    fragments: list[set[str]] = []
+    for match in re.finditer(r"\bdr\s+([a-z]+(?:\s+[a-z]+){0,2})\b", normalized_message):
+        tokens = {token for token in match.group(1).split() if token}
+        if tokens:
+            fragments.append(tokens)
+    return fragments
 
 
 class ChatResponder(Protocol):
@@ -90,6 +100,9 @@ def _doctor_matches_query(doctor: DoctorResponse, message: str) -> bool:
         return True
     if full_name_tokens and full_name_tokens.issubset(normalized_tokens):
         return True
+    for fragment_tokens in _extract_doctor_name_fragments(normalized_message):
+        if fragment_tokens.issubset(bare_name_tokens) or fragment_tokens.issubset(full_name_tokens):
+            return True
 
     return False
 

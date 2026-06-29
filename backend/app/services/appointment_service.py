@@ -19,6 +19,7 @@ from app.repositories.appointment_repository import (
     get_appointment_by_doctor_date_time,
     get_appointment_by_id,
     get_appointment_by_confirmation_code,
+    save_appointment,
 )
 from app.repositories.patient_repository import create_patient, get_patient_by_email
 from app.schemas.appointment import (
@@ -113,7 +114,8 @@ def create_appointment_booking(
     request: AppointmentCreateRequest,
 ) -> AppointmentCreateResponse:
     response_data: dict[str, object]
-    with session.begin():
+    transaction = session.begin_nested() if session.in_transaction() else session.begin()
+    with transaction:
         slot = _validate_slot(
             session,
             doctor_id=request.doctor_id,
@@ -183,6 +185,51 @@ def get_appointment_confirmation(session: Session, appointment_id: int) -> Appoi
         appointment_type=appointment.appointment_type,
         health_description=appointment.health_description,
     )
+
+
+def get_appointment_confirmation_by_reference(
+    session: Session,
+    *,
+    appointment_id: int | None = None,
+    confirmation_code: str | None = None,
+) -> AppointmentConfirmationResponse:
+    if appointment_id is not None:
+        return get_appointment_confirmation(session, appointment_id)
+
+    if confirmation_code is None:
+        raise invalid_booking_request("Appointment reference is required.")
+
+    appointment = get_appointment_by_confirmation_code(session, confirmation_code)
+    if appointment is None:
+        raise invalid_booking_request("Appointment confirmation code was not found.")
+
+    return get_appointment_confirmation(session, appointment.id)
+
+
+def cancel_appointment_booking(
+    session: Session,
+    *,
+    appointment_id: int | None = None,
+    confirmation_code: str | None = None,
+) -> AppointmentConfirmationResponse:
+    if appointment_id is not None:
+        appointment = get_appointment_by_id(session, appointment_id)
+    elif confirmation_code is not None:
+        appointment = get_appointment_by_confirmation_code(session, confirmation_code)
+    else:
+        raise invalid_booking_request("Appointment reference is required.")
+
+    if appointment is None:
+        if appointment_id is not None:
+            raise appointment_not_found(appointment_id)
+        raise invalid_booking_request("Appointment confirmation code was not found.")
+
+    transaction = session.begin_nested() if session.in_transaction() else session.begin()
+    with transaction:
+        appointment.status = AppointmentStatus.CANCELLED.value
+        save_appointment(session, appointment)
+
+    return get_appointment_confirmation(session, appointment.id)
 
 
 def get_appointment_details(session: Session, appointment_id: int) -> AppointmentDetailsResponse:

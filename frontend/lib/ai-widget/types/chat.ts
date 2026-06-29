@@ -4,6 +4,9 @@ export type AiWidgetChatIntent =
   | "SHOW_DOCTOR_DETAILS"
   | "APPOINTMENT_HELP"
   | "CANCEL_APPOINTMENT_HELP"
+  | "BOOK_APPOINTMENT"
+  | "CANCEL_APPOINTMENT"
+  | "APPOINTMENT_CONFIRMATION"
   | "UNKNOWN";
 
 export type AiWidgetConversationRoutingTarget =
@@ -12,6 +15,16 @@ export type AiWidgetConversationRoutingTarget =
   | "FUTURE_AI_LAYER";
 
 export type AiWidgetConversationStatus = "ACTIVE";
+
+export type AiWidgetWorkflowType =
+  | "BOOK_APPOINTMENT"
+  | "CANCEL_APPOINTMENT"
+  | "APPOINTMENT_CONFIRMATION";
+
+export type AiWidgetWorkflowStatus =
+  | "INPUT_REQUIRED"
+  | "READY"
+  | "COMPLETED";
 
 export type AiWidgetChatDoctorCard = {
   doctor_id: number;
@@ -53,6 +66,48 @@ export type AiWidgetConversationContext = {
   last_user_message?: string;
   last_assistant_message?: string;
   routed_to: AiWidgetConversationRoutingTarget;
+  current_workflow?: AiWidgetWorkflowState;
+};
+
+export type AiWidgetWorkflowDraft = {
+  doctor_id?: number;
+  doctor_name?: string;
+  appointment_date?: string;
+  start_time?: string;
+  appointment_type?: string;
+  patient_full_name?: string;
+  patient_email?: string;
+  patient_phone?: string;
+  health_description?: string;
+  appointment_id?: number;
+  confirmation_code?: string;
+};
+
+export type AiWidgetWorkflowAppointmentSummary = {
+  appointment_id: number;
+  confirmation_code: string;
+  status: string;
+  doctor_name: string;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  appointment_type: string;
+  patient_name: string;
+};
+
+export type AiWidgetWorkflowState = {
+  workflow_type: AiWidgetWorkflowType;
+  status: AiWidgetWorkflowStatus;
+  missing_fields: string[];
+  draft: AiWidgetWorkflowDraft;
+};
+
+export type AiWidgetWorkflowResult = {
+  workflow_type: AiWidgetWorkflowType;
+  status: AiWidgetWorkflowStatus;
+  missing_fields: string[];
+  draft: AiWidgetWorkflowDraft;
+  appointment?: AiWidgetWorkflowAppointmentSummary;
 };
 
 export type AiWidgetConversationHistoryItem = {
@@ -78,4 +133,5 @@ export type AiWidgetChatResponsePayload = {
   help_steps?: string[];
   response?: string;
   conversation?: AiWidgetConversationContext;
+  workflow?: AiWidgetWorkflowResult;
 };

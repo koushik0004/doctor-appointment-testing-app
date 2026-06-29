@@ -3,29 +3,25 @@
 ## Active Work
 
 - Status: completed
-- Task: introduce a Conversation Manager as the single orchestration entry point for chat while preserving deterministic assistant behavior
-- Completed on: 2026-06-28
+- Task: stabilize booking workflow continuation across multi-turn chat conversations
+- Completed on: 2026-06-29
 
 ## Outcome
 
-- Added `backend/app/services/conversation_manager.py` as the single orchestration entry point for all chat requests.
-- Extended backend and frontend chat contracts with optional conversation metadata while keeping plain `message` requests valid.
-- Preserved deterministic doctor search, availability, FAQ, booking-help, and cancellation-help behavior.
-- Updated `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md` to reflect the new orchestration path.
+- Fixed booking workflow continuity so follow-up messages like slot, patient name, and email stay inside the active booking workflow instead of falling back to doctor details or availability cards.
+- Preserved and merged collected booking fields across turns, asked only for still-missing mandatory fields, and auto-created the appointment as soon as the booking draft became complete.
+- Wired the frontend AI widget to redirect directly to the appointment confirmation page after a successful chat-driven booking while preserving the existing appointment APIs and workflow architecture.
 
 ## Required Files for This Task
 
+- `frontend/components/layout/GlobalAiWidget.tsx`
 - `backend/app/services/conversation_manager.py`
-- `backend/app/schemas/chat.py`
+- `backend/app/services/workflow_engine.py`
 - `backend/app/services/chat_service.py`
-- `backend/app/api/chat.py`
-- `frontend/lib/ai-widget/services/api-service.ts`
-- `frontend/lib/ai-widget/services/chat-response-mapper.ts`
-- `frontend/lib/ai-widget/types/chat.ts`
 - `backend/tests/test_chat_api.py`
-- `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 
 ## Notes
 
-- No database schema changes were required.
-- Existing `/api/chat` and `/api/v1/chat` behavior remains backward-compatible.
+- No database schema or business API changes were required.
+- Existing `/api/chat` and `/api/v1/chat` contracts remain backward-compatible.
+- The fix is limited to booking workflow ownership, draft merging, and post-booking navigation behavior.

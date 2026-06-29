@@ -13,6 +13,13 @@ def create_appointment(session: Session, appointment: Appointment) -> Appointmen
     return appointment
 
 
+def save_appointment(session: Session, appointment: Appointment) -> Appointment:
+    session.add(appointment)
+    session.flush()
+    session.refresh(appointment)
+    return appointment
+
+
 def get_appointment_by_id(session: Session, appointment_id: int) -> Appointment | None:
     return session.get(Appointment, appointment_id)
 

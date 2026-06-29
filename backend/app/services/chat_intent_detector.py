@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -59,6 +60,7 @@ DOCTOR_DETAILS_KEYWORDS = (
     "details",
     "detail",
     "about",
+    "profile",
 )
 
 
@@ -71,6 +73,10 @@ class ChatIntentMatch:
 
 def _contains_keyword(normalized_message: str, keywords: tuple[str, ...]) -> bool:
     return any(keyword in normalized_message for keyword in keywords)
+
+
+def _looks_like_doctor_profile_query(normalized_message: str) -> bool:
+    return re.search(r"\bwho is\s+(?:dr|doctor)\b", normalized_message) is not None
 
 
 def detect_chat_intent(message: str) -> ChatIntentMatch:
@@ -86,7 +92,9 @@ def detect_chat_intent(message: str) -> ChatIntentMatch:
             target_date=target_date,
         )
 
-    if _contains_keyword(normalized_message, DOCTOR_DETAILS_KEYWORDS):
+    if _contains_keyword(normalized_message, DOCTOR_DETAILS_KEYWORDS) or _looks_like_doctor_profile_query(
+        normalized_message
+    ):
         return ChatIntentMatch(
             intent=ChatIntent.SHOW_DOCTOR_DETAILS,
             specialty=specialty,
