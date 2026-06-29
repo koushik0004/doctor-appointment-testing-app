@@ -36,6 +36,18 @@ def test_detect_chat_intent_for_doctor_details_query():
     assert match.target_date is None
 
 
+def test_detect_chat_intent_for_doctor_profile_query():
+    match = detect_chat_intent("Doctor profile of Dr. Sofia")
+
+    assert match.intent == ChatIntent.SHOW_DOCTOR_DETAILS
+
+
+def test_detect_chat_intent_for_who_is_doctor_query():
+    match = detect_chat_intent("Who is Dr. Sofia?")
+
+    assert match.intent == ChatIntent.SHOW_DOCTOR_DETAILS
+
+
 def test_detect_chat_intent_for_appointment_help_query():
     match = detect_chat_intent("How do I book an appointment?")
 

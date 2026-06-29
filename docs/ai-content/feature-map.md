@@ -107,6 +107,7 @@
 - Current capability:
   - Answers greetings and help flows.
   - Returns structured doctor lists, doctor details, and availability cards.
+  - Resolves doctor-details/profile prompts for partial `Dr. <first-name>` mentions when the name uniquely matches a seeded doctor.
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Can execute booking, cancellation, and confirmation lookup workflows through existing backend appointment services when enough information is present.

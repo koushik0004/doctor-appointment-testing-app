@@ -63,9 +63,9 @@
 - `backend/app/services/appointment_search_service.py`
   - Appointment search behavior across patient and doctor joins.
 - `backend/app/services/chat_service.py`
-  - Deterministic execution engine for the AI assistant and structured chat responses.
+  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching.
 - `backend/app/services/chat_intent_detector.py`
-  - Intent classification entry point for chat behavior.
+  - Intent classification entry point for chat behavior, including doctor-profile/detail query routing.
 - `backend/app/services/chat_entity_extractor.py`
   - Extracts specialization, gender, fee, location, date, and time preferences from messages.
 - `backend/app/services/schedule_service.py`

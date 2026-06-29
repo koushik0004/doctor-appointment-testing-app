@@ -132,6 +132,29 @@ def test_chat_endpoint_returns_structured_doctor_details_response(client):
     assert payload["data"][0]["consultation_fee_max"] == 200
 
 
+def test_chat_endpoint_returns_doctor_details_for_partial_dr_name_query(client):
+    response = client.post("/api/chat", json={"message": "Tell me about Dr. Sofia"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.SHOW_DOCTOR_DETAILS.value
+    assert payload["response"] == payload["message"]
+    assert len(payload["data"]) == 1
+    assert payload["data"][0]["doctor_name"] == "Dr. Sofia Martinez"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.DETERMINISTIC_ENGINE.value
+
+
+def test_chat_endpoint_routes_who_is_dr_query_to_doctor_details(client):
+    response = client.post("/api/chat", json={"message": "Who is Dr. Sofia?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.SHOW_DOCTOR_DETAILS.value
+    assert payload["response"] == payload["message"]
+    assert len(payload["data"]) == 1
+    assert payload["data"][0]["doctor_name"] == "Dr. Sofia Martinez"
+
+
 def test_doctor_list_endpoint_supports_gender_and_fee_filters(client):
     response = client.get("/api/doctors", params={"gender": "Female", "maximum_fee": 200})
 
