@@ -38,3 +38,46 @@ make backend-restart
 make frontend-restart
 make restart
 ```
+
+
+## Codex skill related
+
+```
+.codex/skills/update-existing-report
+ 
+Existing Report:
+docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-03-report.md
+
+Analyze:
+last 4-5 commits
+```
+
+- At new session start in codex
+```
+$ai-context-init
+Initialize AI context files only. Do not analyze the app yet.
+```
+
+- If need to update project-map file
+```
+$ai-project-map
+Analyze the app and generate project-map, feature-map, and important-files only.
+```
+
+- If need to update project index
+```
+$ai-report-index
+Create report-index only. Do not update other files.
+```
+
+- Update the context upfter feature implementation
+```
+$ai-session-context
+Generate compact session-context only from existing AI context files.
+```
+
+- After all need to update the AGENT.md file for context loading
+```
+$agents-md-refresh
+Update AGENTS.md based on docs/ai-content structure only.
+```
