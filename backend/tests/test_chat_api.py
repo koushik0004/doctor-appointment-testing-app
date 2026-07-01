@@ -806,8 +806,64 @@ def test_chat_service_uses_knowledge_retrieval_before_default_fallback(client, m
     assert fake_service.calls == ["assistant capabilities"]
     assert result.intent == ChatIntent.UNKNOWN
     assert result.message == "I can help with doctor discovery and appointment availability."
+    assert result.knowledge_source is not None
+    assert result.knowledge_source.document_id == "capabilities.assistant.v1"
+    assert result.knowledge_source.title == "Assistant Capabilities"
+    assert result.knowledge_source.source_path == "backend/app/knowledge/sources/structured/assistant-capabilities.json"
+    assert result.knowledge_source.matched_terms == ["assistant", "capabilities"]
+    assert result.knowledge_source.score == 20
     assert result.conversation is not None
     assert result.conversation.routed_to == ChatRoutingTarget.FUTURE_AI_LAYER
+
+
+def test_chat_endpoint_returns_knowledge_source_metadata(client, monkeypatch):
+    knowledge_document = KnowledgeDocument(
+        id="capabilities.assistant.v1",
+        title="Assistant Capabilities",
+        source_type=KnowledgeDocumentSourceType.JSON,
+        source_path="backend/app/knowledge/sources/structured/assistant-capabilities.json",
+        domain=KnowledgeDocumentDomain.CAPABILITY,
+        audience=KnowledgeDocumentAudience.ASSISTANT,
+        status=KnowledgeDocumentStatus.ACTIVE,
+        version="1.0",
+        tags=["assistant", "capabilities"],
+        priority=30,
+        summary="Defines current supported assistant capabilities.",
+        content={
+            "can_help_with": [
+                "doctor discovery",
+                "appointment availability",
+            ],
+        },
+    )
+
+    class FakeKnowledgeService:
+        def retrieve_top_match(self, query: str):
+            if "assistant capabilities" in query.lower():
+                return KnowledgeRetrievalMatch(
+                    document=knowledge_document,
+                    score=20,
+                    matched_terms=("assistant", "capabilities"),
+                )
+            return None
+
+    monkeypatch.setattr("app.services.chat_service._knowledge_retrieval_service", lambda: FakeKnowledgeService())
+
+    response = client.post("/api/chat", json={"message": "assistant capabilities"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["knowledge_source"] == {
+        "document_id": "capabilities.assistant.v1",
+        "title": "Assistant Capabilities",
+        "source_type": "json",
+        "source_path": "backend/app/knowledge/sources/structured/assistant-capabilities.json",
+        "domain": "capability",
+        "audience": "assistant",
+        "status": "active",
+        "matched_terms": ["assistant", "capabilities"],
+        "score": 20,
+    }
 
 
 def test_chat_service_skips_knowledge_retrieval_during_active_workflow(client, monkeypatch):

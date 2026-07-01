@@ -22,6 +22,7 @@ from app.schemas.chat import (
     ChatIntent,
     ChatRequest,
     ChatResponse,
+    ChatKnowledgeSource,
     ChatSearchFilters,
 )
 from app.schemas.doctor import DoctorResponse
@@ -274,6 +275,7 @@ def _build_response(
     data: list[ChatDoctorCard | ChatAvailabilityCard] | None = None,
     search_filters: ChatSearchFilters | None = None,
     help_steps: list[str] | None = None,
+    knowledge_source: ChatKnowledgeSource | None = None,
 ) -> ChatResponse:
     return ChatResponse(
         intent=intent,
@@ -281,6 +283,7 @@ def _build_response(
         data=data or [],
         search_filters=search_filters,
         help_steps=help_steps or [],
+        knowledge_source=knowledge_source,
     )
 
 
@@ -315,6 +318,21 @@ def _knowledge_document_message(document: KnowledgeDocument) -> str:
         return document.summary.strip()
 
     return document.title
+
+
+def _knowledge_source_from_match(match: KnowledgeRetrievalMatch) -> ChatKnowledgeSource:
+    document = match.document
+    return ChatKnowledgeSource(
+        document_id=document.id,
+        title=document.title,
+        source_type=document.source_type,
+        source_path=document.source_path,
+        domain=document.domain,
+        audience=document.audience,
+        status=document.status,
+        matched_terms=list(match.matched_terms),
+        score=match.score,
+    )
 
 
 class RuleBasedChatResponder:
@@ -498,6 +516,7 @@ class RuleBasedChatResponder:
             ChatIntent.UNKNOWN,
             _knowledge_document_message(document),
             search_filters=search_filters,
+            knowledge_source=_knowledge_source_from_match(knowledge_match),
         )
 
     def _respond_with_specialty_overview(self) -> ChatResponse:

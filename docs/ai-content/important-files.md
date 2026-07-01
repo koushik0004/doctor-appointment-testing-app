@@ -93,7 +93,7 @@
 - `backend/app/schemas/appointment.py`
 - `backend/app/schemas/appointment_search.py`
 - `backend/app/schemas/chat.py`
-  - Chat request/response contracts including optional conversation metadata and workflow state/result metadata.
+  - Chat request/response contracts including optional conversation metadata, workflow state/result metadata, and knowledge source metadata.
 
 These files define the persistence and API contracts. Any API change should be checked against both the frontend feature API files and these backend schemas/models.
 

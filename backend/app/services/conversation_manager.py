@@ -12,6 +12,7 @@ from app.schemas.chat import (
     ChatConversationRequest,
     ChatConversationStatus,
     ChatIntent,
+    ChatKnowledgeSource,
     ChatRequest,
     ChatResponse,
     ChatRoutingTarget,
@@ -210,6 +211,21 @@ def _resolve_selected_doctor(
     return first_item.doctor_id, first_item.doctor_name
 
 
+def _knowledge_source_from_match(knowledge_match: KnowledgeRetrievalMatch) -> ChatKnowledgeSource:
+    document = knowledge_match.document
+    return ChatKnowledgeSource(
+        document_id=document.id,
+        title=document.title,
+        source_type=document.source_type,
+        source_path=document.source_path,
+        domain=document.domain,
+        audience=document.audience,
+        status=document.status,
+        matched_terms=list(knowledge_match.matched_terms),
+        score=knowledge_match.score,
+    )
+
+
 class ConversationManager:
     def __init__(
         self,
@@ -263,6 +279,7 @@ class ConversationManager:
                     data=response.data,
                     search_filters=response.search_filters,
                     help_steps=response.help_steps,
+                    knowledge_source=_knowledge_source_from_match(knowledge_match),
                     workflow=response.workflow,
                 )
         routed_to = self._resolve_route(response)
