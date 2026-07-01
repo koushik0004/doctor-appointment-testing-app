@@ -267,6 +267,7 @@ export function createAssistantMessageFromChatResponse(
       response: payload.response ?? payload.message,
       conversation: payload.conversation,
       workflow: payload.workflow,
+      knowledge_source: payload.knowledge_source,
     },
   };
 }

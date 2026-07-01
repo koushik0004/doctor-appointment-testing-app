@@ -3,10 +3,22 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 4.5 Chat API Enhancement for Vector-less RAG
+- Task: implement Phase 4.6 Frontend Mapping for Vector-less RAG chat metadata
 - Completed on: 2026-07-01
 
 ## Outcome
+
+- The global AI widget now renders optional `knowledge_source` metadata on assistant text replies when the backend returns a knowledge-backed response.
+- The existing workflow cards, appointment booking redirect, and structured response rendering remain unchanged.
+- The chat response contract now stays backward compatible while exposing knowledge source identity, path, and matched-term context to the UI.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 4.5 Chat API Enhancement for Vector-less RAG
+- Completed on: 2026-07-01
+
+## Prior Outcome
 
 - Added optional `knowledge_source` metadata to `ChatResponse` so knowledge-backed replies can expose their source without breaking existing fields.
 - Wired the deterministic knowledge retrieval service into `ConversationManager` as a read-only fallback when no workflow is active.
@@ -16,6 +28,11 @@
 
 ## Required Files for This Task
 
+- `frontend/components/layout/GlobalAiWidget.tsx`
+- `frontend/lib/ai-widget/components/MessageContentRenderer.tsx`
+- `frontend/lib/ai-widget/services/chat-response-mapper.ts`
+- `frontend/lib/ai-widget/types/chat.ts`
+- `frontend/lib/ai-widget/types/message.ts`
 - `backend/app/knowledge/documents.py`
 - `backend/app/knowledge/loader.py`
 - `backend/app/knowledge/repository.py`

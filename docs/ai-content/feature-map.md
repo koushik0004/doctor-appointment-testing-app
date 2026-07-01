@@ -118,6 +118,7 @@
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
   - Consults the knowledge retrieval service only when no workflow is active and uses the retrieved document to replace the generic unknown fallback response.
   - Returns optional `knowledge_source` metadata on knowledge-backed replies so downstream UI mapping can show the retrieved document source.
+  - Displays a minimal knowledge-source footer on assistant text replies in the existing chat widget while preserving workflow cards and booking navigation.
   - Redirects successful chat-driven bookings into the existing appointment confirmation page.
   - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
   - Supports deterministic top-document retrieval over repository documents with title and keyword matching.

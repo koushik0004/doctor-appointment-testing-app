@@ -39,6 +39,14 @@
   - Single mount point for the AI assistant UI and the chat-booking confirmation redirect hook.
 - `frontend/lib/ai-widget/services/api-service.ts`
   - Bridges widget requests to the backend chat API.
+- `frontend/lib/ai-widget/services/chat-response-mapper.ts`
+  - Maps backend chat payloads into assistant messages and preserves optional workflow and knowledge source metadata.
+- `frontend/lib/ai-widget/components/MessageContentRenderer.tsx`
+  - Renders assistant chat content and the minimal knowledge-source footer for text replies.
+- `frontend/lib/ai-widget/types/chat.ts`
+  - Shared chat payload contract including optional `knowledge_source` metadata from backend responses.
+- `frontend/lib/ai-widget/types/message.ts`
+  - Widget message metadata shape used by the renderer and workflow navigation hook.
 
 ## Core Backend Feature Files
 
