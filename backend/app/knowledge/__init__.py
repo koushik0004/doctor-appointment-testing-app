@@ -7,6 +7,7 @@ from app.knowledge.documents import (
     KnowledgePromptHints,
 )
 from app.knowledge.loader import FileSystemKnowledgeLoader, KnowledgeLoader, KnowledgeValidationError
+from app.knowledge.retrieval import KnowledgeRetrievalMatch, KnowledgeRetrievalService
 from app.knowledge.repository import InMemoryKnowledgeRepository
 
 __all__ = [
@@ -19,5 +20,7 @@ __all__ = [
     "KnowledgeDocumentSourceType",
     "KnowledgeLoader",
     "KnowledgePromptHints",
+    "KnowledgeRetrievalMatch",
+    "KnowledgeRetrievalService",
     "KnowledgeValidationError",
 ]

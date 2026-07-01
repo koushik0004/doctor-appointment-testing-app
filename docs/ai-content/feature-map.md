@@ -89,7 +89,7 @@
 
 ### 6. AI chat assistant
 
-- Status: implemented as a rule-based assistant with a live backend API; Vector-less RAG knowledge repository prototype added but not integrated into chat execution
+- Status: implemented as a rule-based assistant with a live backend API; Vector-less RAG backend knowledge repository and deterministic retrieval service added but not integrated into chat execution
 - Frontend ownership:
   - `frontend/components/layout/GlobalAiWidget.tsx`
   - `frontend/lib/ai-widget/components/*`
@@ -107,6 +107,7 @@
   - `backend/app/knowledge/documents.py`
   - `backend/app/knowledge/loader.py`
   - `backend/app/knowledge/repository.py`
+  - `backend/app/knowledge/retrieval.py`
   - `backend/app/knowledge/sources/`
 - Current capability:
   - Answers greetings and help flows.
@@ -117,10 +118,11 @@
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
   - Redirects successful chat-driven bookings into the existing appointment confirmation page.
   - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
+  - Supports deterministic top-document retrieval over repository documents with title and keyword matching.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
-  - The knowledge repository is passive only; it does not perform retrieval, ranking, embeddings, prompt building, API responses, or chat orchestration.
+  - The knowledge retrieval service is backend-only and passive; it is not used by chat orchestration, prompt building, API responses, LLM calls, embeddings, or a vector database.
 
 ## Platform / Cross-Cutting Features
 

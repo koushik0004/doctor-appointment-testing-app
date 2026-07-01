@@ -2,11 +2,11 @@
 
 ## Status
 
-Prototype design only.
+Prototype implementation in progress. Phase 4.2 added the passive knowledge repository; Phase 4.3 added deterministic top-document retrieval. The module is still not wired into chat orchestration, APIs, prompt building, LLM calls, embeddings, or a vector database.
 
 ## Purpose
 
-This document defines the prototype architecture for a Vector-less RAG module for the Doctor Appointment AI Assistant. The goal is to introduce a simple, trusted knowledge layer backed by Markdown and JSON files without adding embeddings, vector databases, LLM dependencies, or runtime retrieval logic in this phase.
+This document defines the prototype architecture for a Vector-less RAG module for the Doctor Appointment AI Assistant. The goal is to introduce a simple, trusted knowledge layer backed by Markdown and JSON files without adding embeddings, vector databases, or LLM dependencies.
 
 The design preserves the current deterministic assistant architecture:
 
@@ -23,13 +23,13 @@ In scope:
 - Define supported knowledge source formats.
 - Define the knowledge document schema.
 - Define a loader interface contract.
+- Define deterministic title/keyword retrieval over loaded documents.
 - Define extension seams for a future Prompt Builder.
 - Document boundaries and migration path.
 
 Out of scope:
 
-- Implementing retrieval logic.
-- Implementing ranking, scoring, or semantic matching.
+- Implementing semantic matching.
 - Adding a vector database or embedding model.
 - Modifying chat orchestration code.
 - Modifying workflow execution code.
@@ -50,12 +50,14 @@ Deterministic Chat Service / WorkflowEngine
   ->
 Future Knowledge Access Seam
   ->
-Vector-less RAG Loader
+Vector-less RAG Retrieval Service
+  ->
+Vector-less RAG Repository / Loader
   ->
 Markdown and JSON knowledge sources
 ```
 
-The initial module should be passive. It can load and validate curated knowledge documents, but it should not decide which document answers a user message until a later implementation phase explicitly adds retrieval behavior.
+The implemented module remains passive from the chat runtime perspective. It can load, validate, cache, and deterministically select one top matching document, but it does not answer user messages or feed chat responses until a later implementation phase explicitly wires it into orchestration.
 
 ## Proposed Folder Structure
 
@@ -66,7 +68,8 @@ backend/app/knowledge/
   __init__.py
   documents.py
   loader.py
-  registry.py
+  repository.py
+  retrieval.py
   sources/
     README.md
     faq/
@@ -107,7 +110,8 @@ Folder responsibilities:
 
 - `documents.py`: typed document and metadata models.
 - `loader.py`: file loading and validation interface.
-- `registry.py`: in-memory registry abstraction for loaded documents.
+- `repository.py`: in-memory repository abstraction for loaded documents.
+- `retrieval.py`: deterministic title/keyword retrieval service that returns one top matching document.
 - `sources/`: curated Markdown and JSON knowledge files committed to the repo.
 - `sources/faq/`: user-facing support answers and procedural help.
 - `sources/policies/`: product, safety, privacy, and appointment guidance.
@@ -325,16 +329,15 @@ Loader constraints:
 - no database access
 - no embeddings
 - no vector index creation
-- no user-message retrieval or matching
 - no calls into `ConversationManager`
 - no calls into `WorkflowEngine`
 
-## Registry Interface
+## Repository Interface
 
-The registry is an optional in-memory read model built from loaded documents.
+The repository is an in-memory read model built from loaded documents.
 
 ```python
-class KnowledgeRegistry:
+class KnowledgeRepository:
     def all(self) -> list[KnowledgeDocument]:
         ...
 
@@ -348,7 +351,17 @@ class KnowledgeRegistry:
         ...
 ```
 
-The registry may support exact ID, domain, and tag filtering. It should not implement natural-language retrieval in this phase.
+The repository supports exact ID, domain, and tag filtering. It should not implement natural-language retrieval directly.
+
+## Retrieval Service
+
+The retrieval service sits on top of the repository. It performs deterministic token matching only:
+
+- title matches are weighted higher than summary/content/tag keyword matches
+- common suffix normalization is allowed for simple variants such as plural `s` and `ing`
+- repository priority and document id are deterministic tie-breakers
+- the service returns at most one top document
+- no LLM, embeddings, vector index, external search, prompt building, or chat orchestration calls are allowed
 
 ## Future Prompt Builder Seam
 
@@ -477,4 +490,3 @@ This architecture is ready for the next phase when:
 - the registry boundary is defined
 - future Prompt Builder integration is documented
 - non-goals explicitly prevent retrieval logic and orchestration changes in this phase
-

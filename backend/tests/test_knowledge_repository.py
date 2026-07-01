@@ -7,6 +7,7 @@ from app.knowledge import (
     InMemoryKnowledgeRepository,
     KnowledgeDocumentDomain,
     KnowledgeDocumentSourceType,
+    KnowledgeRetrievalService,
     KnowledgeValidationError,
 )
 
@@ -59,6 +60,39 @@ def _write_valid_json(path: Path) -> None:
     "can_help_with": ["tests"]
   }
 }
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_markdown(
+    path: Path,
+    *,
+    document_id: str,
+    title: str,
+    summary: str,
+    content: str,
+    tags: list[str] | None = None,
+    priority: int = 10,
+    status: str = "active",
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tag_lines = "\n".join(f"  - {tag}" for tag in tags or [])
+    path.write_text(
+        f"""---
+id: {document_id}
+title: {title}
+domain: faq
+audience: patient
+status: {status}
+version: "1.0"
+tags:
+{tag_lines}
+priority: {priority}
+summary: {summary}
+---
+
+{content}
 """,
         encoding="utf-8",
     )
@@ -145,3 +179,81 @@ Missing required summary.
 
     with pytest.raises(KnowledgeValidationError, match="Invalid knowledge document"):
         FileSystemKnowledgeLoader(tmp_path).load()
+
+
+def test_retrieval_service_returns_top_title_match(tmp_path):
+    _write_markdown(
+        tmp_path / "faq" / "booking.md",
+        document_id="faq.booking",
+        title="Booking Appointments",
+        summary="General visit scheduling help.",
+        content="Patients can choose a doctor and available time.",
+        tags=["appointments"],
+        priority=1,
+    )
+    _write_markdown(
+        tmp_path / "faq" / "fees.md",
+        document_id="faq.fees",
+        title="Payment Questions",
+        summary="Booking fees and appointment payments.",
+        content="Patients can ask about appointment fees.",
+        tags=["booking"],
+        priority=50,
+    )
+
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(tmp_path))
+    service = KnowledgeRetrievalService(repository)
+
+    assert service.retrieve_top("How do I book an appointment?").id == "faq.booking"
+
+
+def test_retrieval_service_supports_content_keyword_matching(tmp_path):
+    _write_markdown(
+        tmp_path / "faq" / "cancellation.md",
+        document_id="faq.cancellation",
+        title="Appointment Changes",
+        summary="Cancel or reschedule an existing visit.",
+        content="Use your confirmation details before requesting cancellation.",
+        tags=["support"],
+    )
+
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(tmp_path))
+    service = KnowledgeRetrievalService(repository)
+
+    match = service.retrieve_top_match("I need cancellation help")
+
+    assert match is not None
+    assert match.document.id == "faq.cancellation"
+    assert "cancellation" in match.matched_terms
+
+
+def test_retrieval_service_returns_none_for_no_match(tmp_path):
+    _write_valid_markdown(tmp_path / "faq" / "booking.md")
+
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(tmp_path))
+    service = KnowledgeRetrievalService(repository)
+
+    assert service.retrieve_top("unrelated pharmacy refill") is None
+
+
+def test_retrieval_service_uses_active_repository_documents_only(tmp_path):
+    _write_markdown(
+        tmp_path / "faq" / "deprecated.md",
+        document_id="faq.old",
+        title="Legacy Cancellation Help",
+        summary="Old cancellation instructions.",
+        content="Deprecated cancellation instructions.",
+        status="deprecated",
+    )
+    _write_markdown(
+        tmp_path / "faq" / "active.md",
+        document_id="faq.active",
+        title="Active Visit Help",
+        summary="Current visit support instructions.",
+        content="Active cancellation support guidance.",
+    )
+
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(tmp_path))
+    service = KnowledgeRetrievalService(repository)
+
+    assert service.retrieve_top("cancellation").id == "faq.active"

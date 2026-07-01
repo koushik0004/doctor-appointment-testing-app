@@ -76,6 +76,8 @@
   - Filesystem loader for repository-local Markdown and JSON knowledge files; performs schema validation and duplicate ID checks.
 - `backend/app/knowledge/repository.py`
   - In-memory cache for loaded knowledge documents with exact ID/domain/tag accessors only.
+- `backend/app/knowledge/retrieval.py`
+  - Deterministic Vector-less RAG retrieval service that scores title matches above summary/content/tag keyword matches and returns one top document.
 - `backend/app/knowledge/sources/`
   - Curated passive Markdown/JSON knowledge sources for future prompt/context work.
 - `backend/pyproject.toml`
@@ -105,6 +107,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_chat_intent_detector.py`
 - `backend/tests/test_chat_entity_extractor.py`
 - `backend/tests/test_knowledge_repository.py`
+  - Covers Markdown/JSON loading, repository caching, exact filters, and deterministic retrieval matching.
 
 ## High-Value Docs
 

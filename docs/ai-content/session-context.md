@@ -13,7 +13,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Doctor-details chat routing now explicitly handles partial `Dr. <first-name>` mentions and `Who is Dr. ...` profile queries in the deterministic fallback path.
 - Active booking chat workflows now retain ownership across incremental turns, preserve merged draft fields in conversation metadata, and auto-complete booking once all mandatory fields are present.
 - The frontend AI widget now redirects directly to `/appointments/confirmation` after a successful chat booking using the returned workflow payload plus the existing booking store.
-- Vector-less RAG Phase 4 has a passive backend knowledge repository under `backend/app/knowledge/` that loads curated Markdown/JSON files into an in-memory cache. It is not wired into chat routing, retrieval, APIs, `ConversationManager`, or `WorkflowEngine`.
+- Vector-less RAG Phase 4 has backend knowledge components under `backend/app/knowledge/`: a Markdown/JSON repository cache plus a deterministic retrieval service that returns the top title/keyword match. It is not wired into chat routing, APIs, `ConversationManager`, `WorkflowEngine`, prompt building, LLM calls, embeddings, or a vector database.
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
 - AI execution decision record: `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`.
 - Vector-less RAG reference: `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`.
@@ -44,7 +44,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Booking flow: `frontend/app/appointments/page.tsx`, `frontend/features/appointments/api.ts`, `frontend/stores/booking-store.ts`
 - Backend entry/router: `backend/app/main.py`, `backend/app/api/router.py`, `backend/app/db/database.py`
 - Booking/chat services: `backend/app/services/availability_service.py`, `backend/app/services/appointment_service.py`, `backend/app/services/conversation_manager.py`, `backend/app/services/workflow_engine.py`, `backend/app/services/chat_service.py`
-- Knowledge repository: `backend/app/knowledge/documents.py`, `backend/app/knowledge/loader.py`, `backend/app/knowledge/repository.py`, `backend/app/knowledge/sources/`
+- Knowledge components: `backend/app/knowledge/documents.py`, `backend/app/knowledge/loader.py`, `backend/app/knowledge/repository.py`, `backend/app/knowledge/retrieval.py`, `backend/app/knowledge/sources/`
 - Chat booking frontend handoff: `frontend/components/layout/GlobalAiWidget.tsx`, `frontend/stores/booking-store.ts`
 
 ## Commands To Run
