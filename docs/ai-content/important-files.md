@@ -129,3 +129,5 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/feature-02-doctor-listing.md`
 - `docs/feature-03-appointment-booking.md`
 - `docs/feature-04-confirmation-email.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-04-manual-test-checklist.md`
+  - Manual QA checklist for the Vector-less RAG prototype, including positive, negative, edge, regression, workflow, and existing chatbot coverage.

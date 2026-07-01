@@ -3,22 +3,34 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 4.6 Frontend Mapping for Vector-less RAG chat metadata
+- Task: implement Phase 4.7 Manual Test Support for Vector-less RAG prototype
 - Completed on: 2026-07-01
 
 ## Outcome
+
+- A dedicated manual QA checklist now covers positive, negative, edge, regression, workflow, and existing chatbot scenarios for the Vector-less RAG prototype.
+- The checklist is stored in `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-04-manual-test-checklist.md`.
+- The phase-4 context files now point to the new manual test artifact for future validation work.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 4.6 Frontend Mapping for Vector-less RAG chat metadata
+- Completed on: 2026-07-01
+
+## Prior Outcome
 
 - The global AI widget now renders optional `knowledge_source` metadata on assistant text replies when the backend returns a knowledge-backed response.
 - The existing workflow cards, appointment booking redirect, and structured response rendering remain unchanged.
 - The chat response contract now stays backward compatible while exposing knowledge source identity, path, and matched-term context to the UI.
 
-## Prior Work
+## Earlier Work
 
 - Status: completed
 - Task: implement Phase 4.5 Chat API Enhancement for Vector-less RAG
 - Completed on: 2026-07-01
 
-## Prior Outcome
+## Earlier Outcome
 
 - Added optional `knowledge_source` metadata to `ChatResponse` so knowledge-backed replies can expose their source without breaking existing fields.
 - Wired the deterministic knowledge retrieval service into `ConversationManager` as a read-only fallback when no workflow is active.
