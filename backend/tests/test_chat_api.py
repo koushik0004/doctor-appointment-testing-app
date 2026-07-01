@@ -25,6 +25,14 @@ from app.schemas.chat import (  # noqa: E402
     ChatWorkflowStatus,
     ChatWorkflowType,
 )
+from app.knowledge.documents import (  # noqa: E402
+    KnowledgeDocument,
+    KnowledgeDocumentAudience,
+    KnowledgeDocumentDomain,
+    KnowledgeDocumentSourceType,
+    KnowledgeDocumentStatus,
+)
+from app.knowledge.retrieval import KnowledgeRetrievalMatch  # noqa: E402
 from app.schemas.appointment import AppointmentCreateRequest, PatientInput  # noqa: E402
 from app.schemas.doctor import AppointmentType  # noqa: E402
 from app.services.appointment_service import create_appointment_booking  # noqa: E402
@@ -752,3 +760,145 @@ def test_chat_service_returns_default_fallback(client):
     )
     assert result.response == result.message
     assert result.data == []
+
+
+def test_chat_service_uses_knowledge_retrieval_before_default_fallback(client, monkeypatch):
+    knowledge_document = KnowledgeDocument(
+        id="capabilities.assistant.v1",
+        title="Assistant Capabilities",
+        source_type=KnowledgeDocumentSourceType.JSON,
+        source_path="backend/app/knowledge/sources/structured/assistant-capabilities.json",
+        domain=KnowledgeDocumentDomain.CAPABILITY,
+        audience=KnowledgeDocumentAudience.ASSISTANT,
+        status=KnowledgeDocumentStatus.ACTIVE,
+        version="1.0",
+        tags=["assistant", "capabilities"],
+        priority=30,
+        summary="Defines current supported assistant capabilities.",
+        content={
+            "can_help_with": [
+                "doctor discovery",
+                "appointment availability",
+            ],
+        },
+    )
+
+    class FakeKnowledgeService:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def retrieve_top_match(self, query: str):
+            self.calls.append(query)
+            if "assistant capabilities" in query.lower():
+                return KnowledgeRetrievalMatch(
+                    document=knowledge_document,
+                    score=20,
+                    matched_terms=("assistant", "capabilities"),
+                )
+            return None
+
+    fake_service = FakeKnowledgeService()
+    monkeypatch.setattr("app.services.chat_service._knowledge_retrieval_service", lambda: fake_service)
+
+    with _session() as session:
+        result = create_chat_response(session, ChatRequest(message="assistant capabilities"))
+
+    assert fake_service.calls == ["assistant capabilities"]
+    assert result.intent == ChatIntent.UNKNOWN
+    assert result.message == "I can help with doctor discovery and appointment availability."
+    assert result.conversation is not None
+    assert result.conversation.routed_to == ChatRoutingTarget.FUTURE_AI_LAYER
+
+
+def test_chat_service_skips_knowledge_retrieval_during_active_workflow(client, monkeypatch):
+    class FakeKnowledgeService:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def retrieve_top_match(self, query: str):
+            self.calls += 1
+            return None
+
+    fake_service = FakeKnowledgeService()
+    monkeypatch.setattr("app.services.chat_service._knowledge_retrieval_service", lambda: fake_service)
+
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Need a female cardiologist tomorrow"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Book this appointment",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+        fake_service.calls = 0
+        third_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="assistant capabilities",
+                conversation=ChatConversationRequest(
+                    conversation_id=second_result.conversation.conversation_id if second_result.conversation else None,
+                    context=second_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": second_result.message,
+                            "intent": second_result.intent,
+                            "search_filters": second_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": second_result.conversation.selected_doctor_id if second_result.conversation else None,
+                            "selected_doctor_name": second_result.conversation.selected_doctor_name if second_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "assistant capabilities",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+    assert fake_service.calls == 0
+    assert third_result.conversation is not None
+    assert third_result.conversation.routed_to == ChatRoutingTarget.WORKFLOW_ENGINE

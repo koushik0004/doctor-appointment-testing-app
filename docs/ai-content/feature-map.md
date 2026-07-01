@@ -89,7 +89,7 @@
 
 ### 6. AI chat assistant
 
-- Status: implemented as a rule-based assistant with a live backend API; Vector-less RAG backend knowledge repository and deterministic retrieval service added but not integrated into chat execution
+- Status: implemented as a rule-based assistant with a live backend API; Vector-less RAG backend knowledge repository and deterministic retrieval service are now integrated into `ConversationManager` as a read-only fallback when no workflow is active
 - Frontend ownership:
   - `frontend/components/layout/GlobalAiWidget.tsx`
   - `frontend/lib/ai-widget/components/*`
@@ -116,13 +116,14 @@
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
+  - Consults the knowledge retrieval service only when no workflow is active and uses the retrieved document to replace the generic unknown fallback response.
   - Redirects successful chat-driven bookings into the existing appointment confirmation page.
   - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
   - Supports deterministic top-document retrieval over repository documents with title and keyword matching.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
-  - The knowledge retrieval service is backend-only and passive; it is not used by chat orchestration, prompt building, API responses, LLM calls, embeddings, or a vector database.
+  - Knowledge retrieval is still backend-only and deterministic; it is not used by prompt building, LLM calls, embeddings, or a vector database, and it remains inactive while a workflow is running.
 
 ## Platform / Cross-Cutting Features
 

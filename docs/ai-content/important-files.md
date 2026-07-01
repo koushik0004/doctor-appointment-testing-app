@@ -51,7 +51,7 @@
 - `backend/app/api/chat.py`
   - Chat endpoints for `/api/chat` and `/api/v1/chat`.
 - `backend/app/services/conversation_manager.py`
-  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, and routes between workflow execution and deterministic fallback.
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, routes between workflow execution and deterministic fallback, and consults knowledge retrieval only when no workflow is active.
 - `backend/app/services/workflow_engine.py`
   - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation.
 - `backend/app/services/doctor_service.py`
@@ -63,7 +63,7 @@
 - `backend/app/services/appointment_search_service.py`
   - Appointment search behavior across patient and doctor joins.
 - `backend/app/services/chat_service.py`
-  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching.
+  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching and the knowledge-backed fallback composer.
 - `backend/app/services/chat_intent_detector.py`
   - Intent classification entry point for chat behavior, including doctor-profile/detail query routing.
 - `backend/app/services/chat_entity_extractor.py`

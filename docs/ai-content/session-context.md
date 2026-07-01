@@ -13,7 +13,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Doctor-details chat routing now explicitly handles partial `Dr. <first-name>` mentions and `Who is Dr. ...` profile queries in the deterministic fallback path.
 - Active booking chat workflows now retain ownership across incremental turns, preserve merged draft fields in conversation metadata, and auto-complete booking once all mandatory fields are present.
 - The frontend AI widget now redirects directly to `/appointments/confirmation` after a successful chat booking using the returned workflow payload plus the existing booking store.
-- Vector-less RAG Phase 4 has backend knowledge components under `backend/app/knowledge/`: a Markdown/JSON repository cache plus a deterministic retrieval service that returns the top title/keyword match. It is not wired into chat routing, APIs, `ConversationManager`, `WorkflowEngine`, prompt building, LLM calls, embeddings, or a vector database.
+- Vector-less RAG Phase 4 has backend knowledge components under `backend/app/knowledge/`: a Markdown/JSON repository cache plus a deterministic retrieval service that returns the top title/keyword match. `ConversationManager` now consults it only when no workflow is active, and it still falls back to the existing deterministic chat engine when no knowledge document is selected.
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
 - AI execution decision record: `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`.
 - Vector-less RAG reference: `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Prototype implementation in progress. Phase 4.2 added the passive knowledge repository; Phase 4.3 added deterministic top-document retrieval. The module is still not wired into chat orchestration, APIs, prompt building, LLM calls, embeddings, or a vector database.
+Prototype implementation in progress. Phase 4.2 added the passive knowledge repository; Phase 4.3 added deterministic top-document retrieval; Phase 4.4 wired the retrieval service into `ConversationManager` as a read-only fallback when no workflow is active. The module still does not change APIs, prompt building, LLM calls, embeddings, or a vector database.
 
 ## Purpose
 
@@ -10,10 +10,10 @@ This document defines the prototype architecture for a Vector-less RAG module fo
 
 The design preserves the current deterministic assistant architecture:
 
-- `ConversationManager` remains unchanged.
+- `ConversationManager` still owns the orchestration entry point, but it now consults the knowledge retrieval service only when no workflow is active.
 - `WorkflowEngine` remains unchanged.
 - Existing doctor, availability, and appointment services remain the source of truth for live operational data.
-- The deterministic chat engine remains the primary execution path.
+- The deterministic chat engine remains the primary execution path and still handles the fallback when retrieval does not produce a knowledge-backed response.
 
 ## Scope
 
@@ -57,7 +57,7 @@ Vector-less RAG Repository / Loader
 Markdown and JSON knowledge sources
 ```
 
-The implemented module remains passive from the chat runtime perspective. It can load, validate, cache, and deterministically select one top matching document, but it does not answer user messages or feed chat responses until a later implementation phase explicitly wires it into orchestration.
+The implemented module now participates in chat orchestration as a read-only fallback. It can load, validate, cache, and deterministically select one top matching document, and `ConversationManager` uses that result only when no workflow is active before falling back to the deterministic chat engine.
 
 ## Proposed Folder Structure
 
@@ -411,17 +411,17 @@ Phase 4.3, retrieval strategy:
 - add deterministic tests
 - avoid semantic or embedding dependency
 
-Phase 4.4, prompt/context builder:
+Phase 4.4, controlled chat integration:
+
+- introduce a read-only knowledge adapter behind the deterministic assistant
+- preserve `ConversationManager` and `WorkflowEngine` contracts unless a separate migration prompt explicitly changes them
+
+Phase 4.5, prompt/context builder:
 
 - format selected knowledge into bounded context
 - apply prompt hints
 - add token/character budgeting
 - keep domain validation in existing backend services
-
-Phase 4.5, controlled chat integration:
-
-- introduce a read-only knowledge adapter behind the deterministic assistant
-- preserve `ConversationManager` and `WorkflowEngine` contracts unless a separate migration prompt explicitly changes them
 
 ## Safety And Data Boundaries
 

@@ -9,6 +9,31 @@ from app.knowledge.repository import InMemoryKnowledgeRepository
 
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "can",
+    "do",
+    "for",
+    "help",
+    "how",
+    "i",
+    "is",
+    "it",
+    "me",
+    "my",
+    "need",
+    "of",
+    "on",
+    "some",
+    "the",
+    "to",
+    "what",
+    "with",
+    "you",
+}
 
 
 @dataclass(frozen=True)
@@ -97,7 +122,8 @@ def _stringify_content(content: str | dict[str, Any]) -> list[str]:
 
 
 def _tokenize(text: str) -> tuple[str, ...]:
-    return tuple(_normalize_token(token) for token in _TOKEN_PATTERN.findall(text.lower()))
+    tokens = [_normalize_token(token) for token in _TOKEN_PATTERN.findall(text.lower())]
+    return tuple(token for token in tokens if token and token not in _STOPWORDS)
 
 
 def _normalize_token(token: str) -> str:
