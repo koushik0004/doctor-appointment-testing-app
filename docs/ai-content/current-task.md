@@ -3,25 +3,28 @@
 ## Active Work
 
 - Status: completed
-- Task: stabilize booking workflow continuation across multi-turn chat conversations
-- Completed on: 2026-06-29
+- Task: implement Phase 4.2 backend Knowledge Repository for Vector-less RAG
+- Completed on: 2026-07-01
 
 ## Outcome
 
-- Fixed booking workflow continuity so follow-up messages like slot, patient name, and email stay inside the active booking workflow instead of falling back to doctor details or availability cards.
-- Preserved and merged collected booking fields across turns, asked only for still-missing mandatory fields, and auto-created the appointment as soon as the booking draft became complete.
-- Wired the frontend AI widget to redirect directly to the appointment confirmation page after a successful chat-driven booking while preserving the existing appointment APIs and workflow architecture.
+- Added a passive backend knowledge repository package that loads Markdown and JSON knowledge files into typed Pydantic document models.
+- Added an in-memory repository cache with exact ID/domain/tag accessors only; no retrieval, ranking, embeddings, chat orchestration, or API integration was added.
+- Added starter repository-local knowledge sources for booking help, cancellation guidance, and assistant capabilities.
+- Added focused backend tests for Markdown/JSON loading, caching, exact metadata filters, duplicate IDs, and schema validation.
 
 ## Required Files for This Task
 
-- `frontend/components/layout/GlobalAiWidget.tsx`
-- `backend/app/services/conversation_manager.py`
-- `backend/app/services/workflow_engine.py`
-- `backend/app/services/chat_service.py`
-- `backend/tests/test_chat_api.py`
+- `backend/app/knowledge/documents.py`
+- `backend/app/knowledge/loader.py`
+- `backend/app/knowledge/repository.py`
+- `backend/app/knowledge/sources/`
+- `backend/pyproject.toml`
+- `backend/tests/test_knowledge_repository.py`
+- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 
 ## Notes
 
-- No database schema or business API changes were required.
-- Existing `/api/chat` and `/api/v1/chat` contracts remain backward-compatible.
-- The fix is limited to booking workflow ownership, draft merging, and post-booking navigation behavior.
+- `ConversationManager`, `WorkflowEngine`, chat APIs, and frontend code were intentionally not modified.
+- The loader uses a constrained YAML-like front matter parser instead of adding a YAML dependency.
+- Validate with `backend/.venv/bin/python -m pytest backend/tests/test_knowledge_repository.py` and chat regression tests when changing this area.

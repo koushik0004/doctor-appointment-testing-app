@@ -70,6 +70,16 @@
   - Extracts specialization, gender, fee, location, date, and time preferences from messages.
 - `backend/app/services/schedule_service.py`
   - Slot-generation rules that shape both booking and chat availability results.
+- `backend/app/knowledge/documents.py`
+  - Typed Vector-less RAG knowledge document schema and prompt hint metadata.
+- `backend/app/knowledge/loader.py`
+  - Filesystem loader for repository-local Markdown and JSON knowledge files; performs schema validation and duplicate ID checks.
+- `backend/app/knowledge/repository.py`
+  - In-memory cache for loaded knowledge documents with exact ID/domain/tag accessors only.
+- `backend/app/knowledge/sources/`
+  - Curated passive Markdown/JSON knowledge sources for future prompt/context work.
+- `backend/pyproject.toml`
+  - Backend package/test configuration, including package-data entries for bundled knowledge Markdown/JSON sources.
 
 ## Data Model And Contract Files
 
@@ -94,12 +104,14 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_chat_api.py`
 - `backend/tests/test_chat_intent_detector.py`
 - `backend/tests/test_chat_entity_extractor.py`
+- `backend/tests/test_knowledge_repository.py`
 
 ## High-Value Docs
 
 - `docs/architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

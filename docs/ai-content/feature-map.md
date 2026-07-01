@@ -89,7 +89,7 @@
 
 ### 6. AI chat assistant
 
-- Status: implemented as a rule-based assistant with a live backend API
+- Status: implemented as a rule-based assistant with a live backend API; Vector-less RAG knowledge repository prototype added but not integrated into chat execution
 - Frontend ownership:
   - `frontend/components/layout/GlobalAiWidget.tsx`
   - `frontend/lib/ai-widget/components/*`
@@ -104,6 +104,10 @@
   - `backend/app/services/chat_intent_detector.py`
   - `backend/app/services/chat_entity_extractor.py`
   - `backend/app/schemas/chat.py`
+  - `backend/app/knowledge/documents.py`
+  - `backend/app/knowledge/loader.py`
+  - `backend/app/knowledge/repository.py`
+  - `backend/app/knowledge/sources/`
 - Current capability:
   - Answers greetings and help flows.
   - Returns structured doctor lists, doctor details, and availability cards.
@@ -112,9 +116,11 @@
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
   - Redirects successful chat-driven bookings into the existing appointment confirmation page.
+  - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
+  - The knowledge repository is passive only; it does not perform retrieval, ranking, embeddings, prompt building, API responses, or chat orchestration.
 
 ## Platform / Cross-Cutting Features
 
@@ -126,6 +132,7 @@
 
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 - These documents define the current layered architecture, boundaries, request flow, and incremental migration path for the AI assistant without changing runtime behavior.
 
 ### Database initialization and seed data
