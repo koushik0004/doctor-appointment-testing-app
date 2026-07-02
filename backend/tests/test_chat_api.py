@@ -281,7 +281,7 @@ def test_chat_endpoint_returns_online_consultation_knowledge_response(client):
         "# Telemedicine Appointments Telemedicine is an online doctor consultation done remotely, usually by video. When a doctor supports it, you can choose a telemedicine appointment type instead of an in-person visit."
     )
     assert payload["knowledge_source"]["document_id"] == "faq.telemedicine.general"
-    assert "online" in payload["knowledge_source"]["matched_terms"]
+    assert "do you provide online consultation" in payload["knowledge_source"]["matched_terms"]
     assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
 
 
@@ -295,6 +295,29 @@ def test_chat_endpoint_returns_payment_methods_knowledge_response(client):
         "# Payment Methods Patients can usually complete a booking using supported online payment options shown in the app, such as card-based checkout when enabled for that appointment flow. Always check the final booking screen for the currently available payment methods."
     )
     assert payload["knowledge_source"]["document_id"] == "faq.payment.methods"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
+def test_chat_endpoint_ignores_weak_online_overlap_for_unrelated_requests(client):
+    response = client.post("/api/chat", json={"message": "Can you refill my prescription online?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["knowledge_source"] is None
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.DETERMINISTIC_ENGINE.value
+
+
+def test_chat_endpoint_prioritizes_online_consultation_clause_in_multi_sentence_prompt(client):
+    response = client.post(
+        "/api/chat",
+        json={"message": "I may book later. For now, do you provide online consultation?"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["knowledge_source"]["document_id"] == "faq.telemedicine.general"
     assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
 
 

@@ -184,7 +184,7 @@ def test_retrieval_service_matches_bundled_faq_documents():
 
     assert online_consultation_match is not None
     assert online_consultation_match.document.id == "faq.telemedicine.general"
-    assert "online" in online_consultation_match.matched_terms
+    assert "do you provide online consultation" in online_consultation_match.matched_terms
 
     assert payment_match is not None
     assert payment_match.document.id == "faq.payment.methods"
@@ -326,7 +326,26 @@ def test_retrieval_service_prioritizes_keyword_and_alias_matches_over_body_only_
 
     assert match is not None
     assert match.document.id == "faq.telemedicine"
-    assert "online" in match.matched_terms
+    assert "do you provide online consultation" in match.matched_terms
+
+
+def test_retrieval_service_returns_none_for_weak_single_token_overlap(tmp_path):
+    _write_markdown(
+        tmp_path / "faq" / "telemedicine.md",
+        document_id="faq.telemedicine",
+        title="Telemedicine Appointments",
+        summary="Remote visits supported by video.",
+        content="Telemedicine is an online doctor consultation.",
+        tags=["telemedicine"],
+        keywords=["online consultation"],
+        aliases=["do you provide online consultation"],
+        category="telemedicine",
+    )
+
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(tmp_path))
+    service = KnowledgeRetrievalService(repository)
+
+    assert service.retrieve_top("Can you refill my prescription online?") is None
 
 
 def test_retrieval_service_returns_none_for_no_match(tmp_path):

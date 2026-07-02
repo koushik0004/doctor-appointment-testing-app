@@ -40,6 +40,7 @@ _STOPWORDS = {
     "my",
     "need",
     "of",
+    "online",
     "on",
     "provide",
     "provided",
@@ -79,13 +80,14 @@ class KnowledgeRetrievalService:
 
     def retrieve_top_match(self, query: str) -> KnowledgeRetrievalMatch | None:
         query_terms = _tokenize(query)
-        if not query_terms:
+        normalized_query = _normalize_free_text(query)
+        if not query_terms and not normalized_query:
             return None
 
         matches = [
             match
             for document in self._repository.all()
-            if (match := self._score_document(document, query_terms)) is not None
+            if (match := self._score_document(document, query_terms, normalized_query)) is not None
         ]
         if not matches:
             return None
@@ -99,6 +101,7 @@ class KnowledgeRetrievalService:
         self,
         document: KnowledgeDocument,
         query_terms: tuple[str, ...],
+        normalized_query: str,
     ) -> KnowledgeRetrievalMatch | None:
         title_terms = set(_tokenize(document.title))
         alias_terms = _document_alias_terms(document)
@@ -106,6 +109,19 @@ class KnowledgeRetrievalService:
         synonym_terms = _document_terms(document.synonyms)
         category_terms = _tokenize_scalar(document.category)
         body_terms = _document_body_terms(document)
+        title_phrase_labels = _matching_phrase_labels(normalized_query, [document.title])
+        alias_phrase_labels = _matching_phrase_labels(normalized_query, document.aliases)
+        keyword_phrase_labels = _matching_phrase_labels(normalized_query, document.keywords)
+        synonym_phrase_labels = _matching_phrase_labels(normalized_query, document.synonyms)
+        category_phrase_labels = _matching_phrase_labels(
+            normalized_query,
+            [document.category] if document.category else [],
+        )
+        title_phrase_match = bool(title_phrase_labels)
+        alias_phrase_match = bool(alias_phrase_labels)
+        keyword_phrase_match = bool(keyword_phrase_labels)
+        synonym_phrase_match = bool(synonym_phrase_labels)
+        category_phrase_match = bool(category_phrase_labels)
 
         matched_title_terms = set(query_terms).intersection(title_terms)
         matched_alias_terms = set(query_terms).intersection(alias_terms)
@@ -115,6 +131,11 @@ class KnowledgeRetrievalService:
         matched_body_terms = set(query_terms).intersection(body_terms)
         if not any(
             (
+                title_phrase_match,
+                alias_phrase_match,
+                keyword_phrase_match,
+                synonym_phrase_match,
+                category_phrase_match,
                 matched_title_terms,
                 matched_alias_terms,
                 matched_keyword_terms,
@@ -126,7 +147,12 @@ class KnowledgeRetrievalService:
             return None
 
         score = (
-            (len(matched_title_terms) * 50)
+            (120 if title_phrase_match else 0)
+            + (140 if alias_phrase_match else 0)
+            + (100 if keyword_phrase_match else 0)
+            + (80 if synonym_phrase_match else 0)
+            + (40 if category_phrase_match else 0)
+            + (len(matched_title_terms) * 50)
             + (len(matched_alias_terms) * 45)
             + (len(matched_keyword_terms) * 30)
             + (len(matched_synonym_terms) * 20)
@@ -141,6 +167,11 @@ class KnowledgeRetrievalService:
                 .union(matched_synonym_terms)
                 .union(matched_category_terms)
                 .union(matched_body_terms)
+                .union(title_phrase_labels)
+                .union(alias_phrase_labels)
+                .union(keyword_phrase_labels)
+                .union(synonym_phrase_labels)
+                .union(category_phrase_labels)
             )
         )
         return KnowledgeRetrievalMatch(document=document, score=score, matched_terms=matched_terms)
@@ -158,6 +189,17 @@ def _tokenize_scalar(value: str | None) -> set[str]:
     if not value:
         return set()
     return set(_tokenize(value))
+
+
+def _matching_phrase_labels(query: str, phrases: list[str]) -> set[str]:
+    if not query:
+        return set()
+    matches: set[str] = set()
+    for phrase in phrases:
+        normalized_phrase = _normalize_free_text(phrase)
+        if normalized_phrase and normalized_phrase in query:
+            matches.add(normalized_phrase)
+    return matches
 
 
 def _document_body_terms(document: KnowledgeDocument) -> set[str]:
@@ -192,6 +234,10 @@ def _stringify_content(content: str | dict[str, Any]) -> list[str]:
 def _tokenize(text: str) -> tuple[str, ...]:
     tokens = [_normalize_token(token) for token in _TOKEN_PATTERN.findall(text.lower())]
     return tuple(token for token in tokens if token and token not in _STOPWORDS)
+
+
+def _normalize_free_text(text: str) -> str:
+    return " ".join(_TOKEN_PATTERN.findall(text.lower()))
 
 
 def _normalize_token(token: str) -> str:
