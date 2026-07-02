@@ -62,9 +62,9 @@ def extract_specialization(normalized_message: str) -> str | None:
 
 
 def extract_gender(normalized_message: str) -> str | None:
-    if any(keyword in normalized_message for keyword in ("female", "woman", "women", "lady")):
+    if re.search(r"\b(?:female|woman|women|lady)\b", normalized_message):
         return "Female"
-    if any(keyword in normalized_message for keyword in ("male", "man", "men", "gentleman")):
+    if re.search(r"\b(?:male|man|men|gentleman)\b", normalized_message):
         return "Male"
     return None
 

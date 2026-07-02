@@ -121,7 +121,8 @@
   - Displays a minimal knowledge-source footer on assistant text replies in the existing chat widget while preserving workflow cards and booking navigation.
   - Redirects successful chat-driven bookings into the existing appointment confirmation page.
   - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
-  - Supports deterministic top-document retrieval over repository documents with title and keyword matching while filtering broad tokens that would otherwise interfere with doctor-search, availability, fee, or unrelated fallback flows.
+  - Supports deterministic top-document retrieval over repository documents with weighted title, alias, keyword, synonym, category, and body-text matching while filtering broad tokens that would otherwise interfere with doctor-search, availability, fee, or unrelated fallback flows.
+  - Resolves informational FAQ prompts such as online consultation, payment methods, appointment preparation, consultation hours, insurance, and parking through the knowledge layer before the legacy deterministic fallback when no workflow is active.
   - Includes a dedicated manual test checklist that covers positive, negative, edge, regression, workflow, and existing chatbot scenarios.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.

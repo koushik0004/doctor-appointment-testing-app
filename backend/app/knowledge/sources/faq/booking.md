@@ -1,6 +1,7 @@
 ---
 id: faq.booking.general
 title: Booking Appointment Help
+category: booking
 domain: faq
 audience: patient
 status: active
@@ -8,6 +9,15 @@ version: "1.0"
 tags:
   - booking
   - appointment
+keywords:
+  - book appointment
+  - booking help
+  - appointment booking
+synonyms:
+  - schedule appointment
+  - reserve appointment
+aliases:
+  - how do i book an appointment
 priority: 50
 summary: Explains how patients can book appointments through the app.
 prompt_hints:

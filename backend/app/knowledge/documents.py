@@ -45,6 +45,7 @@ class KnowledgePromptHints(BaseModel):
 class KnowledgeDocument(BaseModel):
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
+    category: str | None = None
     source_type: KnowledgeDocumentSourceType
     source_path: str = Field(min_length=1)
     domain: KnowledgeDocumentDomain
@@ -52,6 +53,9 @@ class KnowledgeDocument(BaseModel):
     status: KnowledgeDocumentStatus
     version: str = Field(min_length=1)
     tags: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    synonyms: list[str] = Field(default_factory=list)
+    aliases: list[str] = Field(default_factory=list)
     priority: int = 0
     summary: str = Field(min_length=1)
     content: str | dict[str, Any]

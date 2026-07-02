@@ -27,3 +27,9 @@ def test_extract_chat_search_filters_for_time_preference():
 
     assert filters.specialization == "Pediatrics"
     assert filters.time_preference == "After 5:00 PM"
+
+
+def test_extract_chat_search_filters_does_not_infer_gender_from_payment_methods():
+    filters = extract_chat_search_filters("What payment methods are accepted?")
+
+    assert filters.gender is None

@@ -12,7 +12,9 @@ _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 _STOPWORDS = {
     "about",
     "a",
+    "accepted",
     "after",
+    "all",
     "an",
     "and",
     "are",
@@ -33,10 +35,15 @@ _STOPWORDS = {
     "is",
     "it",
     "me",
+    "method",
+    "methods",
     "my",
     "need",
     "of",
     "on",
+    "provide",
+    "provided",
+    "provides",
     "some",
     "specialization",
     "specializations",
@@ -94,20 +101,66 @@ class KnowledgeRetrievalService:
         query_terms: tuple[str, ...],
     ) -> KnowledgeRetrievalMatch | None:
         title_terms = set(_tokenize(document.title))
-        keyword_terms = _document_keyword_terms(document)
+        alias_terms = _document_alias_terms(document)
+        keyword_terms = _document_terms(document.keywords)
+        synonym_terms = _document_terms(document.synonyms)
+        category_terms = _tokenize_scalar(document.category)
+        body_terms = _document_body_terms(document)
 
         matched_title_terms = set(query_terms).intersection(title_terms)
+        matched_alias_terms = set(query_terms).intersection(alias_terms)
         matched_keyword_terms = set(query_terms).intersection(keyword_terms)
-        if not matched_title_terms and not matched_keyword_terms:
+        matched_synonym_terms = set(query_terms).intersection(synonym_terms)
+        matched_category_terms = set(query_terms).intersection(category_terms)
+        matched_body_terms = set(query_terms).intersection(body_terms)
+        if not any(
+            (
+                matched_title_terms,
+                matched_alias_terms,
+                matched_keyword_terms,
+                matched_synonym_terms,
+                matched_category_terms,
+                matched_body_terms,
+            )
+        ):
             return None
 
-        # Title hits should beat content-only keyword hits for direct user questions.
-        score = (len(matched_title_terms) * 10) + len(matched_keyword_terms)
-        matched_terms = tuple(sorted(matched_title_terms.union(matched_keyword_terms)))
+        score = (
+            (len(matched_title_terms) * 50)
+            + (len(matched_alias_terms) * 45)
+            + (len(matched_keyword_terms) * 30)
+            + (len(matched_synonym_terms) * 20)
+            + (len(matched_category_terms) * 10)
+            + (len(matched_body_terms) * 5)
+        )
+        matched_terms = tuple(
+            sorted(
+                matched_title_terms
+                .union(matched_alias_terms)
+                .union(matched_keyword_terms)
+                .union(matched_synonym_terms)
+                .union(matched_category_terms)
+                .union(matched_body_terms)
+            )
+        )
         return KnowledgeRetrievalMatch(document=document, score=score, matched_terms=matched_terms)
 
 
-def _document_keyword_terms(document: KnowledgeDocument) -> set[str]:
+def _document_alias_terms(document: KnowledgeDocument) -> set[str]:
+    return _document_terms(document.aliases)
+
+
+def _document_terms(values: list[str]) -> set[str]:
+    return set(_tokenize(" ".join(values)))
+
+
+def _tokenize_scalar(value: str | None) -> set[str]:
+    if not value:
+        return set()
+    return set(_tokenize(value))
+
+
+def _document_body_terms(document: KnowledgeDocument) -> set[str]:
     text_parts = [
         document.summary,
         *_stringify_content(document.content),

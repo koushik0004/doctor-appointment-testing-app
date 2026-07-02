@@ -1,6 +1,7 @@
 ---
 id: faq.preparation.general
 title: Appointment Preparation Guide
+category: appointment_preparation
 domain: faq
 audience: patient
 status: active
@@ -9,6 +10,16 @@ tags:
   - appointment
   - preparation
   - before-visit
+keywords:
+  - appointment preparation
+  - prepare for appointment
+  - before appointment
+  - visit checklist
+synonyms:
+  - getting ready for appointment
+  - pre visit preparation
+aliases:
+  - how do i prepare before my appointment
 priority: 45
 summary: Explains how patients should prepare before an appointment.
 prompt_hints:

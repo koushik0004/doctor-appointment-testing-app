@@ -75,19 +75,19 @@
 - `backend/app/services/chat_intent_detector.py`
   - Intent classification entry point for chat behavior, including doctor-profile/detail query routing.
 - `backend/app/services/chat_entity_extractor.py`
-  - Extracts specialization, gender, fee, location, date, and time preferences from messages.
+  - Extracts specialization, gender, fee, location, date, and time preferences from messages; word-boundary matching now avoids false gender inference on unrelated informational prompts such as payment-method questions.
 - `backend/app/services/schedule_service.py`
   - Slot-generation rules that shape both booking and chat availability results.
 - `backend/app/knowledge/documents.py`
-  - Typed Vector-less RAG knowledge document schema and prompt hint metadata.
+  - Typed Vector-less RAG knowledge document schema and prompt hint metadata, including additive retrieval fields for `category`, `keywords`, `synonyms`, and `aliases`.
 - `backend/app/knowledge/loader.py`
   - Filesystem loader for repository-local Markdown and JSON knowledge files; performs schema validation and duplicate ID checks.
 - `backend/app/knowledge/repository.py`
   - In-memory cache for loaded knowledge documents with exact ID/domain/tag accessors only.
 - `backend/app/knowledge/retrieval.py`
-  - Deterministic Vector-less RAG retrieval service that scores title matches above summary/content/tag keyword matches, filters overly broad tokens, and returns one top document.
+  - Deterministic Vector-less RAG retrieval service that scores title, alias, keyword, synonym, category, and body-text matches separately, filters overly broad tokens, and returns one top document.
 - `backend/app/knowledge/sources/`
-  - Curated passive Markdown/JSON knowledge sources for future prompt/context work, including booking, cancellation, consultation-hours, telemedicine, and appointment-preparation FAQs.
+  - Curated passive Markdown/JSON knowledge sources for future prompt/context work, including booking, cancellation, consultation-hours, telemedicine, appointment-preparation, payment-methods, insurance, and parking FAQs.
 - `backend/pyproject.toml`
   - Backend package/test configuration, including package-data entries for bundled knowledge Markdown/JSON sources.
 
@@ -115,9 +115,11 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_chat_intent_detector.py`
 - `backend/tests/test_chat_entity_extractor.py`
 - `backend/tests/test_knowledge_repository.py`
-  - Covers Markdown/JSON loading, repository caching, exact filters, and deterministic retrieval matching.
+  - Covers Markdown/JSON loading, repository caching, exact filters, metadata-aware deterministic retrieval matching, and bundled FAQ retrieval expectations.
 - `backend/tests/test_conversation_manager.py`
   - Covers routing order guarantees: workflow-first, knowledge-before-deterministic fallback, and active-workflow exclusion from retrieval.
+- `backend/tests/test_chat_entity_extractor.py`
+  - Covers search-filter extraction regressions, including the payment-method wording that must not infer a doctor-gender filter.
 
 ## High-Value Docs
 

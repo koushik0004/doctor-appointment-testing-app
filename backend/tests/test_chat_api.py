@@ -271,6 +271,33 @@ def test_chat_endpoint_returns_knowledge_response_before_deterministic_fallback(
     assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
 
 
+def test_chat_endpoint_returns_online_consultation_knowledge_response(client):
+    response = client.post("/api/chat", json={"message": "Do you provide online consultation?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Telemedicine Appointments Telemedicine is an online doctor consultation done remotely, usually by video. When a doctor supports it, you can choose a telemedicine appointment type instead of an in-person visit."
+    )
+    assert payload["knowledge_source"]["document_id"] == "faq.telemedicine.general"
+    assert "online" in payload["knowledge_source"]["matched_terms"]
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
+def test_chat_endpoint_returns_payment_methods_knowledge_response(client):
+    response = client.post("/api/chat", json={"message": "What payment methods are accepted?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Payment Methods Patients can usually complete a booking using supported online payment options shown in the app, such as card-based checkout when enabled for that appointment flow. Always check the final booking screen for the currently available payment methods."
+    )
+    assert payload["knowledge_source"]["document_id"] == "faq.payment.methods"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
 def test_chat_endpoint_falls_back_to_deterministic_when_no_knowledge_exists(client):
     response = client.post("/api/chat", json={"message": "Do you support pharmacy refills?"})
 

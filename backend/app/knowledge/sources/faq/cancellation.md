@@ -1,6 +1,7 @@
 ---
 id: faq.cancellation.general
 title: Cancellation Guidance
+category: cancellation
 domain: faq
 audience: patient
 status: active
@@ -8,6 +9,13 @@ version: "1.0"
 tags:
   - cancellation
   - appointment
+keywords:
+  - cancel appointment
+  - cancellation help
+  - reschedule visit
+synonyms:
+  - cancel booking
+  - change appointment
 priority: 40
 summary: Explains the current cancellation guidance for appointment bookings.
 prompt_hints:

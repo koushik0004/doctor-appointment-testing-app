@@ -18,12 +18,19 @@ def _write_valid_markdown(path: Path, *, document_id: str = "faq.test") -> None:
         f"""---
 id: {document_id}
 title: Test FAQ
+category: general
 domain: faq
 audience: patient
 status: active
 version: "1.0"
 tags:
   - test
+keywords:
+  - test faq
+synonyms:
+  - sample faq
+aliases:
+  - help test
 priority: 10
 summary: Test FAQ summary.
 prompt_hints:
@@ -49,11 +56,15 @@ def _write_valid_json(path: Path) -> None:
         """{
   "id": "capabilities.test",
   "title": "Test Capabilities",
+  "category": "assistant",
   "domain": "capability",
   "audience": "assistant",
   "status": "active",
   "version": "1.0",
   "tags": ["test", "capability"],
+  "keywords": ["assistant capabilities"],
+  "synonyms": ["assistant help"],
+  "aliases": ["what can you do"],
   "priority": 20,
   "summary": "Test capability summary.",
   "content": {
@@ -73,21 +84,35 @@ def _write_markdown(
     summary: str,
     content: str,
     tags: list[str] | None = None,
+    keywords: list[str] | None = None,
+    synonyms: list[str] | None = None,
+    aliases: list[str] | None = None,
+    category: str = "general",
     priority: int = 10,
     status: str = "active",
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tag_lines = "\n".join(f"  - {tag}" for tag in tags or [])
+    keyword_lines = "\n".join(f"  - {keyword}" for keyword in keywords or [])
+    synonym_lines = "\n".join(f"  - {synonym}" for synonym in synonyms or [])
+    alias_lines = "\n".join(f"  - {alias}" for alias in aliases or [])
     path.write_text(
         f"""---
 id: {document_id}
 title: {title}
+category: {category}
 domain: faq
 audience: patient
 status: {status}
 version: "1.0"
 tags:
 {tag_lines}
+keywords:
+{keyword_lines}
+synonyms:
+{synonym_lines}
+aliases:
+{alias_lines}
 priority: {priority}
 summary: {summary}
 ---
@@ -109,9 +134,14 @@ def test_loader_loads_markdown_and_json_documents(tmp_path):
     assert markdown.source_type == KnowledgeDocumentSourceType.MARKDOWN
     assert markdown.source_path == "faq/booking.md"
     assert markdown.content.startswith("# Test FAQ")
+    assert markdown.category == "general"
+    assert markdown.keywords == ["test faq"]
+    assert markdown.synonyms == ["sample faq"]
+    assert markdown.aliases == ["help test"]
     assert markdown.prompt_hints is not None
     assert markdown.prompt_hints.safe_to_quote is True
     assert documents[1].source_type == KnowledgeDocumentSourceType.JSON
+    assert documents[1].category == "assistant"
     assert documents[1].content == {"can_help_with": ["tests"]}
 
 
@@ -126,6 +156,9 @@ def test_loader_loads_bundled_sources():
         "capabilities.assistant.v1",
         "faq.booking.general",
         "faq.cancellation.general",
+        "faq.insurance.general",
+        "faq.parking.general",
+        "faq.payment.methods",
         "faq.telemedicine.general",
     }
 
@@ -137,6 +170,8 @@ def test_retrieval_service_matches_bundled_faq_documents():
 
     consultation_match = service.retrieve_top_match("What are your consultation hours?")
     telemedicine_match = service.retrieve_top_match("What is telemedicine?")
+    online_consultation_match = service.retrieve_top_match("Do you provide online consultation?")
+    payment_match = service.retrieve_top_match("What payment methods are accepted?")
     preparation_match = service.retrieve_top_match("How do I prepare before my appointment?")
 
     assert consultation_match is not None
@@ -146,6 +181,14 @@ def test_retrieval_service_matches_bundled_faq_documents():
     assert telemedicine_match is not None
     assert telemedicine_match.document.id == "faq.telemedicine.general"
     assert "telemedicine" in telemedicine_match.matched_terms
+
+    assert online_consultation_match is not None
+    assert online_consultation_match.document.id == "faq.telemedicine.general"
+    assert "online" in online_consultation_match.matched_terms
+
+    assert payment_match is not None
+    assert payment_match.document.id == "faq.payment.methods"
+    assert "payment" in payment_match.matched_terms
 
     assert preparation_match is not None
     assert preparation_match.document.id == "faq.preparation.general"
@@ -214,6 +257,7 @@ def test_retrieval_service_returns_top_title_match(tmp_path):
         summary="General visit scheduling help.",
         content="Patients can choose a doctor and available time.",
         tags=["appointments"],
+        keywords=["book appointment"],
         priority=1,
     )
     _write_markdown(
@@ -223,6 +267,7 @@ def test_retrieval_service_returns_top_title_match(tmp_path):
         summary="Booking fees and appointment payments.",
         content="Patients can ask about appointment fees.",
         tags=["booking"],
+        keywords=["payment questions"],
         priority=50,
     )
 
@@ -250,6 +295,38 @@ def test_retrieval_service_supports_content_keyword_matching(tmp_path):
     assert match is not None
     assert match.document.id == "faq.cancellation"
     assert "cancellation" in match.matched_terms
+
+
+def test_retrieval_service_prioritizes_keyword_and_alias_matches_over_body_only_hits(tmp_path):
+    _write_markdown(
+        tmp_path / "faq" / "booking.md",
+        document_id="faq.booking",
+        title="Booking Appointment Help",
+        summary="Patients can provide contact details during booking.",
+        content="Provide your details to complete the appointment request.",
+        tags=["booking"],
+    )
+    _write_markdown(
+        tmp_path / "faq" / "telemedicine.md",
+        document_id="faq.telemedicine",
+        title="Telemedicine Appointments",
+        summary="Remote visits supported by video.",
+        content="Telemedicine is an online doctor consultation.",
+        tags=["telemedicine"],
+        keywords=["online consultation"],
+        synonyms=["virtual appointment"],
+        aliases=["do you provide online consultation"],
+        category="telemedicine",
+    )
+
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(tmp_path))
+    service = KnowledgeRetrievalService(repository)
+
+    match = service.retrieve_top_match("Do you provide online consultation?")
+
+    assert match is not None
+    assert match.document.id == "faq.telemedicine"
+    assert "online" in match.matched_terms
 
 
 def test_retrieval_service_returns_none_for_no_match(tmp_path):

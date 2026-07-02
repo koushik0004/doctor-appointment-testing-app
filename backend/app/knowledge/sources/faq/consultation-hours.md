@@ -1,6 +1,7 @@
 ---
 id: faq.consultation.hours
 title: Consultation Hours
+category: hours
 domain: faq
 audience: patient
 status: active
@@ -9,6 +10,15 @@ tags:
   - consultation
   - hours
   - schedule
+keywords:
+  - consultation hours
+  - clinic hours
+  - working hours
+synonyms:
+  - opening hours
+  - operating hours
+aliases:
+  - what are your consultation hours
 priority: 35
 summary: Explains how consultation hours work in the app.
 prompt_hints:

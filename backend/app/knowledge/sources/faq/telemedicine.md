@@ -1,6 +1,7 @@
 ---
 id: faq.telemedicine.general
 title: Telemedicine Appointments
+category: telemedicine
 domain: faq
 audience: patient
 status: active
@@ -10,6 +11,18 @@ tags:
   - video
   - online
   - virtual
+keywords:
+  - telemedicine
+  - online consultation
+  - video consultation
+  - virtual appointment
+synonyms:
+  - remote consultation
+  - online doctor visit
+  - virtual doctor appointment
+aliases:
+  - do you provide online consultation
+  - do you offer online consultation
 priority: 48
 summary: Explains what telemedicine means for appointments in the app.
 prompt_hints:

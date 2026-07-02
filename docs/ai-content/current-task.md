@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: improve Phase 4 Vector-less RAG retrieval quality and informational routing
+- Completed on: 2026-07-02
+
+## Outcome
+
+- Knowledge documents now support additive retrieval metadata fields: `category`, `keywords`, `synonyms`, and `aliases`, while remaining backward compatible with existing Markdown and JSON sources.
+- Deterministic retrieval scoring now weights title, alias, keyword, synonym, category, and body-text matches separately so targeted FAQ metadata beats weak incidental body matches.
+- Added bundled FAQ knowledge for payment methods, insurance, and parking, and enriched the existing telemedicine, booking, cancellation, consultation-hours, and appointment-preparation documents with retrieval metadata.
+- Fixed a narrow entity-extraction bug where substring matching inside words such as `methods` incorrectly produced `gender=Male`, which previously diverted payment-method questions into doctor search.
+- Verified informational prompts now return knowledge-backed responses for online consultation, payment methods, appointment preparation, and consultation hours while booking workflows still route through the workflow engine unchanged.
+
+## Prior Work
+
+- Status: completed
 - Task: fix Phase 4 Vector-less RAG routing so knowledge answers win before deterministic fallback
 - Completed on: 2026-07-02
 
