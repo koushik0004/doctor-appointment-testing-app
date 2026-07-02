@@ -182,17 +182,15 @@ def test_chat_endpoint_returns_appointment_help_response(client):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["intent"] == ChatIntent.APPOINTMENT_HELP.value
-    assert payload["message"] == "Here is how to book an appointment in the app."
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Booking Appointment Help Patients can choose a doctor, select an available date and time, provide contact details, and confirm the appointment."
+    )
     assert payload["response"] == payload["message"]
     assert payload["data"] == []
-    assert payload["help_steps"] == [
-        "Choose a doctor.",
-        "Select an available date.",
-        "Choose a time slot.",
-        "Enter patient details.",
-        "Confirm the appointment.",
-    ]
+    assert payload["help_steps"] == []
+    assert payload["knowledge_source"]["document_id"] == "faq.booking.general"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
 
 
 def test_chat_endpoint_returns_cancellation_help_response(client):
@@ -257,6 +255,44 @@ def test_chat_service_returns_available_specialties(client):
     assert result.data == []
     assert result.conversation is not None
     assert result.conversation.routed_to == ChatRoutingTarget.DETERMINISTIC_ENGINE
+
+
+def test_chat_endpoint_returns_knowledge_response_before_deterministic_fallback(client):
+    response = client.post("/api/chat", json={"message": "What is telemedicine?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Telemedicine Appointments Telemedicine is an online doctor consultation done remotely, usually by video. When a doctor supports it, you can choose a telemedicine appointment type instead of an in-person visit."
+    )
+    assert payload["response"] == payload["message"]
+    assert payload["knowledge_source"]["document_id"] == "faq.telemedicine.general"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
+def test_chat_endpoint_falls_back_to_deterministic_when_no_knowledge_exists(client):
+    response = client.post("/api/chat", json={"message": "Do you support pharmacy refills?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "I can help with available doctors, specializations, consultation fees, and appointment slots."
+    )
+    assert payload["knowledge_source"] is None
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.DETERMINISTIC_ENGINE.value
+
+
+def test_chat_endpoint_keeps_workflow_routing_ahead_of_knowledge(client):
+    response = client.post("/api/chat", json={"message": "Book an appointment with Dr. Sarah Jenkins tomorrow at 10 AM"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["workflow"] is not None
+    assert payload["knowledge_source"] is None
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.WORKFLOW_ENGINE.value
 
 
 def test_chat_service_maintains_conversation_filters_across_turns(client):

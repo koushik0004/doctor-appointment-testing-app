@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: fix Phase 4 Vector-less RAG routing so knowledge answers win before deterministic fallback
+- Completed on: 2026-07-02
+
+## Outcome
+
+- `ConversationManager` now keeps workflow responses first, but returns a knowledge-backed response before the legacy deterministic chatbot for FAQ-style non-workflow turns.
+- Knowledge-backed replies now route consistently with populated `knowledge_source` metadata instead of depending on the generic unknown fallback text.
+- Retrieval token filtering was tightened so broad words such as `appointment`, `consultation`, `available`, and `support` do not hijack doctor search, availability, fee, or unrelated fallback flows.
+- Added bundled FAQ knowledge documents for consultation hours, telemedicine, and appointment preparation so the documented manual-test examples resolve to real repository content.
+- Added focused regression coverage for conversation-manager ordering plus repository and API verification of knowledge-hit, no-match fallback, and workflow-first behavior.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 4.7 Manual Test Support for Vector-less RAG prototype
 - Completed on: 2026-07-01
 
@@ -40,26 +54,16 @@
 
 ## Required Files for This Task
 
-- `frontend/components/layout/GlobalAiWidget.tsx`
-- `frontend/lib/ai-widget/components/MessageContentRenderer.tsx`
-- `frontend/lib/ai-widget/services/chat-response-mapper.ts`
-- `frontend/lib/ai-widget/types/chat.ts`
-- `frontend/lib/ai-widget/types/message.ts`
-- `backend/app/knowledge/documents.py`
-- `backend/app/knowledge/loader.py`
 - `backend/app/knowledge/repository.py`
 - `backend/app/knowledge/retrieval.py`
 - `backend/app/knowledge/sources/`
-- `backend/app/schemas/chat.py`
-- `backend/app/services/chat_service.py`
 - `backend/app/services/conversation_manager.py`
+- `backend/tests/test_conversation_manager.py`
 - `backend/tests/test_knowledge_repository.py`
 - `backend/tests/test_chat_api.py`
-- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 
 ## Notes
 
-- `ConversationManager` now consults `KnowledgeRetrievalService` only when no workflow is active.
-- Knowledge-backed chat replies now carry optional `knowledge_source` metadata with document identity, source path, and deterministic match details.
-- Token normalization is intentionally small and deterministic; it handles common suffixes such as plural `s` and `ing`, while filtering very broad stopwords to avoid stealing the generic fallback.
-- Validate with `backend/.venv/bin/python -m pytest backend/tests/test_knowledge_repository.py backend/tests/test_chat_api.py backend/tests/test_chat_intent_detector.py` when changing this area.
+- `ConversationManager` should preserve workflow ownership, use knowledge only for FAQ-style non-workflow turns, and then fall back to the deterministic chatbot when retrieval returns no usable match.
+- Broad retrieval tokens are intentionally filtered to keep structured doctor/availability/fee flows deterministic.
+- Validate with `backend/.venv/bin/python -m pytest backend/tests/test_conversation_manager.py backend/tests/test_knowledge_repository.py backend/tests/test_chat_api.py` when changing this area.

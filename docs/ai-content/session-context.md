@@ -13,7 +13,8 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Doctor-details chat routing now explicitly handles partial `Dr. <first-name>` mentions and `Who is Dr. ...` profile queries in the deterministic fallback path.
 - Active booking chat workflows now retain ownership across incremental turns, preserve merged draft fields in conversation metadata, and auto-complete booking once all mandatory fields are present.
 - The frontend AI widget now redirects directly to `/appointments/confirmation` after a successful chat booking using the returned workflow payload plus the existing booking store.
-- Vector-less RAG Phase 4 has backend knowledge components under `backend/app/knowledge/`: a Markdown/JSON repository cache plus a deterministic retrieval service that returns the top title/keyword match. `ConversationManager` now consults it only when no workflow is active, returns optional `knowledge_source` metadata on knowledge-backed chat replies, and still falls back to the existing deterministic chat engine when no knowledge document is selected.
+- Vector-less RAG Phase 4 has backend knowledge components under `backend/app/knowledge/`: a Markdown/JSON repository cache plus a deterministic retrieval service that returns the top title/keyword match. `ConversationManager` now preserves workflow-first behavior, uses knowledge responses before the legacy deterministic chatbot for FAQ-style non-workflow turns, returns optional `knowledge_source` metadata on those replies, and still falls back to the existing deterministic chat engine when retrieval returns no usable match.
+- Bundled knowledge coverage now includes booking help, cancellation guidance, consultation hours, telemedicine, appointment preparation, and assistant capabilities; retrieval token filtering excludes broad terms that previously stole doctor search, availability, fee, and unrelated fallback requests.
 - The frontend AI widget now surfaces optional `knowledge_source` metadata on assistant text replies with a minimal source footer while leaving structured workflow cards unchanged.
 - Phase 4.7 added a dedicated manual test checklist for the Vector-less RAG prototype covering positive, negative, edge, regression, workflow, and existing chatbot scenarios.
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
@@ -47,6 +48,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - Backend entry/router: `backend/app/main.py`, `backend/app/api/router.py`, `backend/app/db/database.py`
 - Booking/chat services: `backend/app/services/availability_service.py`, `backend/app/services/appointment_service.py`, `backend/app/services/conversation_manager.py`, `backend/app/services/workflow_engine.py`, `backend/app/services/chat_service.py`
 - Knowledge components: `backend/app/knowledge/documents.py`, `backend/app/knowledge/loader.py`, `backend/app/knowledge/repository.py`, `backend/app/knowledge/retrieval.py`, `backend/app/knowledge/sources/`
+- Routing regression tests: `backend/tests/test_conversation_manager.py`, `backend/tests/test_knowledge_repository.py`, `backend/tests/test_chat_api.py`
 - Chat booking frontend handoff: `frontend/components/layout/GlobalAiWidget.tsx`, `frontend/stores/booking-store.ts`
 
 ## Commands To Run

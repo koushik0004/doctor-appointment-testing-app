@@ -59,7 +59,7 @@
 - `backend/app/api/chat.py`
   - Chat endpoints for `/api/chat` and `/api/v1/chat`.
 - `backend/app/services/conversation_manager.py`
-  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, routes between workflow execution and deterministic fallback, and consults knowledge retrieval only when no workflow is active.
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, and uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns.
 - `backend/app/services/workflow_engine.py`
   - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation.
 - `backend/app/services/doctor_service.py`
@@ -85,9 +85,9 @@
 - `backend/app/knowledge/repository.py`
   - In-memory cache for loaded knowledge documents with exact ID/domain/tag accessors only.
 - `backend/app/knowledge/retrieval.py`
-  - Deterministic Vector-less RAG retrieval service that scores title matches above summary/content/tag keyword matches and returns one top document.
+  - Deterministic Vector-less RAG retrieval service that scores title matches above summary/content/tag keyword matches, filters overly broad tokens, and returns one top document.
 - `backend/app/knowledge/sources/`
-  - Curated passive Markdown/JSON knowledge sources for future prompt/context work.
+  - Curated passive Markdown/JSON knowledge sources for future prompt/context work, including booking, cancellation, consultation-hours, telemedicine, and appointment-preparation FAQs.
 - `backend/pyproject.toml`
   - Backend package/test configuration, including package-data entries for bundled knowledge Markdown/JSON sources.
 
@@ -116,6 +116,8 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_chat_entity_extractor.py`
 - `backend/tests/test_knowledge_repository.py`
   - Covers Markdown/JSON loading, repository caching, exact filters, and deterministic retrieval matching.
+- `backend/tests/test_conversation_manager.py`
+  - Covers routing order guarantees: workflow-first, knowledge-before-deterministic fallback, and active-workflow exclusion from retrieval.
 
 ## High-Value Docs
 

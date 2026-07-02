@@ -121,10 +121,35 @@ def test_loader_loads_bundled_sources():
     documents = FileSystemKnowledgeLoader(sources_root).load()
 
     assert {document.id for document in documents} == {
+        "faq.consultation.hours",
+        "faq.preparation.general",
         "capabilities.assistant.v1",
         "faq.booking.general",
         "faq.cancellation.general",
+        "faq.telemedicine.general",
     }
+
+
+def test_retrieval_service_matches_bundled_faq_documents():
+    sources_root = Path(__file__).resolve().parents[1] / "app" / "knowledge" / "sources"
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(sources_root))
+    service = KnowledgeRetrievalService(repository)
+
+    consultation_match = service.retrieve_top_match("What are your consultation hours?")
+    telemedicine_match = service.retrieve_top_match("What is telemedicine?")
+    preparation_match = service.retrieve_top_match("How do I prepare before my appointment?")
+
+    assert consultation_match is not None
+    assert consultation_match.document.id == "faq.consultation.hours"
+    assert "hour" in consultation_match.matched_terms
+
+    assert telemedicine_match is not None
+    assert telemedicine_match.document.id == "faq.telemedicine.general"
+    assert "telemedicine" in telemedicine_match.matched_terms
+
+    assert preparation_match is not None
+    assert preparation_match.document.id == "faq.preparation.general"
+    assert "prepare" in preparation_match.matched_terms
 
 
 def test_repository_caches_documents_until_forced_reload(tmp_path):

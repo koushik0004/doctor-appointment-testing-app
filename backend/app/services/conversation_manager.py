@@ -25,11 +25,6 @@ from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_inten
 from app.services.workflow_engine import WorkflowEngine
 
 
-_GENERIC_UNKNOWN_MESSAGE = (
-    "I can help with available doctors, specializations, consultation fees, and appointment slots."
-)
-
-
 def _join_english_list(items: list[str]) -> str:
     if not items:
         return ""
@@ -226,6 +221,10 @@ def _knowledge_source_from_match(knowledge_match: KnowledgeRetrievalMatch) -> Ch
     )
 
 
+def _should_use_knowledge_response(intent_match: ChatIntentMatch) -> bool:
+    return intent_match.intent in {ChatIntent.UNKNOWN, ChatIntent.APPOINTMENT_HELP}
+
+
 class ConversationManager:
     def __init__(
         self,
@@ -242,6 +241,8 @@ class ConversationManager:
     def _resolve_route(self, response: ChatResponse) -> ChatRoutingTarget:
         if response.workflow is not None:
             return ChatRoutingTarget.WORKFLOW_ENGINE
+        if response.knowledge_source is not None:
+            return ChatRoutingTarget.FUTURE_AI_LAYER
         return ChatRoutingTarget.DETERMINISTIC_ENGINE
 
     def _retrieve_knowledge_match(self, message: str, base_context: ChatConversationContext) -> KnowledgeRetrievalMatch | None:
@@ -253,6 +254,7 @@ class ConversationManager:
         base_context = _build_context_from_request(request.conversation)
         current_filters = extract_chat_search_filters(request.message)
         resolved_filters = _merge_search_filters(base_context.active_filters, current_filters)
+        intent_match = detect_chat_intent(request.message)
         knowledge_match = self._retrieve_knowledge_match(request.message, base_context)
         response = self._workflow_engine.handle(
             request.message,
@@ -260,39 +262,24 @@ class ConversationManager:
             search_filters=resolved_filters,
         )
         if response is None:
-            intent_match = detect_chat_intent(request.message)
-            response = self._deterministic_engine.generate(
-                request.message,
-                intent_match=intent_match,
-                search_filters=resolved_filters,
-                selected_doctor_name=base_context.selected_doctor_name,
-                conversation_context=base_context,
-            )
-            if (
-                knowledge_match is not None
-                and response.intent == ChatIntent.UNKNOWN
-                and response.message == _GENERIC_UNKNOWN_MESSAGE
-            ):
+            if knowledge_match is not None and _should_use_knowledge_response(intent_match):
                 response = ChatResponse(
                     intent=ChatIntent.UNKNOWN,
                     message=_knowledge_document_message(knowledge_match.document),
-                    data=response.data,
-                    search_filters=response.search_filters,
-                    help_steps=response.help_steps,
+                    data=[],
+                    search_filters=resolved_filters,
+                    help_steps=[],
                     knowledge_source=_knowledge_source_from_match(knowledge_match),
-                    workflow=response.workflow,
+                )
+            else:
+                response = self._deterministic_engine.generate(
+                    request.message,
+                    intent_match=intent_match,
+                    search_filters=resolved_filters,
+                    selected_doctor_name=base_context.selected_doctor_name,
+                    conversation_context=base_context,
                 )
         routed_to = self._resolve_route(response)
-        if (
-            knowledge_match is not None
-            and response.workflow is None
-            and response.intent == ChatIntent.UNKNOWN
-            and response.message != _GENERIC_UNKNOWN_MESSAGE
-            and not response.message.startswith("Hello, I am your AI Assistant.")
-            and not response.message.startswith("Available specializations:")
-        ):
-            routed_to = ChatRoutingTarget.FUTURE_AI_LAYER
-
         selected_doctor_id, selected_doctor_name = _resolve_selected_doctor(
             response,
             base_context.selected_doctor_id,
