@@ -70,9 +70,11 @@ def _extract_patient_phone(message: str) -> str | None:
 
 def _extract_patient_name(message: str) -> str | None:
     patterns = (
-        r"\bmy name is\s+([A-Za-z]+(?:\s+[A-Za-z]+){1,3})\b",
-        r"\bi am\s+([A-Za-z]+(?:\s+[A-Za-z]+){1,3})\b",
-        r"\bfor\s+([A-Za-z]+(?:\s+[A-Za-z]+){1,3})\b",
+        r"\bmy name is\s+([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\bi am\s+([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\bfor\s+([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\b(?:patient\s+)?full name\s*[:\-]\s*([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\b(?:patient\s+)?name\s*[:\-]\s*([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
     )
     for pattern in patterns:
         match = re.search(pattern, message, re.IGNORECASE)
@@ -144,6 +146,10 @@ def _find_matching_doctor(message: str, doctors: list[DoctorResponse]) -> Doctor
         if _doctor_matches_query(doctor, message):
             return doctor
     return None
+
+
+def _contains_doctor_reference(message: str) -> bool:
+    return re.search(r"\bdr\.?\s+[A-Za-z]+(?:\s+[A-Za-z]+){0,2}\b", message, re.IGNORECASE) is not None
 
 
 def _resolve_doctor_from_context(
@@ -232,7 +238,7 @@ def _looks_like_workflow_follow_up(message: str) -> bool:
             extract_target_date(normalized_message),
             _extract_health_description(message),
         )
-    )
+    ) or _contains_doctor_reference(message)
 
 
 def _resolve_workflow_type(

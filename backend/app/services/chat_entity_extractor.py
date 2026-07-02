@@ -115,6 +115,52 @@ def extract_target_date(normalized_message: str) -> date | None:
     if "today" in normalized_message:
         return today
 
+    for numeric_pattern in (
+        r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b",
+        r"\b(\d{1,2})\s+(\d{1,2})\s+(\d{4})\b",
+    ):
+        numeric_match = re.search(numeric_pattern, normalized_message)
+        if not numeric_match:
+            continue
+        day_value = int(numeric_match.group(1))
+        month_value = int(numeric_match.group(2))
+        year_value = int(numeric_match.group(3))
+        try:
+            return date(year_value, month_value, day_value)
+        except ValueError:
+            return None
+
+    month_names = (
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+    )
+    ordinal_free_message = re.sub(r"\b(\d{1,2})(st|nd|rd|th)\b", r"\1", normalized_message)
+    explicit_date_patterns = (
+        r"\b(\d{1,2})\s+(" + "|".join(month_names) + r")\s+(\d{4})\b",
+        r"\b(" + "|".join(month_names) + r")\s+(\d{1,2})\s+(\d{4})\b",
+    )
+    for pattern in explicit_date_patterns:
+        explicit_match = re.search(pattern, ordinal_free_message)
+        if not explicit_match:
+            continue
+        try:
+            return datetime.strptime(explicit_match.group(0), "%d %B %Y").date()
+        except ValueError:
+            try:
+                return datetime.strptime(explicit_match.group(0), "%B %d %Y").date()
+            except ValueError:
+                continue
+
     for weekday_name, weekday_index in _WEEKDAY_TO_INDEX.items():
         if weekday_name not in normalized_message:
             continue

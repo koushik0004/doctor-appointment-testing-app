@@ -66,6 +66,14 @@ def _session() -> Session:
     return database_module.get_session_factory()()
 
 
+def _ordinal_day(day: int) -> str:
+    if 10 <= day % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
 def test_chat_endpoint_returns_structured_specialty_response(client):
     response = client.post("/api/chat", json={"message": "Show cardiologists"})
 
@@ -768,6 +776,228 @@ def test_chat_service_continues_booking_workflow_across_incremental_turns(client
     assert final_result.workflow.appointment is not None
     assert final_result.workflow.appointment.patient_name == "John Doe"
     assert final_result.workflow.appointment.confirmation_code.startswith("CN-")
+
+
+def test_chat_service_books_appointment_from_single_structured_message(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        result = create_chat_response(
+            session,
+            ChatRequest(
+                message=(
+                    "Book appointment as below\n\n"
+                    "Dr. Sarah Jenkins\n"
+                    f"{formatted_date}\n"
+                    "10:00 AM\n"
+                    "Patient name: John Doe\n"
+                    "Email: john.doe@example.com"
+                ),
+            ),
+        )
+
+    assert result.intent == ChatIntent.BOOK_APPOINTMENT
+    assert result.workflow is not None
+    assert result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert result.workflow.draft.doctor_name == "Dr. Sarah Jenkins"
+    assert result.workflow.draft.appointment_date == appointment_date
+    assert result.workflow.draft.start_time == "10:00"
+    assert result.workflow.draft.patient_full_name == "John Doe"
+    assert result.workflow.draft.patient_email == "john.doe@example.com"
+    assert result.workflow.appointment is not None
+    assert result.workflow.appointment.patient_name == "John Doe"
+
+
+def test_chat_service_starts_booking_with_doctor_reference_and_merges_one_field_per_turn(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = appointment_date.strftime("%d/%m/%Y")
+
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Book appointment with Dr. Sarah Jenkins"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message=formatted_date,
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                    ],
+                ),
+            ),
+        )
+
+        third_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="10:00 AM",
+                conversation=ChatConversationRequest(
+                    conversation_id=second_result.conversation.conversation_id if second_result.conversation else None,
+                    context=second_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "10:00 AM"},
+                    ],
+                ),
+            ),
+        )
+
+        fourth_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Pandora Kaki",
+                conversation=ChatConversationRequest(
+                    conversation_id=third_result.conversation.conversation_id if third_result.conversation else None,
+                    context=third_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "10:00 AM"},
+                        {"role": "assistant", "text": third_result.message, "intent": third_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                    ],
+                ),
+            ),
+        )
+
+        final_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="pandora.kaki@example.com",
+                conversation=ChatConversationRequest(
+                    conversation_id=fourth_result.conversation.conversation_id if fourth_result.conversation else None,
+                    context=fourth_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "10:00 AM"},
+                        {"role": "assistant", "text": third_result.message, "intent": third_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                        {"role": "assistant", "text": fourth_result.message, "intent": fourth_result.intent},
+                        {"role": "user", "text": "pandora.kaki@example.com"},
+                    ],
+                ),
+            ),
+        )
+
+    assert first_result.workflow is not None
+    assert first_result.workflow.status == ChatWorkflowStatus.INPUT_REQUIRED
+    assert first_result.workflow.draft.doctor_name == "Dr. Sarah Jenkins"
+    assert first_result.workflow.missing_fields == [
+        "appointment_date",
+        "start_time",
+        "patient_full_name",
+        "patient_email",
+    ]
+
+    assert second_result.workflow is not None
+    assert second_result.workflow.draft.appointment_date == appointment_date
+    assert second_result.workflow.missing_fields == [
+        "start_time",
+        "patient_full_name",
+        "patient_email",
+    ]
+    assert second_result.message != first_result.message
+
+    assert third_result.workflow is not None
+    assert third_result.workflow.draft.start_time == "10:00"
+    assert third_result.workflow.missing_fields == [
+        "patient_full_name",
+        "patient_email",
+    ]
+    assert third_result.message != second_result.message
+
+    assert fourth_result.workflow is not None
+    assert fourth_result.workflow.draft.patient_full_name == "Pandora Kaki"
+    assert fourth_result.workflow.missing_fields == ["patient_email"]
+    assert fourth_result.message != third_result.message
+
+    assert final_result.workflow is not None
+    assert final_result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert final_result.workflow.appointment is not None
+    assert final_result.workflow.appointment.patient_name == "Pandora Kaki"
+
+
+def test_chat_service_merges_partial_structured_booking_before_follow_up_fields(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(
+                message=(
+                    "Book appointment as below\n\n"
+                    "Dr. Sarah Jenkins\n"
+                    f"{formatted_date}\n"
+                    "10:00 AM"
+                ),
+            ),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Pandora Kaki",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment as below"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                    ],
+                ),
+            ),
+        )
+
+        final_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="pandora.kaki@example.com",
+                conversation=ChatConversationRequest(
+                    conversation_id=second_result.conversation.conversation_id if second_result.conversation else None,
+                    context=second_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment as below"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "pandora.kaki@example.com"},
+                    ],
+                ),
+            ),
+        )
+
+    assert first_result.workflow is not None
+    assert first_result.workflow.draft.doctor_name == "Dr. Sarah Jenkins"
+    assert first_result.workflow.draft.appointment_date == appointment_date
+    assert first_result.workflow.draft.start_time == "10:00"
+    assert first_result.workflow.missing_fields == ["patient_full_name", "patient_email"]
+
+    assert second_result.workflow is not None
+    assert second_result.workflow.draft.patient_full_name == "Pandora Kaki"
+    assert second_result.workflow.missing_fields == ["patient_email"]
+
+    assert final_result.workflow is not None
+    assert final_result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert final_result.workflow.appointment is not None
+    assert final_result.workflow.appointment.patient_name == "Pandora Kaki"
 
 
 def test_chat_service_cancels_appointment_through_workflow(client):

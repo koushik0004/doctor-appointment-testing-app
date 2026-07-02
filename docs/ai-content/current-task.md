@@ -3,6 +3,21 @@
 ## Active Work
 
 - Status: completed
+- Task: fix Phase 4 booking-workflow entity extraction and continuation regressions
+- Completed on: 2026-07-02
+
+## Outcome
+
+- Deterministic booking extraction now recognizes explicit absolute dates in both textual (`2nd July 2026`) and numeric day-month-year (`02/07/2026`) formats, restoring single-message booking prompts that include doctor, date, and time.
+- Booking workflow entry now accepts direct doctor-reference prompts such as `Book appointment with Dr. Sarah Jenkins`, so one-field-per-turn booking conversations can start without a prior doctor-search turn.
+- Labeled patient-name lines such as `Patient name: John Doe` and `Full name: John Doe` now parse correctly without swallowing the following email label from multi-line structured booking messages.
+- Multi-turn booking continuation now progresses deterministically as newly supplied date, time, patient name, and email values are merged into the active workflow draft before missing-field validation.
+- Added focused regression coverage for explicit-date extraction plus three booking workflow scenarios: complete single-message structured booking, one-field-per-turn continuation, and partial structured booking followed by incremental replies.
+- Revalidated Phase 4 chat coverage with `backend/.venv/bin/python -m pytest backend/tests/test_chat_entity_extractor.py backend/tests/test_knowledge_repository.py backend/tests/test_conversation_manager.py backend/tests/test_chat_api.py -q` (`58 passed`).
+
+## Prior Work
+
+- Status: completed
 - Task: improve Phase 4 Vector-less RAG retrieval quality and informational routing
 - Completed on: 2026-07-02
 
@@ -69,16 +84,15 @@
 
 ## Required Files for This Task
 
-- `backend/app/knowledge/repository.py`
-- `backend/app/knowledge/retrieval.py`
-- `backend/app/knowledge/sources/`
+- `backend/app/services/chat_entity_extractor.py`
+- `backend/app/services/workflow_engine.py`
 - `backend/app/services/conversation_manager.py`
+- `backend/tests/test_chat_entity_extractor.py`
 - `backend/tests/test_conversation_manager.py`
-- `backend/tests/test_knowledge_repository.py`
 - `backend/tests/test_chat_api.py`
 
 ## Notes
 
-- `ConversationManager` should preserve workflow ownership, use knowledge only for FAQ-style non-workflow turns, and then fall back to the deterministic chatbot when retrieval returns no usable match.
-- Broad retrieval tokens are intentionally filtered to keep structured doctor/availability/fee flows deterministic.
-- Validate with `backend/.venv/bin/python -m pytest backend/tests/test_conversation_manager.py backend/tests/test_knowledge_repository.py backend/tests/test_chat_api.py` when changing this area.
+- Keep Phase 3 workflow-first routing intact: `ConversationManager` should continue deferring to the workflow engine before knowledge retrieval or deterministic fallback.
+- Booking regressions in this area are most likely to come from deterministic extraction or draft-merging behavior inside `WorkflowEngine`, not from the Phase 4 knowledge layer.
+- Validate with `backend/.venv/bin/python -m pytest backend/tests/test_chat_entity_extractor.py backend/tests/test_knowledge_repository.py backend/tests/test_conversation_manager.py backend/tests/test_chat_api.py -q` when changing this area.

@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from app.services.chat_entity_extractor import extract_chat_search_filters
+from app.services.chat_entity_extractor import extract_chat_search_filters, extract_target_date, normalize_text
 
 
 def test_extract_chat_search_filters_for_specialty_gender_and_date():
@@ -33,3 +33,15 @@ def test_extract_chat_search_filters_does_not_infer_gender_from_payment_methods(
     filters = extract_chat_search_filters("What payment methods are accepted?")
 
     assert filters.gender is None
+
+
+def test_extract_target_date_from_day_month_year_text():
+    extracted = extract_target_date(normalize_text("Book for 2nd July 2026"))
+
+    assert extracted == date(2026, 7, 2)
+
+
+def test_extract_target_date_from_numeric_day_month_year():
+    extracted = extract_target_date(normalize_text("Book for 02/07/2026"))
+
+    assert extracted == date(2026, 7, 2)

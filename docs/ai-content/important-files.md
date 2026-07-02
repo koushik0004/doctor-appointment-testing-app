@@ -61,7 +61,7 @@
 - `backend/app/services/conversation_manager.py`
   - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, and uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns.
 - `backend/app/services/workflow_engine.py`
-  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation.
+  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
@@ -75,7 +75,7 @@
 - `backend/app/services/chat_intent_detector.py`
   - Intent classification entry point for chat behavior, including doctor-profile/detail query routing.
 - `backend/app/services/chat_entity_extractor.py`
-  - Extracts specialization, gender, fee, location, date, and time preferences from messages; word-boundary matching now avoids false gender inference on unrelated informational prompts such as payment-method questions.
+  - Extracts specialization, gender, fee, location, date, and time preferences from messages; word-boundary matching avoids false gender inference on unrelated informational prompts, and explicit absolute date parsing now supports booking workflow turns such as `2nd July 2026` or `02/07/2026`.
 - `backend/app/services/schedule_service.py`
   - Slot-generation rules that shape both booking and chat availability results.
 - `backend/app/knowledge/documents.py`
