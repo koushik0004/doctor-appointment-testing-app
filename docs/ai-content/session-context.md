@@ -19,6 +19,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - The chat entity extractor now uses word-boundary gender matching, preventing unrelated informational prompts such as `payment methods` from being misclassified as male-doctor searches.
 - Booking extraction now also supports explicit absolute dates (`2nd July 2026`, `02/07/2026`), labeled patient-name lines, and direct `Book appointment with Dr. ...` entry prompts so incremental booking turns progress without repeating stale missing-field prompts.
 - Booking workflow execution now maps expected booking validation failures back into deterministic `BOOK_APPOINTMENT` workflow responses, preserving active draft state for retry instead of letting those cases escape as chat API 500/503 errors.
+- Manual-test booking data now includes a small idempotent seed utility at `backend/scripts/seed_test_data.py`; the July 3, 2026 run inserted three future confirmed appointments and three patients into `backend/app.db` for broader booking/search coverage.
 - The frontend AI widget now surfaces optional `knowledge_source` metadata on assistant text replies with a minimal source footer while leaving structured workflow cards unchanged.
 - Phase 4.7 added a dedicated manual test checklist for the Vector-less RAG prototype covering positive, negative, edge, regression, workflow, and existing chatbot scenarios.
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.

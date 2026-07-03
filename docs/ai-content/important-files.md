@@ -14,6 +14,8 @@
   - Registers all API domains in one place.
 - `backend/app/db/database.py`
   - Engine/session creation, schema initialization, and startup seeding.
+- `backend/scripts/seed_test_data.py`
+  - Idempotent manual-test data seeding utility; books a small set of valid future appointments through the service layer and writes `docs/reports/test-data-report.md`.
 
 ## Core Frontend Feature Files
 
@@ -135,3 +137,5 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/feature-04-confirmation-email.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-04-manual-test-checklist.md`
   - Manual QA checklist for the Vector-less RAG prototype, including positive, negative, edge, regression, workflow, and existing chatbot coverage.
+- `docs/reports/test-data-report.md`
+  - Latest manual-test data execution report with row counts, inserted demo bookings, duplicate handling, and validation notes.

@@ -3,10 +3,24 @@
 ## Active Work
 
 - Status: completed
-- Task: fix Phase 4 booking workflow business-validation failures returning HTTP 500/503
+- Task: seed realistic manual-test data for implemented booking/search workflows
 - Completed on: 2026-07-03
 
 ## Outcome
+
+- Added an idempotent backend utility at `backend/scripts/seed_test_data.py` that seeds a small amount of demo booking data through the existing appointment service instead of raw SQL.
+- Executed the seed run against `backend/app.db`, inserting 3 patients and 3 future confirmed appointments for manual booking/search validation without exceeding the 10-row cap.
+- The new demo data now exercises both `IN_PERSON` and `TELEMEDICINE` appointment types across multiple doctors, improving manual coverage for appointment confirmation and patient search.
+- Generated `docs/reports/test-data-report.md` with inspected-table counts, inserted rows, duplicate detection, validation checks, and remaining demo-data gaps.
+- Confirmed the legacy `doctor_availability` table remains historical only and was intentionally left unchanged because the live booking flow uses generated schedule slots.
+
+## Prior Work
+
+- Status: completed
+- Task: fix Phase 4 booking workflow business-validation failures returning HTTP 500/503
+- Completed on: 2026-07-03
+
+## Prior Outcome
 
 - Booking workflow execution now converts expected booking validation failures into structured chat workflow responses instead of surfacing them as transport errors from `/api/chat`.
 - Covered business validation scenarios include past appointment date, invalid or unavailable appointment time, already-booked slot / duplicate booking, invalid doctor context, and invalid patient email data.
