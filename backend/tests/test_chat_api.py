@@ -1000,6 +1000,230 @@ def test_chat_service_merges_partial_structured_booking_before_follow_up_fields(
     assert final_result.workflow.appointment.patient_name == "Pandora Kaki"
 
 
+def test_chat_endpoint_returns_structured_response_for_past_booking_date(client):
+    past_date = date.today() - timedelta(days=1)
+    formatted_date = f"{_ordinal_day(past_date.day)} {past_date.strftime('%B %Y')}"
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "I can't book an appointment in the past. Please share a future appointment date."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["appointment_date"]
+    assert payload["workflow"]["draft"]["doctor_name"] == "Dr. Sarah Jenkins"
+    assert payload["workflow"]["draft"]["appointment_date"] is None
+    assert payload["workflow"]["draft"]["start_time"] == "10:00"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.WORKFLOW_ENGINE.value
+    assert payload["conversation"]["current_workflow"]["missing_fields"] == ["appointment_date"]
+
+
+def test_chat_endpoint_returns_structured_response_for_slot_already_booked(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        create_appointment_booking(
+            session,
+            AppointmentCreateRequest(
+                doctor_id=1,
+                appointment_date=appointment_date,
+                start_time="10:00",
+                appointment_type=AppointmentType.IN_PERSON,
+                patient=PatientInput(
+                    full_name="Existing Patient",
+                    email="existing.patient@example.com",
+                    phone="9999999999",
+                ),
+                health_description="Routine checkup.",
+            ),
+        )
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "That appointment slot is already booked. Please share another time."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["start_time"]
+    assert payload["workflow"]["draft"]["appointment_date"] == appointment_date.isoformat()
+    assert payload["workflow"]["draft"]["start_time"] is None
+    assert payload["conversation"]["current_workflow"]["missing_fields"] == ["start_time"]
+
+
+def test_chat_endpoint_returns_structured_response_for_invalid_doctor(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book this appointment on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            ),
+            "conversation": {
+                "conversation_id": "conv-invalid-doctor",
+                "context": {
+                    "conversation_id": "conv-invalid-doctor",
+                    "status": ChatConversationStatus.ACTIVE.value,
+                    "turn_count": 1,
+                    "selected_doctor_id": 999,
+                    "selected_doctor_name": "Dr. Missing",
+                    "routed_to": ChatRoutingTarget.DETERMINISTIC_ENGINE.value,
+                },
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "Book appointment with Dr. Missing",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "I couldn't find that doctor for booking. Please choose a valid doctor."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["doctor"]
+    assert payload["workflow"]["draft"]["doctor_id"] is None
+    assert payload["workflow"]["draft"]["doctor_name"] is None
+    assert payload["conversation"]["current_workflow"]["missing_fields"] == ["doctor"]
+
+
+def test_chat_endpoint_returns_structured_response_for_invalid_appointment_time(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 23:45. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == (
+        "That appointment time is not available for the selected date. Please share another time."
+    )
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["start_time"]
+    assert payload["workflow"]["draft"]["appointment_date"] == appointment_date.isoformat()
+    assert payload["workflow"]["draft"]["start_time"] is None
+
+
+def test_chat_endpoint_returns_structured_response_for_invalid_patient_information(client):
+    appointment_date = date.today() + timedelta(days=1)
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": "Book this appointment",
+            "conversation": {
+                "conversation_id": "conv-invalid-patient",
+                "context": {
+                    "conversation_id": "conv-invalid-patient",
+                    "status": ChatConversationStatus.ACTIVE.value,
+                    "turn_count": 1,
+                    "routed_to": ChatRoutingTarget.WORKFLOW_ENGINE.value,
+                    "current_workflow": {
+                        "workflow_type": ChatWorkflowType.BOOK_APPOINTMENT.value,
+                        "status": ChatWorkflowStatus.INPUT_REQUIRED.value,
+                        "missing_fields": [],
+                        "draft": {
+                            "doctor_id": 1,
+                            "doctor_name": "Dr. Sarah Jenkins",
+                            "appointment_date": appointment_date.isoformat(),
+                            "start_time": "10:00",
+                            "appointment_type": AppointmentType.IN_PERSON.value,
+                            "patient_full_name": "John Doe",
+                            "patient_email": "not-an-email",
+                        },
+                    },
+                },
+                "history": [
+                    {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == (
+        "I couldn't complete the booking because I need a valid patient email."
+    )
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["patient_email"]
+    assert payload["workflow"]["draft"]["patient_full_name"] == "John Doe"
+    assert payload["workflow"]["draft"]["patient_email"] is None
+
+
+def test_chat_endpoint_returns_structured_response_for_duplicate_booking(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        create_appointment_booking(
+            session,
+            AppointmentCreateRequest(
+                doctor_id=1,
+                appointment_date=appointment_date,
+                start_time="10:00",
+                appointment_type=AppointmentType.IN_PERSON,
+                patient=PatientInput(
+                    full_name="John Doe",
+                    email="john.doe@example.com",
+                    phone="9999999999",
+                ),
+                health_description="Routine checkup.",
+            ),
+        )
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "That appointment slot is already booked. Please share another time."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["start_time"]
+
+
 def test_chat_service_cancels_appointment_through_workflow(client):
     with _session() as session:
         created = create_appointment_booking(
@@ -1076,6 +1300,20 @@ def test_chat_service_returns_default_fallback(client):
     )
     assert result.response == result.message
     assert result.data == []
+
+
+def test_chat_endpoint_returns_500_for_unexpected_errors(client, monkeypatch):
+    import app.api.chat as chat_api
+
+    def _raise_unexpected_error(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(chat_api, "create_chat_response", _raise_unexpected_error)
+
+    response = client.post("/api/chat", json={"message": "Hello"})
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Chat service is unavailable."}
 
 
 def test_chat_service_uses_knowledge_retrieval_before_default_fallback(client, monkeypatch):

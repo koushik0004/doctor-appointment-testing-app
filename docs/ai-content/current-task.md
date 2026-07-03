@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: fix Phase 4 booking workflow business-validation failures returning HTTP 500/503
+- Completed on: 2026-07-03
+
+## Outcome
+
+- Booking workflow execution now converts expected booking validation failures into structured chat workflow responses instead of surfacing them as transport errors from `/api/chat`.
+- Covered business validation scenarios include past appointment date, invalid or unavailable appointment time, already-booked slot / duplicate booking, invalid doctor context, and invalid patient email data.
+- Validation responses keep the booking workflow active by preserving valid draft fields, clearing only the invalid field when possible, and returning `INPUT_REQUIRED` workflow state with deterministic next-step guidance.
+- Chat API error handling now re-raises expected `HTTPException` values and reserves HTTP 500 for unexpected system failures instead of wrapping everything as HTTP 503.
+- Added chat endpoint regression coverage for all validation scenarios plus an explicit unexpected-error test, and revalidated the focused Phase 4 backend suite (`65 passed`).
+
+## Prior Work
+
+- Status: completed
 - Task: fix Phase 4 booking-workflow entity extraction and continuation regressions
 - Completed on: 2026-07-02
 

@@ -57,7 +57,7 @@
 - `backend/app/api/appointments.py`
   - Appointment creation, appointment details, and appointment search API surface.
 - `backend/app/api/chat.py`
-  - Chat endpoints for `/api/chat` and `/api/v1/chat`.
+  - Chat endpoints for `/api/chat` and `/api/v1/chat`; expected workflow/business errors should pass through while only unexpected chat failures become HTTP 500 responses.
 - `backend/app/services/conversation_manager.py`
   - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, and uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns.
 - `backend/app/services/workflow_engine.py`

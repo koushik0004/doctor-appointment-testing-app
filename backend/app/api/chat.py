@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.errors import chat_service_error
 from app.db.database import get_db
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat_service import create_chat_response
@@ -13,8 +12,13 @@ versioned_router = APIRouter(prefix="/v1/chat", tags=["chat"])
 def _handle_chat(request: ChatRequest, session: Session) -> ChatResponse:
     try:
         return create_chat_response(session, request)
+    except HTTPException:
+        raise
     except Exception as exc:  # pragma: no cover
-        raise chat_service_error() from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Chat service is unavailable.",
+        ) from exc
 
 
 @router.post("", response_model=ChatResponse)
