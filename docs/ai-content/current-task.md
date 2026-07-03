@@ -3,16 +3,16 @@
 ## Active Work
 
 - Status: completed
-- Task: seed realistic manual-test data for implemented booking/search workflows
+- Task: extend manual-test seed coverage with additional doctor demo data
 - Completed on: 2026-07-03
 
 ## Outcome
 
-- Added an idempotent backend utility at `backend/scripts/seed_test_data.py` that seeds a small amount of demo booking data through the existing appointment service instead of raw SQL.
-- Executed the seed run against `backend/app.db`, inserting 3 patients and 3 future confirmed appointments for manual booking/search validation without exceeding the 10-row cap.
-- The new demo data now exercises both `IN_PERSON` and `TELEMEDICINE` appointment types across multiple doctors, improving manual coverage for appointment confirmation and patient search.
-- Generated `docs/reports/test-data-report.md` with inspected-table counts, inserted rows, duplicate detection, validation checks, and remaining demo-data gaps.
-- Confirmed the legacy `doctor_availability` table remains historical only and was intentionally left unchanged because the live booking flow uses generated schedule slots.
+- Extended `backend/scripts/seed_test_data.py` so it seeds additional doctor profiles before booking records while keeping the global 10-row insertion cap and name-based duplicate prevention.
+- The script now pins its default SQLite target to the absolute `backend/app.db` path, preventing accidental writes to a different relative database when launched from the repo root.
+- Executed the updated seed run against `backend/app.db`, inserting 4 new doctors: Dr. Amelia Foster (Neurology), Dr. Rohan Mehta (Orthopedics), Dr. Grace Okafor (Gynecology), and Dr. Leo Hammond (ENT).
+- Re-verified idempotency with a second execution; no additional rows were inserted once the new doctors and prior appointments already existed.
+- Refreshed `docs/reports/test-data-report.md` with the real inspected-table counts, inserted doctor rows, duplicate skips, validation checks, and remaining demo-data gaps.
 
 ## Prior Work
 
@@ -112,15 +112,13 @@
 
 ## Required Files for This Task
 
-- `backend/app/services/chat_entity_extractor.py`
-- `backend/app/services/workflow_engine.py`
-- `backend/app/services/conversation_manager.py`
-- `backend/tests/test_chat_entity_extractor.py`
-- `backend/tests/test_conversation_manager.py`
-- `backend/tests/test_chat_api.py`
+- `backend/scripts/seed_test_data.py`
+- `backend/app/db/seed.py`
+- `backend/app/models/doctor.py`
+- `docs/reports/test-data-report.md`
 
 ## Notes
 
-- Keep Phase 3 workflow-first routing intact: `ConversationManager` should continue deferring to the workflow engine before knowledge retrieval or deterministic fallback.
-- Booking regressions in this area are most likely to come from deterministic extraction or draft-merging behavior inside `WorkflowEngine`, not from the Phase 4 knowledge layer.
-- Validate with `backend/.venv/bin/python -m pytest backend/tests/test_chat_entity_extractor.py backend/tests/test_knowledge_repository.py backend/tests/test_conversation_manager.py backend/tests/test_chat_api.py -q` when changing this area.
+- The canonical startup seed remains unchanged at 10 doctors so existing backend tests and fixture expectations are not widened implicitly.
+- The manual-test seed utility is now the supported path for enriching the local demo dataset beyond the default startup seed.
+- Running `backend/.venv/bin/python backend/scripts/seed_test_data.py` from either the repo root or `backend/` should now target the same `backend/app.db` file.

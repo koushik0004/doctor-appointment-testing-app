@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_DATABASE_PATH = BACKEND_DIR / "app.db"
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}")
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -20,6 +25,24 @@ from app.services.appointment_service import create_appointment_booking
 
 MAX_INSERTED_ROWS = 10
 REPORT_PATH = Path(__file__).resolve().parents[2] / "docs" / "reports" / "test-data-report.md"
+
+
+@dataclass(frozen=True)
+class DemoDoctor:
+    name: str
+    specialty: str
+    gender: str
+    rating: float
+    review_count: int
+    clinic_name: str
+    location: str
+    consultation_fee_min: int
+    consultation_fee_max: int
+    next_available_slot: str
+    appointment_types: tuple[AppointmentType, ...]
+    languages: tuple[str, ...]
+    description: str
+    image_url: str
 
 
 @dataclass(frozen=True)
@@ -67,6 +90,73 @@ DEMO_BOOKINGS: tuple[DemoBooking, ...] = (
     ),
 )
 
+DEMO_DOCTORS: tuple[DemoDoctor, ...] = (
+    DemoDoctor(
+        name="Dr. Amelia Foster",
+        specialty="Neurology",
+        gender="Female",
+        rating=4.8,
+        review_count=91,
+        clinic_name="Thames Neuro Clinic",
+        location="King's Cross",
+        consultation_fee_min=140,
+        consultation_fee_max=225,
+        next_available_slot="Tuesday, 9:30 AM",
+        appointment_types=(AppointmentType.IN_PERSON, AppointmentType.TELEMEDICINE),
+        languages=("English", "French"),
+        description="Neurologist focused on migraine care, dizziness workups, and long-term nerve health management.",
+        image_url="/avatars/doctor-elena.svg",
+    ),
+    DemoDoctor(
+        name="Dr. Rohan Mehta",
+        specialty="Orthopedics",
+        gender="Male",
+        rating=4.7,
+        review_count=76,
+        clinic_name="Active Joint & Spine Centre",
+        location="Hammersmith",
+        consultation_fee_min=125,
+        consultation_fee_max=205,
+        next_available_slot="Wednesday, 2:15 PM",
+        appointment_types=(AppointmentType.IN_PERSON,),
+        languages=("English", "Hindi"),
+        description="Orthopedic specialist treating sports injuries, knee pain, and post-fracture recovery plans.",
+        image_url="/avatars/doctor-james.svg",
+    ),
+    DemoDoctor(
+        name="Dr. Grace Okafor",
+        specialty="Gynecology",
+        gender="Female",
+        rating=4.9,
+        review_count=134,
+        clinic_name="Bloom Women's Health",
+        location="South Kensington",
+        consultation_fee_min=110,
+        consultation_fee_max=190,
+        next_available_slot="Thursday, 5:00 PM",
+        appointment_types=(AppointmentType.IN_PERSON, AppointmentType.TELEMEDICINE),
+        languages=("English", "Yoruba"),
+        description="Gynecologist supporting preventive screening, cycle concerns, and routine women's health follow-ups.",
+        image_url="/avatars/doctor-sarah.svg",
+    ),
+    DemoDoctor(
+        name="Dr. Leo Hammond",
+        specialty="ENT",
+        gender="Male",
+        rating=4.6,
+        review_count=58,
+        clinic_name="West End ENT Associates",
+        location="Paddington",
+        consultation_fee_min=95,
+        consultation_fee_max=165,
+        next_available_slot="Friday, 11:45 AM",
+        appointment_types=(AppointmentType.TELEMEDICINE, AppointmentType.IN_PERSON),
+        languages=("English",),
+        description="ENT consultant helping with sinus issues, throat pain, and recurring ear infections.",
+        image_url="/avatars/doctor-marcus.svg",
+    ),
+)
+
 
 def _table_counts(session: Session) -> dict[str, int]:
     return {
@@ -78,6 +168,11 @@ def _table_counts(session: Session) -> dict[str, int]:
 
 def _availability_row_count(session: Session) -> int:
     return session.scalar(select(func.count()).select_from(DoctorAvailability)) or 0
+
+
+def _get_doctor_by_name(session: Session, name: str) -> Doctor | None:
+    statement = select(Doctor).where(func.lower(Doctor.name) == name.lower())
+    return session.scalars(statement).first()
 
 
 def _existing_future_appointment_for_patient(
@@ -125,6 +220,26 @@ def _create_booking_request(booking: DemoBooking, appointment_date: date) -> App
     )
 
 
+def _create_doctor_record(doctor: DemoDoctor) -> Doctor:
+    return Doctor(
+        name=doctor.name,
+        specialty=doctor.specialty,
+        gender=doctor.gender,
+        rating=doctor.rating,
+        review_count=doctor.review_count,
+        clinic_name=doctor.clinic_name,
+        location=doctor.location,
+        consultation_fee_min=doctor.consultation_fee_min,
+        consultation_fee_max=doctor.consultation_fee_max,
+        next_available_slot=doctor.next_available_slot,
+        appointment_types=Doctor.encode_list([item.value for item in doctor.appointment_types]),
+        languages=Doctor.encode_list(list(doctor.languages)),
+        description=doctor.description,
+        image_url=doctor.image_url,
+        is_active=True,
+    )
+
+
 def seed_test_data() -> dict[str, object]:
     init_db()
     session = get_session_factory()()
@@ -133,7 +248,7 @@ def seed_test_data() -> dict[str, object]:
     inserted_entries: list[str] = []
     duplicate_lines = ["- No duplicates or conflicts were encountered during this run."]
     validation_checks = [
-        "Confirmed app uses backend/.env DATABASE_URL=sqlite:///./app.db.",
+        f"Confirmed script targets `{DEFAULT_DATABASE_PATH}` via an absolute SQLite DATABASE_URL when none is preconfigured.",
         "Validated appointment types against doctor-supported appointment_types via service-layer booking.",
         "Validated only future schedule-generated slots were booked.",
         "Validated duplicate doctor/date/time conflicts before insert.",
@@ -144,9 +259,27 @@ def seed_test_data() -> dict[str, object]:
         counts_before = _table_counts(session)
         availability_rows = _availability_row_count(session)
         inserted_rows = 0
+        inserted_doctor_rows = 0
         inserted_patient_rows = 0
         inserted_appointment_rows = 0
         skipped_rows = 0
+
+        for doctor in DEMO_DOCTORS:
+            if inserted_rows >= MAX_INSERTED_ROWS:
+                duplicate_reasons.append("Stopped before exceeding the 10-row insertion cap.")
+                break
+
+            if _get_doctor_by_name(session, doctor.name) is not None:
+                skipped_rows += 1
+                duplicate_reasons.append(f"Skipped {doctor.name}: doctor already exists.")
+                continue
+
+            session.add(_create_doctor_record(doctor))
+            session.commit()
+
+            inserted_rows += 1
+            inserted_doctor_rows += 1
+            inserted_entries.append(f"Inserted doctor profile for {doctor.name} ({doctor.specialty}).")
 
         for booking in DEMO_BOOKINGS:
             appointment_date = today + timedelta(days=booking.day_offset)
@@ -227,7 +360,7 @@ def seed_test_data() -> dict[str, object]:
             "- Database inspected: `backend/app.db`",
             "- Tables inspected: `doctors`, `patients`, `appointments`, `doctor_availability`",
             f"- Rows before: doctors={counts_before['doctors']}, patients={counts_before['patients']}, appointments={counts_before['appointments']}, doctor_availability={availability_rows}",
-            f"- Rows inserted: patients={inserted_patient_rows}, appointments={inserted_appointment_rows}, total={inserted_rows}",
+            f"- Rows inserted: doctors={inserted_doctor_rows}, patients={inserted_patient_rows}, appointments={inserted_appointment_rows}, total={inserted_rows}",
             f"- Rows skipped: {skipped_rows}",
             "",
             "## Inserted Records",
@@ -248,6 +381,7 @@ def seed_test_data() -> dict[str, object]:
             "",
             "## Remaining Missing Demo Data",
             "",
+            "- Doctor coverage is broader than the default startup seed now, but some specialties still have only one profile and no associated future appointments.",
             "- Legacy `doctor_availability` rows remain historical only and were not extended because the live booking flow uses generated schedule slots.",
             "- The seeded dataset still favors manual booking/search coverage over chat-specific conversation history because chat state is request-scoped, not persisted.",
             "",
