@@ -6,6 +6,13 @@ Commit range analyzed:
 - `a1d99e0488ab2483cb93474fe7ca231104bea73c` (2026-07-01)
 - `6bbd350abe717cfa3160c9f6267f81b820b7f4f5` (2026-07-02)
 
+Stabilization update scope for this revision:
+- `09c46e0ac91fd7c3cbec1485a2d83fe3f754f614` (2026-07-02)
+- `b4a21b173bfb8975cda8951438282b401855e885` (2026-07-02)
+- `6cd0da4fa952359b176108fdb18dac3b15d0dbc3` (2026-07-02)
+- `6bbd350abe717cfa3160c9f6267f81b820b7f4f5` (2026-07-02)
+- `457385da01122ca01b3a3e856aa684436d353dac` (2026-07-03, report generation only)
+
 Analyzed commits:
 1. `a1d99e0` Vector-less RAG prompt generation and planning docs
 2. `a4312dc` backend knowledge repository implementation
@@ -78,6 +85,8 @@ Analyzed commits:
 
 - `backend/tests/test_chat_api.py`
 - `backend/tests/test_chat_entity_extractor.py`
+- `backend/tests/test_conversation_manager.py`
+- `backend/tests/test_knowledge_repository.py`
 
 ### Frontend AI widget
 
@@ -115,10 +124,11 @@ The implementation is split into four parts:
 
 3. Deterministic retrieval
    - `backend/app/knowledge/retrieval.py` tokenizes user text, removes broad stopwords, scores title, alias, keyword, synonym, category, and body matches, and returns a single highest-ranked document.
-   - Later commits refined scoring so exact phrase matches and explicit metadata beat weak incidental overlap.
+   - Later commits refined scoring so exact phrase matches and explicit metadata beat weak incidental overlap, while broad tokens such as `online`, `appointment`, `support`, and `methods` no longer dominate unrelated requests.
 
 4. Chat orchestration and UI exposure
    - `backend/app/services/conversation_manager.py` still executes workflows first, then uses knowledge retrieval for eligible non-workflow turns, and falls back to the legacy deterministic engine when retrieval finds nothing useful.
+   - The post-implementation stabilization commits tightened that routing so knowledge-backed FAQ replies are emitted before the generic deterministic fallback path for eligible non-workflow turns.
    - `backend/app/schemas/chat.py` adds optional `knowledge_source` metadata to the chat response contract.
    - The frontend AI widget maps and renders that metadata as a small source footer on plain assistant text responses only.
 
@@ -126,12 +136,14 @@ The implementation is split into four parts:
 
 - Backend chat entrypoint
   - `ConversationManager` now accepts `KnowledgeRetrievalService` and resolves routing between workflow, knowledge, and deterministic fallback paths.
+  - The July 2 stabilization commits changed the ordering inside this boundary so knowledge matches can win before the legacy deterministic unknown-response path when no workflow is active.
 
 - Existing deterministic chat engine
   - `chat_service.py` remains the primary non-workflow engine and now also contains the knowledge repository bootstrap and response formatting helpers.
 
 - Existing workflow engine
   - `WorkflowEngine` remains authoritative for booking, cancellation, and appointment confirmation. Knowledge lookup is explicitly skipped while a workflow is active.
+  - Booking continuation also now depends on merged draft state from prior turns plus the newer explicit-date and labeled-name extraction patterns, which prevents repeated missing-field prompts during incremental booking conversations.
 
 - Chat API contract
   - `ChatResponse` now supports `knowledge_source` while preserving `message`, `response`, `data`, `workflow`, and `conversation`.
@@ -170,17 +182,75 @@ This kept Vector-less RAG read-only for informational turns while leaving all bo
 - Prefer explicit retrieval metadata over body-text coincidence.
   `category`, `keywords`, `synonyms`, and `aliases` were added so important FAQ prompts can be steered without changing the document body.
 
+- Prefer phrase-level and metadata-aware ranking over raw token overlap.
+  Manual-test regressions showed that weak single-token matches were not precise enough, so the retrieval service now gives stronger weight to title/alias/keyword phrase hits before body-text overlap.
+
 - Keep knowledge metadata optional on the wire.
   Existing clients can ignore `knowledge_source`, and the frontend renders it only when present.
 
 - Fix regressions in the same phase rather than deferring them.
   Manual testing exposed routing noise and booking continuation regressions, so the phase closed with retrieval tuning plus workflow-entry extraction fixes.
 
+## Stabilization Summary
+
+### Fix 1: Knowledge responses were losing to deterministic fallback on FAQ-style prompts
+
+- Issue
+  Eligible informational queries could fall through to the legacy deterministic response path instead of returning the matched knowledge document.
+- Root Cause
+  `ConversationManager` workflow-first behavior was intact, but the non-workflow branch did not consistently prioritize the retrieved knowledge match ahead of the generic deterministic fallback response.
+- Implementation
+  The routing logic was tightened so workflows still win first, active workflows still bypass retrieval, and otherwise a successful knowledge match returns a knowledge-backed response before the legacy fallback path runs.
+- Files Changed
+  `backend/app/services/conversation_manager.py`, `backend/app/knowledge/retrieval.py`, `backend/tests/test_conversation_manager.py`, `backend/tests/test_chat_api.py`, `backend/tests/test_knowledge_repository.py`
+- Backward Compatibility
+  Chat endpoints and response structure stayed unchanged; only the answer-selection order changed for eligible non-workflow turns.
+
+### Fix 2: Weak retrieval matches were stealing unrelated informational requests
+
+- Issue
+  Queries such as consultation-hours, telemedicine, payment-method, and unrelated fallback prompts could resolve to the wrong FAQ because broad single tokens matched too easily.
+- Root Cause
+  Early deterministic scoring leaned too heavily on token overlap, and the knowledge corpus did not yet expose enough explicit metadata to disambiguate similar FAQ domains.
+- Implementation
+  Retrieval scoring was upgraded to consider title, alias, keyword, synonym, and category phrase matches separately; new stopwords and phrase normalization reduced noisy tokens; and the FAQ source files were enriched with targeted retrieval metadata plus new bundled documents for insurance, parking, payment methods, consultation hours, telemedicine, and appointment preparation.
+- Files Changed
+  `backend/app/knowledge/documents.py`, `backend/app/knowledge/retrieval.py`, `backend/app/knowledge/sources/faq/appointment-preparation.md`, `backend/app/knowledge/sources/faq/booking.md`, `backend/app/knowledge/sources/faq/cancellation.md`, `backend/app/knowledge/sources/faq/consultation-hours.md`, `backend/app/knowledge/sources/faq/insurance.md`, `backend/app/knowledge/sources/faq/parking.md`, `backend/app/knowledge/sources/faq/payment-methods.md`, `backend/app/knowledge/sources/faq/telemedicine.md`, `backend/tests/test_knowledge_repository.py`, `backend/tests/test_chat_api.py`
+- Backward Compatibility
+  The retrieval service remains read-only and single-document; the change improves ranking without altering API contracts or workflow ownership of state-changing actions.
+
+### Fix 3: Informational prompts containing words like `methods` triggered false gender extraction
+
+- Issue
+  A prompt such as `What payment methods do you accept?` could be misread as a male-doctor search instead of an informational FAQ request.
+- Root Cause
+  Gender extraction matched male/female markers by substring rather than word boundary, so unrelated words containing `men` or similar fragments polluted entity extraction.
+- Implementation
+  Gender matching was restricted to explicit whole-word patterns and covered with regression tests tied to payment-method prompts.
+- Files Changed
+  `backend/app/services/chat_entity_extractor.py`, `backend/tests/test_chat_entity_extractor.py`, `backend/tests/test_chat_api.py`
+- Backward Compatibility
+  Existing valid gender-filter prompts still work; only accidental false positives were removed.
+
+### Fix 4: Booking workflow continuation dropped new values or failed to start from direct doctor-reference prompts
+
+- Issue
+  Incremental booking conversations could repeat stale missing-field prompts, and direct entry prompts such as `Book appointment with Dr. Sarah Jenkins` did not always progress correctly.
+- Root Cause
+  The draft-building path did not fully merge newly supplied date, time, patient-name, and email values into the active workflow state before validating missing fields, and extraction coverage for absolute dates plus labeled name fields was incomplete.
+- Implementation
+  Booking extraction now supports explicit absolute dates in textual and numeric forms, labeled patient-name lines, bare-name follow-up replies when the workflow is specifically waiting for the patient name, and direct doctor-reference entry prompts. `WorkflowEngine` now carries the merged draft forward so continuation turns progress deterministically.
+- Files Changed
+  `backend/app/services/chat_entity_extractor.py`, `backend/app/services/workflow_engine.py`, `backend/tests/test_chat_entity_extractor.py`, `backend/tests/test_chat_api.py`
+- Backward Compatibility
+  The booking workflow type, API shape, and existing step-by-step booking behavior remain unchanged; the fix only broadens accepted input forms and removes continuation regressions.
+
 ## Known Limitations
 
 - Retrieval is still deterministic single-document matching, not semantic retrieval.
 - There is no confidence threshold or multi-document synthesis beyond score-based best-match selection.
 - Knowledge coverage is limited to the bundled FAQ/capability documents added in this phase.
+- Retrieval quality still depends on manually curated metadata and stopword tuning; new FAQ areas may need additional aliases, synonyms, or phrase labels to rank correctly.
 - Conversation state is still request-scoped metadata passed through the chat payload; there is no persisted conversation store.
 - Manual testing artifacts exist, but the inspected commits do not include a full final human execution log inside this report file.
 - `backend/app.db` changed during the range, but the Vector-less RAG architecture itself does not depend on a new database schema.
@@ -207,6 +277,7 @@ The implementation is backward compatible for the current app surface for four r
 - Manual-testing commits on 2026-07-02 drove two classes of fixes:
   - routing fixes so knowledge responses win before generic deterministic fallback for eligible FAQ-style turns
   - retrieval quality fixes so broad terms such as `online`, `appointment`, or `methods` do not steal unrelated requests
+- A later regression pass also fixed booking-workflow continuation behavior for direct doctor-reference prompts, explicit absolute dates, and labeled patient-name inputs.
 - Regression coverage was expanded in:
   - `backend/tests/test_knowledge_repository.py`
   - `backend/tests/test_conversation_manager.py`
@@ -219,4 +290,5 @@ The implementation is backward compatible for the current app surface for four r
   - knowledge metadata serialization
   - phrase-priority retrieval ranking
   - protection against weak single-token overlap
+  - payment-method prompts no longer inferring `gender=Male`
   - booking workflow entry and continuation extraction for explicit dates and structured patient details
