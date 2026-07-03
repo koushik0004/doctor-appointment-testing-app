@@ -3,16 +3,16 @@
 ## Active Work
 
 - Status: completed
-- Task: extend manual-test seed coverage with additional doctor demo data
+- Task: refresh test data health without causing data loss
 - Completed on: 2026-07-03
 
 ## Outcome
 
-- Extended `backend/scripts/seed_test_data.py` so it seeds additional doctor profiles before booking records while keeping the global 10-row insertion cap and name-based duplicate prevention.
-- The script now pins its default SQLite target to the absolute `backend/app.db` path, preventing accidental writes to a different relative database when launched from the repo root.
-- Executed the updated seed run against `backend/app.db`, inserting 4 new doctors: Dr. Amelia Foster (Neurology), Dr. Rohan Mehta (Orthopedics), Dr. Grace Okafor (Gynecology), and Dr. Leo Hammond (ENT).
-- Re-verified idempotency with a second execution; no additional rows were inserted once the new doctors and prior appointments already existed.
-- Refreshed `docs/reports/test-data-report.md` with the real inspected-table counts, inserted doctor rows, duplicate skips, validation checks, and remaining demo-data gaps.
+- Inspected the live `backend/app.db` schema and data against the current models and booking/search services with an explicit no-data-loss policy.
+- Verified the current doctor, patient, and appointment rows remain valid for implemented workflows; no orphaned relationships, duplicate appointment-slot conflicts, or broken demo appointments were found.
+- Confirmed the three future `@example.com` demo bookings still behave correctly under generated availability for July 7, July 8, and July 9, 2026.
+- Detected one retained legacy inconsistency in `doctor_availability` where Dr. Sarah Jenkins has a historical `TELEMEDICINE` row despite the live profile supporting only `IN_PERSON`, but intentionally did not mutate it because the table is historical and the current flow no longer depends on it.
+- Generated `docs/reports/test-data-health-report.md` documenting schema checks, skipped legacy repair candidates, and the fact that zero rows were inserted, updated, or deleted.
 
 ## Prior Work
 
@@ -113,12 +113,17 @@
 ## Required Files for This Task
 
 - `backend/scripts/seed_test_data.py`
-- `backend/app/db/seed.py`
+- `backend/app/services/appointment_service.py`
+- `backend/app/services/availability_service.py`
+- `backend/app/services/schedule_service.py`
 - `backend/app/models/doctor.py`
-- `docs/reports/test-data-report.md`
+- `backend/app/models/patient.py`
+- `backend/app/models/appointment.py`
+- `backend/app/models/availability.py`
+- `docs/reports/test-data-health-report.md`
 
 ## Notes
 
-- The canonical startup seed remains unchanged at 10 doctors so existing backend tests and fixture expectations are not widened implicitly.
-- The manual-test seed utility is now the supported path for enriching the local demo dataset beyond the default startup seed.
-- Running `backend/.venv/bin/python backend/scripts/seed_test_data.py` from either the repo root or `backend/` should now target the same `backend/app.db` file.
+- No database writes were performed during this refresh run.
+- Historical `doctor_availability` rows were retained intentionally to avoid data loss; the current implementation uses generated schedule slots instead.
+- The stray root-level `doctor_appointment.db` file remains outside the active backend DB path and was not modified.

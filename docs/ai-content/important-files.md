@@ -16,6 +16,8 @@
   - Engine/session creation, schema initialization, and startup seeding.
 - `backend/scripts/seed_test_data.py`
   - Idempotent manual-test data seeding utility; now adds extra doctor demo profiles, books a small set of valid future appointments through the service layer, pins the default DB target to `backend/app.db`, and writes `docs/reports/test-data-report.md`.
+- `docs/reports/test-data-health-report.md`
+  - Latest zero-write data-health audit for `backend/app.db`; records schema validation, retained legacy availability issues, and explicit no-data-loss decisions.
 
 ## Core Frontend Feature Files
 
