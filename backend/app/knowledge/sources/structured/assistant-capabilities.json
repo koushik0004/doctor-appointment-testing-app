@@ -1,0 +1,33 @@
+{
+  "id": "capabilities.assistant.v1",
+  "title": "Assistant Capabilities",
+  "domain": "capability",
+  "audience": "assistant",
+  "status": "active",
+  "version": "1.0",
+  "tags": ["assistant", "capabilities"],
+  "priority": 30,
+  "summary": "Defines current supported assistant capabilities.",
+  "content": {
+    "can_help_with": [
+      "doctor discovery",
+      "appointment availability",
+      "booking guidance",
+      "appointment confirmation lookup",
+      "cancellation guidance"
+    ],
+    "cannot_help_with": [
+      "medical diagnosis",
+      "emergency triage",
+      "insurance verification"
+    ]
+  },
+  "prompt_hints": {
+    "include_when_intents": ["UNKNOWN"],
+    "exclude_when_intents": [],
+    "safe_to_quote": false,
+    "requires_domain_validation": false,
+    "max_context_chars": 1000
+  },
+  "metadata": {}
+}

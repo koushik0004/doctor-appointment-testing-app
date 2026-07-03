@@ -5,11 +5,14 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from app.knowledge import KnowledgeRetrievalMatch, KnowledgeRetrievalService
 from app.schemas.chat import (
     ChatConversationContext,
     ChatConversationHistoryMessage,
     ChatConversationRequest,
     ChatConversationStatus,
+    ChatIntent,
+    ChatKnowledgeSource,
     ChatRequest,
     ChatResponse,
     ChatRoutingTarget,
@@ -20,6 +23,37 @@ from app.schemas.chat import (
 from app.services.chat_entity_extractor import extract_chat_search_filters
 from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_intent
 from app.services.workflow_engine import WorkflowEngine
+
+
+def _join_english_list(items: list[str]) -> str:
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def _knowledge_document_message(document) -> str:
+    if isinstance(document.content, dict):
+        help_items = [
+            item
+            for item in document.content.get("can_help_with", [])
+            if isinstance(item, str) and item.strip()
+        ]
+        if help_items:
+            return f"I can help with {_join_english_list(help_items)}."
+
+    if isinstance(document.content, str):
+        content = " ".join(line.strip() for line in document.content.splitlines() if line.strip())
+        if document.prompt_hints is not None and document.prompt_hints.safe_to_quote and content:
+            return content
+
+    if document.summary.strip():
+        return document.summary.strip()
+
+    return document.title
 
 
 class DeterministicChatEngine(Protocol):
@@ -149,6 +183,10 @@ def _next_workflow_state(
     return None
 
 
+def _has_active_workflow(workflow: ChatWorkflowState | None) -> bool:
+    return workflow is not None and workflow.status != ChatWorkflowStatus.COMPLETED
+
+
 def _resolve_selected_doctor(
     response: ChatResponse,
     fallback_doctor_id: int | None,
@@ -168,42 +206,80 @@ def _resolve_selected_doctor(
     return first_item.doctor_id, first_item.doctor_name
 
 
+def _knowledge_source_from_match(knowledge_match: KnowledgeRetrievalMatch) -> ChatKnowledgeSource:
+    document = knowledge_match.document
+    return ChatKnowledgeSource(
+        document_id=document.id,
+        title=document.title,
+        source_type=document.source_type,
+        source_path=document.source_path,
+        domain=document.domain,
+        audience=document.audience,
+        status=document.status,
+        matched_terms=list(knowledge_match.matched_terms),
+        score=knowledge_match.score,
+    )
+
+
+def _should_use_knowledge_response(intent_match: ChatIntentMatch) -> bool:
+    return intent_match.intent in {ChatIntent.UNKNOWN, ChatIntent.APPOINTMENT_HELP}
+
+
 class ConversationManager:
     def __init__(
         self,
         session: Session,
         *,
         deterministic_engine: DeterministicChatEngine,
+        knowledge_retrieval_service: KnowledgeRetrievalService | None = None,
     ) -> None:
         self._session = session
         self._deterministic_engine = deterministic_engine
+        self._knowledge_retrieval_service = knowledge_retrieval_service
         self._workflow_engine = WorkflowEngine(session)
 
     def _resolve_route(self, response: ChatResponse) -> ChatRoutingTarget:
         if response.workflow is not None:
             return ChatRoutingTarget.WORKFLOW_ENGINE
+        if response.knowledge_source is not None:
+            return ChatRoutingTarget.FUTURE_AI_LAYER
         return ChatRoutingTarget.DETERMINISTIC_ENGINE
+
+    def _retrieve_knowledge_match(self, message: str, base_context: ChatConversationContext) -> KnowledgeRetrievalMatch | None:
+        if self._knowledge_retrieval_service is None or _has_active_workflow(base_context.current_workflow):
+            return None
+        return self._knowledge_retrieval_service.retrieve_top_match(message)
 
     def handle(self, request: ChatRequest) -> ChatResponse:
         base_context = _build_context_from_request(request.conversation)
         current_filters = extract_chat_search_filters(request.message)
         resolved_filters = _merge_search_filters(base_context.active_filters, current_filters)
+        intent_match = detect_chat_intent(request.message)
+        knowledge_match = self._retrieve_knowledge_match(request.message, base_context)
         response = self._workflow_engine.handle(
             request.message,
             conversation_context=base_context,
             search_filters=resolved_filters,
         )
         if response is None:
-            intent_match = detect_chat_intent(request.message)
-            response = self._deterministic_engine.generate(
-                request.message,
-                intent_match=intent_match,
-                search_filters=resolved_filters,
-                selected_doctor_name=base_context.selected_doctor_name,
-                conversation_context=base_context,
-            )
+            if knowledge_match is not None and _should_use_knowledge_response(intent_match):
+                response = ChatResponse(
+                    intent=ChatIntent.UNKNOWN,
+                    message=_knowledge_document_message(knowledge_match.document),
+                    data=[],
+                    search_filters=resolved_filters,
+                    help_steps=[],
+                    knowledge_source=_knowledge_source_from_match(knowledge_match),
+                )
+            else:
+                response = self._deterministic_engine.generate(
+                    request.message,
+                    intent_match=intent_match,
+                    search_filters=resolved_filters,
+                    selected_doctor_name=base_context.selected_doctor_name,
+                    conversation_context=base_context,
+                )
         routed_to = self._resolve_route(response)
-
         selected_doctor_id, selected_doctor_name = _resolve_selected_doctor(
             response,
             base_context.selected_doctor_id,

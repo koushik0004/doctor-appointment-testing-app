@@ -110,6 +110,18 @@ export type AiWidgetWorkflowResult = {
   appointment?: AiWidgetWorkflowAppointmentSummary;
 };
 
+export type AiWidgetChatKnowledgeSource = {
+  document_id: string;
+  title: string;
+  source_type: "markdown" | "json";
+  source_path: string;
+  domain: "faq" | "policy" | "capability" | "workflow_guidance" | "safety";
+  audience: "patient" | "assistant" | "developer" | "internal";
+  status: "draft" | "active" | "deprecated";
+  matched_terms: string[];
+  score?: number | null;
+};
+
 export type AiWidgetConversationHistoryItem = {
   role: "user" | "assistant" | "system";
   text: string;
@@ -131,6 +143,7 @@ export type AiWidgetChatResponsePayload = {
   data: Array<AiWidgetChatDoctorCard | AiWidgetChatAvailabilityCard>;
   search_filters?: AiWidgetChatSearchFilters;
   help_steps?: string[];
+  knowledge_source?: AiWidgetChatKnowledgeSource;
   response?: string;
   conversation?: AiWidgetConversationContext;
   workflow?: AiWidgetWorkflowResult;

@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from fastapi import HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.schemas.appointment import AppointmentConfirmationResponse, AppointmentCreateRequest, PatientInput
@@ -70,9 +72,11 @@ def _extract_patient_phone(message: str) -> str | None:
 
 def _extract_patient_name(message: str) -> str | None:
     patterns = (
-        r"\bmy name is\s+([A-Za-z]+(?:\s+[A-Za-z]+){1,3})\b",
-        r"\bi am\s+([A-Za-z]+(?:\s+[A-Za-z]+){1,3})\b",
-        r"\bfor\s+([A-Za-z]+(?:\s+[A-Za-z]+){1,3})\b",
+        r"\bmy name is\s+([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\bi am\s+([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\bfor\s+([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\b(?:patient\s+)?full name\s*[:\-]\s*([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
+        r"\b(?:patient\s+)?name\s*[:\-]\s*([A-Za-z]+(?: [A-Za-z]+){1,3})\b",
     )
     for pattern in patterns:
         match = re.search(pattern, message, re.IGNORECASE)
@@ -144,6 +148,10 @@ def _find_matching_doctor(message: str, doctors: list[DoctorResponse]) -> Doctor
         if _doctor_matches_query(doctor, message):
             return doctor
     return None
+
+
+def _contains_doctor_reference(message: str) -> bool:
+    return re.search(r"\bdr\.?\s+[A-Za-z]+(?:\s+[A-Za-z]+){0,2}\b", message, re.IGNORECASE) is not None
 
 
 def _resolve_doctor_from_context(
@@ -232,7 +240,7 @@ def _looks_like_workflow_follow_up(message: str) -> bool:
             extract_target_date(normalized_message),
             _extract_health_description(message),
         )
-    )
+    ) or _contains_doctor_reference(message)
 
 
 def _resolve_workflow_type(
@@ -324,6 +332,155 @@ def _workflow_intent(workflow_type: ChatWorkflowType) -> ChatIntent:
     return ChatIntent.APPOINTMENT_CONFIRMATION
 
 
+def _booking_validation_response(
+    *,
+    draft: ChatWorkflowDraft,
+    workflow_type: ChatWorkflowType,
+    search_filters: ChatSearchFilters | None,
+    message: str,
+    missing_fields: list[str],
+) -> ChatResponse:
+    workflow = ChatWorkflowResult(
+        workflow_type=workflow_type,
+        status=ChatWorkflowStatus.INPUT_REQUIRED,
+        missing_fields=missing_fields,
+        draft=draft,
+    )
+    return ChatResponse(
+        intent=ChatIntent.BOOK_APPOINTMENT,
+        message=message,
+        workflow=workflow,
+        search_filters=search_filters,
+    )
+
+
+def _booking_validation_failure_response(
+    *,
+    draft: ChatWorkflowDraft,
+    search_filters: ChatSearchFilters | None,
+    exc: Exception,
+) -> ChatResponse | None:
+    if isinstance(exc, ValidationError):
+        missing_fields: list[str] = []
+        updated_draft = draft.model_copy(deep=True)
+        issues: list[str] = []
+
+        for error in exc.errors():
+            field_path = tuple(str(part) for part in error.get("loc", ()))
+            if field_path in {("patient", "full_name"), ("full_name",)}:
+                updated_draft.patient_full_name = None
+                if "patient_full_name" not in missing_fields:
+                    missing_fields.append("patient_full_name")
+                issues.append("a valid patient full name")
+            elif field_path in {("patient", "email"), ("email",)}:
+                updated_draft.patient_email = None
+                if "patient_email" not in missing_fields:
+                    missing_fields.append("patient_email")
+                issues.append("a valid patient email")
+            elif field_path == ("start_time",):
+                updated_draft.start_time = None
+                if "start_time" not in missing_fields:
+                    missing_fields.append("start_time")
+                issues.append("a valid appointment time")
+
+        if missing_fields:
+            return _booking_validation_response(
+                draft=updated_draft,
+                workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+                search_filters=search_filters,
+                message=(
+                    "I couldn't complete the booking because I need "
+                    + " and ".join(issues)
+                    + "."
+                ),
+                missing_fields=missing_fields,
+            )
+        return None
+
+    if not isinstance(exc, HTTPException):
+        return None
+
+    updated_draft = draft.model_copy(deep=True)
+    detail = str(exc.detail)
+
+    if exc.status_code == status.HTTP_404_NOT_FOUND and detail.startswith("Doctor "):
+        updated_draft.doctor_id = None
+        updated_draft.doctor_name = None
+        return _booking_validation_response(
+            draft=updated_draft,
+            workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+            search_filters=search_filters,
+            message="I couldn't find that doctor for booking. Please choose a valid doctor.",
+            missing_fields=["doctor"],
+        )
+
+    if exc.status_code == status.HTTP_409_CONFLICT and "already booked" in detail.lower():
+        updated_draft.start_time = None
+        return _booking_validation_response(
+            draft=updated_draft,
+            workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+            search_filters=search_filters,
+            message="That appointment slot is already booked. Please share another time.",
+            missing_fields=["start_time"],
+        )
+
+    if exc.status_code != status.HTTP_400_BAD_REQUEST:
+        return None
+
+    normalized_detail = detail.lower()
+
+    if "already passed" in normalized_detail:
+        if updated_draft.appointment_date is not None and updated_draft.appointment_date < datetime.now().date():
+            updated_draft.appointment_date = None
+            return _booking_validation_response(
+                draft=updated_draft,
+                workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+                search_filters=search_filters,
+                message="I can't book an appointment in the past. Please share a future appointment date.",
+                missing_fields=["appointment_date"],
+            )
+
+        updated_draft.start_time = None
+        return _booking_validation_response(
+            draft=updated_draft,
+            workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+            search_filters=search_filters,
+            message="That appointment time has already passed. Please share another time.",
+            missing_fields=["start_time"],
+        )
+
+    if "not available for the chosen date" in normalized_detail:
+        updated_draft.start_time = None
+        return _booking_validation_response(
+            draft=updated_draft,
+            workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+            search_filters=search_filters,
+            message="That appointment time is not available for the selected date. Please share another time.",
+            missing_fields=["start_time"],
+        )
+
+    if "appointment type is not supported" in normalized_detail:
+        updated_draft.appointment_type = None
+        return _booking_validation_response(
+            draft=updated_draft,
+            workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+            search_filters=search_filters,
+            message="That appointment type is not supported for the selected doctor. Please choose another appointment type.",
+            missing_fields=[],
+        )
+
+    if "patient record" in normalized_detail:
+        return _booking_validation_response(
+            draft=updated_draft,
+            workflow_type=ChatWorkflowType.BOOK_APPOINTMENT,
+            search_filters=search_filters,
+            message="I couldn't complete the booking because the patient information is invalid. Please share the patient details again.",
+            missing_fields=["patient_full_name", "patient_email"],
+        )
+
+    return None
+
+
 class WorkflowEngine:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -370,21 +527,31 @@ class WorkflowEngine:
             )
 
         if workflow_type == ChatWorkflowType.BOOK_APPOINTMENT:
-            created = create_appointment_booking(
-                self._session,
-                AppointmentCreateRequest(
-                    doctor_id=draft.doctor_id,
-                    appointment_date=draft.appointment_date,
-                    start_time=draft.start_time,
-                    appointment_type=AppointmentType(draft.appointment_type or AppointmentType.IN_PERSON.value),
-                    patient=PatientInput(
-                        full_name=draft.patient_full_name or "",
-                        email=draft.patient_email or "",
-                        phone=draft.patient_phone,
+            try:
+                created = create_appointment_booking(
+                    self._session,
+                    AppointmentCreateRequest(
+                        doctor_id=draft.doctor_id,
+                        appointment_date=draft.appointment_date,
+                        start_time=draft.start_time,
+                        appointment_type=AppointmentType(draft.appointment_type or AppointmentType.IN_PERSON.value),
+                        patient=PatientInput(
+                            full_name=draft.patient_full_name or "",
+                            email=draft.patient_email or "",
+                            phone=draft.patient_phone,
+                        ),
+                        health_description=draft.health_description,
                     ),
-                    health_description=draft.health_description,
-                ),
-            )
+                )
+            except (HTTPException, ValidationError) as exc:
+                response = _booking_validation_failure_response(
+                    draft=draft,
+                    search_filters=search_filters,
+                    exc=exc,
+                )
+                if response is not None:
+                    return response
+                raise
             confirmation = get_appointment_confirmation_by_reference(self._session, appointment_id=created.id)
             summary = _build_appointment_summary(confirmation)
             workflow = ChatWorkflowResult(

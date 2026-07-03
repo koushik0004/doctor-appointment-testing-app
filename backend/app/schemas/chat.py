@@ -6,6 +6,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.knowledge.documents import (
+    KnowledgeDocumentAudience,
+    KnowledgeDocumentDomain,
+    KnowledgeDocumentSourceType,
+    KnowledgeDocumentStatus,
+)
+
 
 class ChatIntent(str, Enum):
     SHOW_DOCTORS_BY_SPECIALIZATION = "SHOW_DOCTORS_BY_SPECIALIZATION"
@@ -154,12 +161,25 @@ class ChatAvailabilityCard(BaseModel):
     available_time: str
 
 
+class ChatKnowledgeSource(BaseModel):
+    document_id: str
+    title: str
+    source_type: KnowledgeDocumentSourceType
+    source_path: str
+    domain: KnowledgeDocumentDomain
+    audience: KnowledgeDocumentAudience
+    status: KnowledgeDocumentStatus
+    matched_terms: list[str] = Field(default_factory=list)
+    score: int | None = None
+
+
 class ChatResponse(BaseModel):
     intent: ChatIntent
     message: str
     data: list[ChatDoctorCard | ChatAvailabilityCard] = Field(default_factory=list)
     search_filters: ChatSearchFilters | None = None
     help_steps: list[str] = Field(default_factory=list)
+    knowledge_source: ChatKnowledgeSource | None = None
     response: str = ""
     conversation: ChatConversationContext | None = None
     workflow: ChatWorkflowResult | None = None

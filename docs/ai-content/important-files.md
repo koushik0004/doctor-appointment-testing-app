@@ -39,6 +39,14 @@
   - Single mount point for the AI assistant UI and the chat-booking confirmation redirect hook.
 - `frontend/lib/ai-widget/services/api-service.ts`
   - Bridges widget requests to the backend chat API.
+- `frontend/lib/ai-widget/services/chat-response-mapper.ts`
+  - Maps backend chat payloads into assistant messages and preserves optional workflow and knowledge source metadata.
+- `frontend/lib/ai-widget/components/MessageContentRenderer.tsx`
+  - Renders assistant chat content and the minimal knowledge-source footer for text replies.
+- `frontend/lib/ai-widget/types/chat.ts`
+  - Shared chat payload contract including optional `knowledge_source` metadata from backend responses.
+- `frontend/lib/ai-widget/types/message.ts`
+  - Widget message metadata shape used by the renderer and workflow navigation hook.
 
 ## Core Backend Feature Files
 
@@ -49,11 +57,11 @@
 - `backend/app/api/appointments.py`
   - Appointment creation, appointment details, and appointment search API surface.
 - `backend/app/api/chat.py`
-  - Chat endpoints for `/api/chat` and `/api/v1/chat`.
+  - Chat endpoints for `/api/chat` and `/api/v1/chat`; expected workflow/business errors should pass through while only unexpected chat failures become HTTP 500 responses.
 - `backend/app/services/conversation_manager.py`
-  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, and routes between workflow execution and deterministic fallback.
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, and uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns.
 - `backend/app/services/workflow_engine.py`
-  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation.
+  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
@@ -63,13 +71,25 @@
 - `backend/app/services/appointment_search_service.py`
   - Appointment search behavior across patient and doctor joins.
 - `backend/app/services/chat_service.py`
-  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching.
+  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching and the knowledge-backed fallback composer.
 - `backend/app/services/chat_intent_detector.py`
   - Intent classification entry point for chat behavior, including doctor-profile/detail query routing.
 - `backend/app/services/chat_entity_extractor.py`
-  - Extracts specialization, gender, fee, location, date, and time preferences from messages.
+  - Extracts specialization, gender, fee, location, date, and time preferences from messages; word-boundary matching avoids false gender inference on unrelated informational prompts, and explicit absolute date parsing now supports booking workflow turns such as `2nd July 2026` or `02/07/2026`.
 - `backend/app/services/schedule_service.py`
   - Slot-generation rules that shape both booking and chat availability results.
+- `backend/app/knowledge/documents.py`
+  - Typed Vector-less RAG knowledge document schema and prompt hint metadata, including additive retrieval fields for `category`, `keywords`, `synonyms`, and `aliases`.
+- `backend/app/knowledge/loader.py`
+  - Filesystem loader for repository-local Markdown and JSON knowledge files; performs schema validation and duplicate ID checks.
+- `backend/app/knowledge/repository.py`
+  - In-memory cache for loaded knowledge documents with exact ID/domain/tag accessors only.
+- `backend/app/knowledge/retrieval.py`
+  - Deterministic Vector-less RAG retrieval service that scores title, alias, keyword, synonym, category, and body-text matches separately, filters overly broad tokens, and returns one top document.
+- `backend/app/knowledge/sources/`
+  - Curated passive Markdown/JSON knowledge sources for future prompt/context work, including booking, cancellation, consultation-hours, telemedicine, appointment-preparation, payment-methods, insurance, and parking FAQs.
+- `backend/pyproject.toml`
+  - Backend package/test configuration, including package-data entries for bundled knowledge Markdown/JSON sources.
 
 ## Data Model And Contract Files
 
@@ -81,7 +101,7 @@
 - `backend/app/schemas/appointment.py`
 - `backend/app/schemas/appointment_search.py`
 - `backend/app/schemas/chat.py`
-  - Chat request/response contracts including optional conversation metadata and workflow state/result metadata.
+  - Chat request/response contracts including optional conversation metadata, workflow state/result metadata, and knowledge source metadata.
 
 These files define the persistence and API contracts. Any API change should be checked against both the frontend feature API files and these backend schemas/models.
 
@@ -94,15 +114,24 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_chat_api.py`
 - `backend/tests/test_chat_intent_detector.py`
 - `backend/tests/test_chat_entity_extractor.py`
+- `backend/tests/test_knowledge_repository.py`
+  - Covers Markdown/JSON loading, repository caching, exact filters, metadata-aware deterministic retrieval matching, and bundled FAQ retrieval expectations.
+- `backend/tests/test_conversation_manager.py`
+  - Covers routing order guarantees: workflow-first, knowledge-before-deterministic fallback, and active-workflow exclusion from retrieval.
+- `backend/tests/test_chat_entity_extractor.py`
+  - Covers search-filter extraction regressions, including the payment-method wording that must not infer a doctor-gender filter.
 
 ## High-Value Docs
 
 - `docs/architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`
 - `docs/feature-02-doctor-listing.md`
 - `docs/feature-03-appointment-booking.md`
 - `docs/feature-04-confirmation-email.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-04-manual-test-checklist.md`
+  - Manual QA checklist for the Vector-less RAG prototype, including positive, negative, edge, regression, workflow, and existing chatbot coverage.

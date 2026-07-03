@@ -1,3 +1,10 @@
+import type {
+  AiWidgetChatIntent,
+  AiWidgetChatKnowledgeSource,
+  AiWidgetConversationContext,
+  AiWidgetWorkflowResult,
+} from "@/lib/ai-widget/types/chat";
+
 export type AiWidgetActor = "assistant" | "user" | "system";
 
 export type AiWidgetMessageStatus = "idle" | "streaming" | "failed";
@@ -59,6 +66,14 @@ export type AiWidgetAppointmentHelpMessageContent = {
   steps?: string[];
 };
 
+export type AiWidgetMessageMetadata = {
+  intent?: AiWidgetChatIntent;
+  response?: string;
+  conversation?: AiWidgetConversationContext;
+  workflow?: AiWidgetWorkflowResult;
+  knowledge_source?: AiWidgetChatKnowledgeSource;
+} & Record<string, unknown>;
+
 export type AiWidgetMessageContent =
   | AiWidgetTextMessageContent
   | AiWidgetDoctorListMessageContent
@@ -71,7 +86,7 @@ export type AiWidgetMessage = {
   content: AiWidgetMessageContent;
   createdAt: string;
   status?: AiWidgetMessageStatus;
-  metadata?: Record<string, unknown>;
+  metadata?: AiWidgetMessageMetadata;
 };
 
 export type AiWidgetQuickAction = {

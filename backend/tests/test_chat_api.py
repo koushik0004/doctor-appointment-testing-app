@@ -25,6 +25,14 @@ from app.schemas.chat import (  # noqa: E402
     ChatWorkflowStatus,
     ChatWorkflowType,
 )
+from app.knowledge.documents import (  # noqa: E402
+    KnowledgeDocument,
+    KnowledgeDocumentAudience,
+    KnowledgeDocumentDomain,
+    KnowledgeDocumentSourceType,
+    KnowledgeDocumentStatus,
+)
+from app.knowledge.retrieval import KnowledgeRetrievalMatch  # noqa: E402
 from app.schemas.appointment import AppointmentCreateRequest, PatientInput  # noqa: E402
 from app.schemas.doctor import AppointmentType  # noqa: E402
 from app.services.appointment_service import create_appointment_booking  # noqa: E402
@@ -56,6 +64,14 @@ def client():
 
 def _session() -> Session:
     return database_module.get_session_factory()()
+
+
+def _ordinal_day(day: int) -> str:
+    if 10 <= day % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
 
 
 def test_chat_endpoint_returns_structured_specialty_response(client):
@@ -174,17 +190,15 @@ def test_chat_endpoint_returns_appointment_help_response(client):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["intent"] == ChatIntent.APPOINTMENT_HELP.value
-    assert payload["message"] == "Here is how to book an appointment in the app."
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Booking Appointment Help Patients can choose a doctor, select an available date and time, provide contact details, and confirm the appointment."
+    )
     assert payload["response"] == payload["message"]
     assert payload["data"] == []
-    assert payload["help_steps"] == [
-        "Choose a doctor.",
-        "Select an available date.",
-        "Choose a time slot.",
-        "Enter patient details.",
-        "Confirm the appointment.",
-    ]
+    assert payload["help_steps"] == []
+    assert payload["knowledge_source"]["document_id"] == "faq.booking.general"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
 
 
 def test_chat_endpoint_returns_cancellation_help_response(client):
@@ -249,6 +263,94 @@ def test_chat_service_returns_available_specialties(client):
     assert result.data == []
     assert result.conversation is not None
     assert result.conversation.routed_to == ChatRoutingTarget.DETERMINISTIC_ENGINE
+
+
+def test_chat_endpoint_returns_knowledge_response_before_deterministic_fallback(client):
+    response = client.post("/api/chat", json={"message": "What is telemedicine?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Telemedicine Appointments Telemedicine is an online doctor consultation done remotely, usually by video. When a doctor supports it, you can choose a telemedicine appointment type instead of an in-person visit."
+    )
+    assert payload["response"] == payload["message"]
+    assert payload["knowledge_source"]["document_id"] == "faq.telemedicine.general"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
+def test_chat_endpoint_returns_online_consultation_knowledge_response(client):
+    response = client.post("/api/chat", json={"message": "Do you provide online consultation?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Telemedicine Appointments Telemedicine is an online doctor consultation done remotely, usually by video. When a doctor supports it, you can choose a telemedicine appointment type instead of an in-person visit."
+    )
+    assert payload["knowledge_source"]["document_id"] == "faq.telemedicine.general"
+    assert "do you provide online consultation" in payload["knowledge_source"]["matched_terms"]
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
+def test_chat_endpoint_returns_payment_methods_knowledge_response(client):
+    response = client.post("/api/chat", json={"message": "What payment methods are accepted?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "# Payment Methods Patients can usually complete a booking using supported online payment options shown in the app, such as card-based checkout when enabled for that appointment flow. Always check the final booking screen for the currently available payment methods."
+    )
+    assert payload["knowledge_source"]["document_id"] == "faq.payment.methods"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
+def test_chat_endpoint_ignores_weak_online_overlap_for_unrelated_requests(client):
+    response = client.post("/api/chat", json={"message": "Can you refill my prescription online?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["knowledge_source"] is None
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.DETERMINISTIC_ENGINE.value
+
+
+def test_chat_endpoint_prioritizes_online_consultation_clause_in_multi_sentence_prompt(client):
+    response = client.post(
+        "/api/chat",
+        json={"message": "I may book later. For now, do you provide online consultation?"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["knowledge_source"]["document_id"] == "faq.telemedicine.general"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.FUTURE_AI_LAYER.value
+
+
+def test_chat_endpoint_falls_back_to_deterministic_when_no_knowledge_exists(client):
+    response = client.post("/api/chat", json={"message": "Do you support pharmacy refills?"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.UNKNOWN.value
+    assert payload["message"] == (
+        "I can help with available doctors, specializations, consultation fees, and appointment slots."
+    )
+    assert payload["knowledge_source"] is None
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.DETERMINISTIC_ENGINE.value
+
+
+def test_chat_endpoint_keeps_workflow_routing_ahead_of_knowledge(client):
+    response = client.post("/api/chat", json={"message": "Book an appointment with Dr. Sarah Jenkins tomorrow at 10 AM"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["workflow"] is not None
+    assert payload["knowledge_source"] is None
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.WORKFLOW_ENGINE.value
 
 
 def test_chat_service_maintains_conversation_filters_across_turns(client):
@@ -676,6 +778,452 @@ def test_chat_service_continues_booking_workflow_across_incremental_turns(client
     assert final_result.workflow.appointment.confirmation_code.startswith("CN-")
 
 
+def test_chat_service_books_appointment_from_single_structured_message(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        result = create_chat_response(
+            session,
+            ChatRequest(
+                message=(
+                    "Book appointment as below\n\n"
+                    "Dr. Sarah Jenkins\n"
+                    f"{formatted_date}\n"
+                    "10:00 AM\n"
+                    "Patient name: John Doe\n"
+                    "Email: john.doe@example.com"
+                ),
+            ),
+        )
+
+    assert result.intent == ChatIntent.BOOK_APPOINTMENT
+    assert result.workflow is not None
+    assert result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert result.workflow.draft.doctor_name == "Dr. Sarah Jenkins"
+    assert result.workflow.draft.appointment_date == appointment_date
+    assert result.workflow.draft.start_time == "10:00"
+    assert result.workflow.draft.patient_full_name == "John Doe"
+    assert result.workflow.draft.patient_email == "john.doe@example.com"
+    assert result.workflow.appointment is not None
+    assert result.workflow.appointment.patient_name == "John Doe"
+
+
+def test_chat_service_starts_booking_with_doctor_reference_and_merges_one_field_per_turn(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = appointment_date.strftime("%d/%m/%Y")
+
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Book appointment with Dr. Sarah Jenkins"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message=formatted_date,
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                    ],
+                ),
+            ),
+        )
+
+        third_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="10:00 AM",
+                conversation=ChatConversationRequest(
+                    conversation_id=second_result.conversation.conversation_id if second_result.conversation else None,
+                    context=second_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "10:00 AM"},
+                    ],
+                ),
+            ),
+        )
+
+        fourth_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Pandora Kaki",
+                conversation=ChatConversationRequest(
+                    conversation_id=third_result.conversation.conversation_id if third_result.conversation else None,
+                    context=third_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "10:00 AM"},
+                        {"role": "assistant", "text": third_result.message, "intent": third_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                    ],
+                ),
+            ),
+        )
+
+        final_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="pandora.kaki@example.com",
+                conversation=ChatConversationRequest(
+                    conversation_id=fourth_result.conversation.conversation_id if fourth_result.conversation else None,
+                    context=fourth_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": formatted_date},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "10:00 AM"},
+                        {"role": "assistant", "text": third_result.message, "intent": third_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                        {"role": "assistant", "text": fourth_result.message, "intent": fourth_result.intent},
+                        {"role": "user", "text": "pandora.kaki@example.com"},
+                    ],
+                ),
+            ),
+        )
+
+    assert first_result.workflow is not None
+    assert first_result.workflow.status == ChatWorkflowStatus.INPUT_REQUIRED
+    assert first_result.workflow.draft.doctor_name == "Dr. Sarah Jenkins"
+    assert first_result.workflow.missing_fields == [
+        "appointment_date",
+        "start_time",
+        "patient_full_name",
+        "patient_email",
+    ]
+
+    assert second_result.workflow is not None
+    assert second_result.workflow.draft.appointment_date == appointment_date
+    assert second_result.workflow.missing_fields == [
+        "start_time",
+        "patient_full_name",
+        "patient_email",
+    ]
+    assert second_result.message != first_result.message
+
+    assert third_result.workflow is not None
+    assert third_result.workflow.draft.start_time == "10:00"
+    assert third_result.workflow.missing_fields == [
+        "patient_full_name",
+        "patient_email",
+    ]
+    assert third_result.message != second_result.message
+
+    assert fourth_result.workflow is not None
+    assert fourth_result.workflow.draft.patient_full_name == "Pandora Kaki"
+    assert fourth_result.workflow.missing_fields == ["patient_email"]
+    assert fourth_result.message != third_result.message
+
+    assert final_result.workflow is not None
+    assert final_result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert final_result.workflow.appointment is not None
+    assert final_result.workflow.appointment.patient_name == "Pandora Kaki"
+
+
+def test_chat_service_merges_partial_structured_booking_before_follow_up_fields(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(
+                message=(
+                    "Book appointment as below\n\n"
+                    "Dr. Sarah Jenkins\n"
+                    f"{formatted_date}\n"
+                    "10:00 AM"
+                ),
+            ),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Pandora Kaki",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment as below"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                    ],
+                ),
+            ),
+        )
+
+        final_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="pandora.kaki@example.com",
+                conversation=ChatConversationRequest(
+                    conversation_id=second_result.conversation.conversation_id if second_result.conversation else None,
+                    context=second_result.conversation,
+                    history=[
+                        {"role": "user", "text": "Book appointment as below"},
+                        {"role": "assistant", "text": first_result.message, "intent": first_result.intent},
+                        {"role": "user", "text": "Pandora Kaki"},
+                        {"role": "assistant", "text": second_result.message, "intent": second_result.intent},
+                        {"role": "user", "text": "pandora.kaki@example.com"},
+                    ],
+                ),
+            ),
+        )
+
+    assert first_result.workflow is not None
+    assert first_result.workflow.draft.doctor_name == "Dr. Sarah Jenkins"
+    assert first_result.workflow.draft.appointment_date == appointment_date
+    assert first_result.workflow.draft.start_time == "10:00"
+    assert first_result.workflow.missing_fields == ["patient_full_name", "patient_email"]
+
+    assert second_result.workflow is not None
+    assert second_result.workflow.draft.patient_full_name == "Pandora Kaki"
+    assert second_result.workflow.missing_fields == ["patient_email"]
+
+    assert final_result.workflow is not None
+    assert final_result.workflow.status == ChatWorkflowStatus.COMPLETED
+    assert final_result.workflow.appointment is not None
+    assert final_result.workflow.appointment.patient_name == "Pandora Kaki"
+
+
+def test_chat_endpoint_returns_structured_response_for_past_booking_date(client):
+    past_date = date.today() - timedelta(days=1)
+    formatted_date = f"{_ordinal_day(past_date.day)} {past_date.strftime('%B %Y')}"
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "I can't book an appointment in the past. Please share a future appointment date."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["appointment_date"]
+    assert payload["workflow"]["draft"]["doctor_name"] == "Dr. Sarah Jenkins"
+    assert payload["workflow"]["draft"]["appointment_date"] is None
+    assert payload["workflow"]["draft"]["start_time"] == "10:00"
+    assert payload["conversation"]["routed_to"] == ChatRoutingTarget.WORKFLOW_ENGINE.value
+    assert payload["conversation"]["current_workflow"]["missing_fields"] == ["appointment_date"]
+
+
+def test_chat_endpoint_returns_structured_response_for_slot_already_booked(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        create_appointment_booking(
+            session,
+            AppointmentCreateRequest(
+                doctor_id=1,
+                appointment_date=appointment_date,
+                start_time="10:00",
+                appointment_type=AppointmentType.IN_PERSON,
+                patient=PatientInput(
+                    full_name="Existing Patient",
+                    email="existing.patient@example.com",
+                    phone="9999999999",
+                ),
+                health_description="Routine checkup.",
+            ),
+        )
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "That appointment slot is already booked. Please share another time."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["start_time"]
+    assert payload["workflow"]["draft"]["appointment_date"] == appointment_date.isoformat()
+    assert payload["workflow"]["draft"]["start_time"] is None
+    assert payload["conversation"]["current_workflow"]["missing_fields"] == ["start_time"]
+
+
+def test_chat_endpoint_returns_structured_response_for_invalid_doctor(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book this appointment on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            ),
+            "conversation": {
+                "conversation_id": "conv-invalid-doctor",
+                "context": {
+                    "conversation_id": "conv-invalid-doctor",
+                    "status": ChatConversationStatus.ACTIVE.value,
+                    "turn_count": 1,
+                    "selected_doctor_id": 999,
+                    "selected_doctor_name": "Dr. Missing",
+                    "routed_to": ChatRoutingTarget.DETERMINISTIC_ENGINE.value,
+                },
+                "history": [
+                    {
+                        "role": "user",
+                        "text": "Book appointment with Dr. Missing",
+                    }
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "I couldn't find that doctor for booking. Please choose a valid doctor."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["doctor"]
+    assert payload["workflow"]["draft"]["doctor_id"] is None
+    assert payload["workflow"]["draft"]["doctor_name"] is None
+    assert payload["conversation"]["current_workflow"]["missing_fields"] == ["doctor"]
+
+
+def test_chat_endpoint_returns_structured_response_for_invalid_appointment_time(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 23:45. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == (
+        "That appointment time is not available for the selected date. Please share another time."
+    )
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["start_time"]
+    assert payload["workflow"]["draft"]["appointment_date"] == appointment_date.isoformat()
+    assert payload["workflow"]["draft"]["start_time"] is None
+
+
+def test_chat_endpoint_returns_structured_response_for_invalid_patient_information(client):
+    appointment_date = date.today() + timedelta(days=1)
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": "Book this appointment",
+            "conversation": {
+                "conversation_id": "conv-invalid-patient",
+                "context": {
+                    "conversation_id": "conv-invalid-patient",
+                    "status": ChatConversationStatus.ACTIVE.value,
+                    "turn_count": 1,
+                    "routed_to": ChatRoutingTarget.WORKFLOW_ENGINE.value,
+                    "current_workflow": {
+                        "workflow_type": ChatWorkflowType.BOOK_APPOINTMENT.value,
+                        "status": ChatWorkflowStatus.INPUT_REQUIRED.value,
+                        "missing_fields": [],
+                        "draft": {
+                            "doctor_id": 1,
+                            "doctor_name": "Dr. Sarah Jenkins",
+                            "appointment_date": appointment_date.isoformat(),
+                            "start_time": "10:00",
+                            "appointment_type": AppointmentType.IN_PERSON.value,
+                            "patient_full_name": "John Doe",
+                            "patient_email": "not-an-email",
+                        },
+                    },
+                },
+                "history": [
+                    {"role": "user", "text": "Book appointment with Dr. Sarah Jenkins"},
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == (
+        "I couldn't complete the booking because I need a valid patient email."
+    )
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["patient_email"]
+    assert payload["workflow"]["draft"]["patient_full_name"] == "John Doe"
+    assert payload["workflow"]["draft"]["patient_email"] is None
+
+
+def test_chat_endpoint_returns_structured_response_for_duplicate_booking(client):
+    appointment_date = date.today() + timedelta(days=1)
+    formatted_date = f"{_ordinal_day(appointment_date.day)} {appointment_date.strftime('%B %Y')}"
+
+    with _session() as session:
+        create_appointment_booking(
+            session,
+            AppointmentCreateRequest(
+                doctor_id=1,
+                appointment_date=appointment_date,
+                start_time="10:00",
+                appointment_type=AppointmentType.IN_PERSON,
+                patient=PatientInput(
+                    full_name="John Doe",
+                    email="john.doe@example.com",
+                    phone="9999999999",
+                ),
+                health_description="Routine checkup.",
+            ),
+        )
+
+    response = client.post(
+        "/api/chat",
+        json={
+            "message": (
+                f"Book appointment with Dr. Sarah Jenkins on {formatted_date} "
+                "at 10:00 AM. My name is John Doe. john.doe@example.com"
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == ChatIntent.BOOK_APPOINTMENT.value
+    assert payload["message"] == "That appointment slot is already booked. Please share another time."
+    assert payload["workflow"]["status"] == ChatWorkflowStatus.INPUT_REQUIRED.value
+    assert payload["workflow"]["missing_fields"] == ["start_time"]
+
+
 def test_chat_service_cancels_appointment_through_workflow(client):
     with _session() as session:
         created = create_appointment_booking(
@@ -752,3 +1300,215 @@ def test_chat_service_returns_default_fallback(client):
     )
     assert result.response == result.message
     assert result.data == []
+
+
+def test_chat_endpoint_returns_500_for_unexpected_errors(client, monkeypatch):
+    import app.api.chat as chat_api
+
+    def _raise_unexpected_error(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(chat_api, "create_chat_response", _raise_unexpected_error)
+
+    response = client.post("/api/chat", json={"message": "Hello"})
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Chat service is unavailable."}
+
+
+def test_chat_service_uses_knowledge_retrieval_before_default_fallback(client, monkeypatch):
+    knowledge_document = KnowledgeDocument(
+        id="capabilities.assistant.v1",
+        title="Assistant Capabilities",
+        source_type=KnowledgeDocumentSourceType.JSON,
+        source_path="backend/app/knowledge/sources/structured/assistant-capabilities.json",
+        domain=KnowledgeDocumentDomain.CAPABILITY,
+        audience=KnowledgeDocumentAudience.ASSISTANT,
+        status=KnowledgeDocumentStatus.ACTIVE,
+        version="1.0",
+        tags=["assistant", "capabilities"],
+        priority=30,
+        summary="Defines current supported assistant capabilities.",
+        content={
+            "can_help_with": [
+                "doctor discovery",
+                "appointment availability",
+            ],
+        },
+    )
+
+    class FakeKnowledgeService:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def retrieve_top_match(self, query: str):
+            self.calls.append(query)
+            if "assistant capabilities" in query.lower():
+                return KnowledgeRetrievalMatch(
+                    document=knowledge_document,
+                    score=20,
+                    matched_terms=("assistant", "capabilities"),
+                )
+            return None
+
+    fake_service = FakeKnowledgeService()
+    monkeypatch.setattr("app.services.chat_service._knowledge_retrieval_service", lambda: fake_service)
+
+    with _session() as session:
+        result = create_chat_response(session, ChatRequest(message="assistant capabilities"))
+
+    assert fake_service.calls == ["assistant capabilities"]
+    assert result.intent == ChatIntent.UNKNOWN
+    assert result.message == "I can help with doctor discovery and appointment availability."
+    assert result.knowledge_source is not None
+    assert result.knowledge_source.document_id == "capabilities.assistant.v1"
+    assert result.knowledge_source.title == "Assistant Capabilities"
+    assert result.knowledge_source.source_path == "backend/app/knowledge/sources/structured/assistant-capabilities.json"
+    assert result.knowledge_source.matched_terms == ["assistant", "capabilities"]
+    assert result.knowledge_source.score == 20
+    assert result.conversation is not None
+    assert result.conversation.routed_to == ChatRoutingTarget.FUTURE_AI_LAYER
+
+
+def test_chat_endpoint_returns_knowledge_source_metadata(client, monkeypatch):
+    knowledge_document = KnowledgeDocument(
+        id="capabilities.assistant.v1",
+        title="Assistant Capabilities",
+        source_type=KnowledgeDocumentSourceType.JSON,
+        source_path="backend/app/knowledge/sources/structured/assistant-capabilities.json",
+        domain=KnowledgeDocumentDomain.CAPABILITY,
+        audience=KnowledgeDocumentAudience.ASSISTANT,
+        status=KnowledgeDocumentStatus.ACTIVE,
+        version="1.0",
+        tags=["assistant", "capabilities"],
+        priority=30,
+        summary="Defines current supported assistant capabilities.",
+        content={
+            "can_help_with": [
+                "doctor discovery",
+                "appointment availability",
+            ],
+        },
+    )
+
+    class FakeKnowledgeService:
+        def retrieve_top_match(self, query: str):
+            if "assistant capabilities" in query.lower():
+                return KnowledgeRetrievalMatch(
+                    document=knowledge_document,
+                    score=20,
+                    matched_terms=("assistant", "capabilities"),
+                )
+            return None
+
+    monkeypatch.setattr("app.services.chat_service._knowledge_retrieval_service", lambda: FakeKnowledgeService())
+
+    response = client.post("/api/chat", json={"message": "assistant capabilities"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["knowledge_source"] == {
+        "document_id": "capabilities.assistant.v1",
+        "title": "Assistant Capabilities",
+        "source_type": "json",
+        "source_path": "backend/app/knowledge/sources/structured/assistant-capabilities.json",
+        "domain": "capability",
+        "audience": "assistant",
+        "status": "active",
+        "matched_terms": ["assistant", "capabilities"],
+        "score": 20,
+    }
+
+
+def test_chat_service_skips_knowledge_retrieval_during_active_workflow(client, monkeypatch):
+    class FakeKnowledgeService:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def retrieve_top_match(self, query: str):
+            self.calls += 1
+            return None
+
+    fake_service = FakeKnowledgeService()
+    monkeypatch.setattr("app.services.chat_service._knowledge_retrieval_service", lambda: fake_service)
+
+    with _session() as session:
+        first_result = create_chat_response(
+            session,
+            ChatRequest(message="Need a female cardiologist tomorrow"),
+        )
+
+        second_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="Book this appointment",
+                conversation=ChatConversationRequest(
+                    conversation_id=first_result.conversation.conversation_id if first_result.conversation else None,
+                    context=first_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+        fake_service.calls = 0
+        third_result = create_chat_response(
+            session,
+            ChatRequest(
+                message="assistant capabilities",
+                conversation=ChatConversationRequest(
+                    conversation_id=second_result.conversation.conversation_id if second_result.conversation else None,
+                    context=second_result.conversation,
+                    history=[
+                        {
+                            "role": "user",
+                            "text": "Need a female cardiologist tomorrow",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": first_result.message,
+                            "intent": first_result.intent,
+                            "search_filters": first_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": first_result.conversation.selected_doctor_id if first_result.conversation else None,
+                            "selected_doctor_name": first_result.conversation.selected_doctor_name if first_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "Book this appointment",
+                        },
+                        {
+                            "role": "assistant",
+                            "text": second_result.message,
+                            "intent": second_result.intent,
+                            "search_filters": second_result.search_filters or ChatSearchFilters(),
+                            "selected_doctor_id": second_result.conversation.selected_doctor_id if second_result.conversation else None,
+                            "selected_doctor_name": second_result.conversation.selected_doctor_name if second_result.conversation else None,
+                        },
+                        {
+                            "role": "user",
+                            "text": "assistant capabilities",
+                        },
+                    ],
+                ),
+            ),
+        )
+
+    assert fake_service.calls == 0
+    assert third_result.conversation is not None
+    assert third_result.conversation.routed_to == ChatRoutingTarget.WORKFLOW_ENGINE

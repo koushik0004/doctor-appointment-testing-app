@@ -89,7 +89,7 @@
 
 ### 6. AI chat assistant
 
-- Status: implemented as a rule-based assistant with a live backend API
+- Status: implemented as a rule-based assistant with a live backend API; Vector-less RAG backend knowledge repository and deterministic retrieval service are now integrated into `ConversationManager` as a read-only fallback when no workflow is active
 - Frontend ownership:
   - `frontend/components/layout/GlobalAiWidget.tsx`
   - `frontend/lib/ai-widget/components/*`
@@ -104,6 +104,11 @@
   - `backend/app/services/chat_intent_detector.py`
   - `backend/app/services/chat_entity_extractor.py`
   - `backend/app/schemas/chat.py`
+  - `backend/app/knowledge/documents.py`
+  - `backend/app/knowledge/loader.py`
+  - `backend/app/knowledge/repository.py`
+  - `backend/app/knowledge/retrieval.py`
+  - `backend/app/knowledge/sources/`
 - Current capability:
   - Answers greetings and help flows.
   - Returns structured doctor lists, doctor details, and availability cards.
@@ -111,10 +116,19 @@
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
+  - Accepts direct booking-entry prompts that mention a doctor plus incremental follow-up fields, including explicit day-month-year dates and labeled patient details in structured messages.
+  - Consults the knowledge retrieval service only when no workflow is active and uses the retrieved document before the legacy deterministic fallback for FAQ-style non-workflow turns.
+  - Returns optional `knowledge_source` metadata on knowledge-backed replies so downstream UI mapping can show the retrieved document source.
+  - Displays a minimal knowledge-source footer on assistant text replies in the existing chat widget while preserving workflow cards and booking navigation.
   - Redirects successful chat-driven bookings into the existing appointment confirmation page.
+  - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
+  - Supports deterministic top-document retrieval over repository documents with weighted title, alias, keyword, synonym, category, and body-text matching while filtering broad tokens that would otherwise interfere with doctor-search, availability, fee, or unrelated fallback flows.
+  - Resolves informational FAQ prompts such as online consultation, payment methods, appointment preparation, consultation hours, insurance, and parking through the knowledge layer before the legacy deterministic fallback when no workflow is active.
+  - Includes a dedicated manual test checklist that covers positive, negative, edge, regression, workflow, and existing chatbot scenarios.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
+  - Knowledge retrieval is still backend-only and deterministic; it is not used by prompt building, LLM calls, embeddings, or a vector database, and it remains inactive while a workflow is running.
 
 ## Platform / Cross-Cutting Features
 
@@ -126,6 +140,7 @@
 
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 - These documents define the current layered architecture, boundaries, request flow, and incremental migration path for the AI assistant without changing runtime behavior.
 
 ### Database initialization and seed data

@@ -1,6 +1,7 @@
 "use client";
 
 import type { AiWidgetMessage, AiWidgetMessageContent } from "@/lib/ai-widget/types";
+import type { AiWidgetChatKnowledgeSource } from "@/lib/ai-widget/types";
 import { AppointmentHelpMessage } from "@/lib/ai-widget/components/AppointmentHelpMessage";
 import { AvailabilityMessage } from "@/lib/ai-widget/components/AvailabilityMessage";
 import { DoctorCardMessage } from "@/lib/ai-widget/components/DoctorCardMessage";
@@ -14,6 +15,29 @@ type MessageContentRendererProps = {
 
 function TextContent({ text }: { text: string }) {
   return <p className="whitespace-pre-wrap leading-6">{text}</p>;
+}
+
+function KnowledgeSourceFooter({
+  source,
+}: {
+  source: AiWidgetChatKnowledgeSource;
+}) {
+  const matchedTerms = source.matched_terms.filter(Boolean);
+
+  return (
+    <div className="mt-3 border-t border-slate-200 pt-3 text-[0.72rem] leading-5 text-slate-500">
+      <p className="font-semibold uppercase tracking-[0.16em] text-slate-400">
+        Knowledge source
+      </p>
+      <p className="mt-1 break-words text-slate-600">{source.title}</p>
+      <p className="mt-0.5 break-words text-slate-500">{source.source_path}</p>
+      {matchedTerms.length > 0 ? (
+        <p className="mt-1 text-slate-500">
+          Matched terms: {matchedTerms.join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function DoctorListContent({
@@ -127,6 +151,9 @@ export function MessageContentRenderer({
   return (
     <article className={isUser ? userShellClasses : assistantShellClasses}>
       <TextContent text={message.content.text} />
+      {!isUser && message.metadata?.knowledge_source ? (
+        <KnowledgeSourceFooter source={message.metadata.knowledge_source} />
+      ) : null}
     </article>
   );
 }

@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 from typing import Protocol
 
 from sqlalchemy.orm import Session
 
+from app.knowledge import (
+    FileSystemKnowledgeLoader,
+    InMemoryKnowledgeRepository,
+    KnowledgeDocument,
+    KnowledgeRetrievalMatch,
+    KnowledgeRetrievalService,
+)
 from app.schemas.chat import (
     ChatAvailabilityCard,
     ChatConversationContext,
@@ -13,6 +22,7 @@ from app.schemas.chat import (
     ChatIntent,
     ChatRequest,
     ChatResponse,
+    ChatKnowledgeSource,
     ChatSearchFilters,
 )
 from app.schemas.doctor import DoctorResponse
@@ -265,6 +275,7 @@ def _build_response(
     data: list[ChatDoctorCard | ChatAvailabilityCard] | None = None,
     search_filters: ChatSearchFilters | None = None,
     help_steps: list[str] | None = None,
+    knowledge_source: ChatKnowledgeSource | None = None,
 ) -> ChatResponse:
     return ChatResponse(
         intent=intent,
@@ -272,6 +283,55 @@ def _build_response(
         data=data or [],
         search_filters=search_filters,
         help_steps=help_steps or [],
+        knowledge_source=knowledge_source,
+    )
+
+
+def _join_english_list(items: list[str]) -> str:
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item.strip()]
+
+
+def _knowledge_document_message(document: KnowledgeDocument) -> str:
+    if isinstance(document.content, dict):
+        help_items = _string_list(document.content.get("can_help_with"))
+        if help_items:
+            return f"I can help with {_join_english_list(help_items)}."
+
+    if isinstance(document.content, str):
+        content = " ".join(line.strip() for line in document.content.splitlines() if line.strip())
+        if document.prompt_hints is not None and document.prompt_hints.safe_to_quote and content:
+            return content
+
+    if document.summary.strip():
+        return document.summary.strip()
+
+    return document.title
+
+
+def _knowledge_source_from_match(match: KnowledgeRetrievalMatch) -> ChatKnowledgeSource:
+    document = match.document
+    return ChatKnowledgeSource(
+        document_id=document.id,
+        title=document.title,
+        source_type=document.source_type,
+        source_path=document.source_path,
+        domain=document.domain,
+        audience=document.audience,
+        status=document.status,
+        matched_terms=list(match.matched_terms),
+        score=match.score,
     )
 
 
@@ -446,6 +506,19 @@ class RuleBasedChatResponder:
             "I can help with available doctors, specializations, consultation fees, and appointment slots.",
         )
 
+    def _respond_with_knowledge(
+        self,
+        knowledge_match: KnowledgeRetrievalMatch,
+        search_filters: ChatSearchFilters | None = None,
+    ) -> ChatResponse:
+        document = knowledge_match.document
+        return _build_response(
+            ChatIntent.UNKNOWN,
+            _knowledge_document_message(document),
+            search_filters=search_filters,
+            knowledge_source=_knowledge_source_from_match(knowledge_match),
+        )
+
     def _respond_with_specialty_overview(self) -> ChatResponse:
         specialties = sorted({doctor.specialty for doctor in self._list_all_doctors()})
         return _build_response(
@@ -461,6 +534,7 @@ class RuleBasedChatResponder:
         search_filters: ChatSearchFilters | None = None,
         selected_doctor_name: str | None = None,
         conversation_context: ChatConversationContext | None = None,
+        knowledge_match: KnowledgeRetrievalMatch | None = None,
     ) -> ChatResponse:
         del conversation_context
 
@@ -556,13 +630,24 @@ class RuleBasedChatResponder:
                     search_filters=resolved_search_filters,
                 )
 
-            return _build_response(
-                ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
-                "I can help you search for doctors by specialization, location, fee, or availability.",
-                search_filters=resolved_search_filters,
-            )
+                return _build_response(
+                    ChatIntent.SHOW_DOCTORS_BY_SPECIALIZATION,
+                    "I can help you search for doctors by specialization, location, fee, or availability.",
+                    search_filters=resolved_search_filters,
+                )
+
+        if knowledge_match is not None:
+            return self._respond_with_knowledge(knowledge_match, resolved_search_filters)
 
         return self._respond_with_unknown()
+
+
+@lru_cache(maxsize=1)
+def _knowledge_retrieval_service() -> KnowledgeRetrievalService:
+    sources_root = Path(__file__).resolve().parents[1] / "knowledge" / "sources"
+    repository = InMemoryKnowledgeRepository(FileSystemKnowledgeLoader(sources_root))
+    repository.load()
+    return KnowledgeRetrievalService(repository)
 
 
 def create_chat_response(
@@ -576,5 +661,6 @@ def create_chat_response(
     manager = ConversationManager(
         session,
         deterministic_engine=chat_responder,
+        knowledge_retrieval_service=_knowledge_retrieval_service(),
     )
     return manager.handle(request)

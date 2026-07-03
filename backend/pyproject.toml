@@ -32,6 +32,14 @@ include-package-data = true
 where = ["."]
 include = ["app*"]
 
+[tool.setuptools.package-data]
+"app.knowledge" = [
+  "sources/*.md",
+  "sources/faq/*.md",
+  "sources/policies/*.md",
+  "sources/structured/*.json",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
