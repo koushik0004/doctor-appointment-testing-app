@@ -11,7 +11,9 @@ Stabilization update scope for this revision:
 - `b4a21b173bfb8975cda8951438282b401855e885` (2026-07-02)
 - `6cd0da4fa952359b176108fdb18dac3b15d0dbc3` (2026-07-02)
 - `6bbd350abe717cfa3160c9f6267f81b820b7f4f5` (2026-07-02)
+- `46311c7285b564a00105bf6270b9436a686221c7` (2026-07-03)
 - `457385da01122ca01b3a3e856aa684436d353dac` (2026-07-03, report generation only)
+- `219a37e25fd3be68d5aaaaaf9916c86453afd7a2` (2026-07-03, report update only)
 
 Analyzed commits:
 1. `a1d99e0` Vector-less RAG prompt generation and planning docs
@@ -25,6 +27,7 @@ Analyzed commits:
 9. `b4a21b1` retrieval quality improvement
 10. `6cd0da4` additional retrieval tuning from manual outcomes
 11. `6bbd350` booking workflow entry and extraction regression fixes
+12. `46311c7` booking workflow validation/error handling stabilization
 
 ## Files Added
 
@@ -67,12 +70,14 @@ Analyzed commits:
 - `docs/prompts/ai-impl-architecture-and-implementation/phase-4-vectorless-rag/debug-and-issue-fix/1-fix-vectorless-routing-prompt.md`
 - `docs/prompts/ai-impl-architecture-and-implementation/phase-4-vectorless-rag/debug-and-issue-fix/2-retrieval-quality-improvement-prompt.md`
 - `docs/prompts/ai-impl-architecture-and-implementation/phase-4-vectorless-rag/debug-and-issue-fix/3-regression-booking-wf-entry-extraction.md`
+- `docs/prompts/ai-impl-architecture-and-implementation/phase-4-vectorless-rag/debug-and-issue-fix/4-fix-503-500-in-appontment-booking-prompt.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-04-manual-test-checklist.md`
 
 ## Files Modified
 
 ### Backend runtime and contracts
 
+- `backend/app/api/chat.py`
 - `backend/app/schemas/chat.py`
 - `backend/app/services/chat_entity_extractor.py`
 - `backend/app/services/chat_service.py`
@@ -129,6 +134,7 @@ The implementation is split into four parts:
 4. Chat orchestration and UI exposure
    - `backend/app/services/conversation_manager.py` still executes workflows first, then uses knowledge retrieval for eligible non-workflow turns, and falls back to the legacy deterministic engine when retrieval finds nothing useful.
    - The post-implementation stabilization commits tightened that routing so knowledge-backed FAQ replies are emitted before the generic deterministic fallback path for eligible non-workflow turns.
+   - Booking-workflow execution now also converts expected booking validation failures into structured `INPUT_REQUIRED` workflow responses, keeping the active draft usable for retry instead of leaking those cases as chat transport failures.
    - `backend/app/schemas/chat.py` adds optional `knowledge_source` metadata to the chat response contract.
    - The frontend AI widget maps and renders that metadata as a small source footer on plain assistant text responses only.
 
@@ -144,9 +150,13 @@ The implementation is split into four parts:
 - Existing workflow engine
   - `WorkflowEngine` remains authoritative for booking, cancellation, and appointment confirmation. Knowledge lookup is explicitly skipped while a workflow is active.
   - Booking continuation also now depends on merged draft state from prior turns plus the newer explicit-date and labeled-name extraction patterns, which prevents repeated missing-field prompts during incremental booking conversations.
+  - Booking completion now traps expected `HTTPException` and `ValidationError` failures from `create_appointment_booking(...)` and maps them back into deterministic workflow guidance so the same booking session can continue.
 
 - Chat API contract
   - `ChatResponse` now supports `knowledge_source` while preserving `message`, `response`, `data`, `workflow`, and `conversation`.
+
+- Chat API transport boundary
+  - `backend/app/api/chat.py` now re-raises expected `HTTPException` values and reserves HTTP 500 for unexpected failures only, replacing the earlier behavior that collapsed business-validation cases into HTTP 503.
 
 - Frontend widget rendering
   - `chat-response-mapper.ts` forwards `knowledge_source` into message metadata.
@@ -190,6 +200,9 @@ This kept Vector-less RAG read-only for informational turns while leaving all bo
 
 - Fix regressions in the same phase rather than deferring them.
   Manual testing exposed routing noise and booking continuation regressions, so the phase closed with retrieval tuning plus workflow-entry extraction fixes.
+
+- Keep expected business validation failures inside the workflow layer.
+  Booking errors such as past dates, invalid doctor context, unavailable times, duplicate slots, and invalid patient fields now return structured workflow guidance instead of being treated as transport-level chat outages.
 
 ## Stabilization Summary
 
@@ -245,6 +258,19 @@ This kept Vector-less RAG read-only for informational turns while leaving all bo
 - Backward Compatibility
   The booking workflow type, API shape, and existing step-by-step booking behavior remain unchanged; the fix only broadens accepted input forms and removes continuation regressions.
 
+### Fix 5: Booking validation failures were escaping as chat API 503/500 errors
+
+- Issue
+  Expected booking failures such as past dates, already-booked slots, invalid doctor context, invalid appointment times, and invalid patient email data were surfacing as HTTP 503 or HTTP 500 instead of a recoverable booking response.
+- Root Cause
+  `WorkflowEngine` called the booking service directly and let expected `HTTPException` and `ValidationError` failures bubble out. `backend/app/api/chat.py` then wrapped generic exceptions as a chat-service transport failure, so business validation errors were misclassified as server outages.
+- Implementation
+  `WorkflowEngine` now catches expected booking validation failures, clears only the invalid draft field when possible, and returns a structured `BOOK_APPOINTMENT` workflow response with `INPUT_REQUIRED` status and deterministic retry guidance. The chat API now re-raises expected `HTTPException` values and returns HTTP 500 only for unexpected failures.
+- Files Changed
+  `backend/app/api/chat.py`, `backend/app/services/workflow_engine.py`, `backend/tests/test_chat_api.py`
+- Backward Compatibility
+  Endpoint paths and chat response fields remain unchanged. The behavior change is limited to error classification: expected booking validation failures now stay inside the existing workflow contract instead of becoming transport-level failures.
+
 ## Known Limitations
 
 - Retrieval is still deterministic single-document matching, not semantic retrieval.
@@ -252,6 +278,7 @@ This kept Vector-less RAG read-only for informational turns while leaving all bo
 - Knowledge coverage is limited to the bundled FAQ/capability documents added in this phase.
 - Retrieval quality still depends on manually curated metadata and stopword tuning; new FAQ areas may need additional aliases, synonyms, or phrase labels to rank correctly.
 - Conversation state is still request-scoped metadata passed through the chat payload; there is no persisted conversation store.
+- Some booking-validation mappings depend on current service exception details (`already passed`, `already booked`, `not available for the chosen date`), so future wording changes in the appointment service will require matching updates in the workflow error-normalization layer.
 - Manual testing artifacts exist, but the inspected commits do not include a full final human execution log inside this report file.
 - `backend/app.db` changed during the range, but the Vector-less RAG architecture itself does not depend on a new database schema.
 
@@ -278,6 +305,7 @@ The implementation is backward compatible for the current app surface for four r
   - routing fixes so knowledge responses win before generic deterministic fallback for eligible FAQ-style turns
   - retrieval quality fixes so broad terms such as `online`, `appointment`, or `methods` do not steal unrelated requests
 - A later regression pass also fixed booking-workflow continuation behavior for direct doctor-reference prompts, explicit absolute dates, and labeled patient-name inputs.
+- The July 3 defect-fix commit added endpoint-level regression coverage for recoverable booking validation failures plus the unexpected-error path, confirming that past-date, already-booked, invalid-doctor, invalid-time, duplicate-booking, and invalid-patient cases now return structured workflow responses instead of HTTP 503/500.
 - Regression coverage was expanded in:
   - `backend/tests/test_knowledge_repository.py`
   - `backend/tests/test_conversation_manager.py`
