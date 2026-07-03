@@ -1,3 +1,8 @@
+---
+name: generate-impl-report
+description: Read the last commit range and generate a concise implementation report in markdown format.
+---
+
 # Generate Implementation Report
 
 You are documenting a completed implementation.
