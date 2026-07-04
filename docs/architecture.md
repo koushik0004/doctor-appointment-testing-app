@@ -23,11 +23,13 @@ Next.js Chat UI
   ↓
 FastAPI AI endpoint
   ↓
-LLM command parser
+Deterministic orchestration
   ↓
-Playwright browser automation agent
+Optional Prompt Builder
   ↓
-Visible frontend navigation and appointment booking
+Optional provider-neutral LLM Integration layer
+  ↓
+Deterministic validation and domain services
 ```
 
 ## 2. Monorepo Structure

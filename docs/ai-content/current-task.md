@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.1 provider-neutral LLM integration architecture seam
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added a new inactive backend `app.llm` package that defines provider-neutral LLM integration contracts without wiring any part of the production runtime to an external model.
+- Introduced implementation-ready internal models for messages, generation requests/responses, constraints, token usage, finish reasons, provider capabilities, and provider descriptors.
+- Added protocol boundaries for future provider adapters and provider registries plus an inactive `LLMIntegrationService` facade that reports disconnected status by default and only delegates generation when an explicit registry is supplied.
+- Kept `ConversationManager`, `WorkflowEngine`, Vector-less RAG retrieval, Prompt Builder, frontend contracts, APIs, and the database unchanged.
+- Added focused backend tests plus Phase 6 architecture/report documentation and refreshed the compact AI context files so future sessions can discover the new seam directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.8 dedicated prompt renderer
 - Completed on: 2026-07-04
 

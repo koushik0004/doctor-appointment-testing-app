@@ -68,6 +68,14 @@
   - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file.
 - `backend/app/services/prompt_builder.py`
   - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; it does not do retrieval, routing, workflow execution, API calls, database access, or AI reasoning.
+- `backend/app/llm/__init__.py`
+  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts and the disconnected integration facade.
+- `backend/app/llm/models.py`
+  - Internal LLM integration request/response, capabilities, and usage models; provider-neutral and not wired to API schemas or any SDK.
+- `backend/app/llm/interfaces.py`
+  - Provider and provider-registry protocols for future adapter implementations.
+- `backend/app/llm/service.py`
+  - Inactive `LLMIntegrationService` facade that reports disconnected status by default and only delegates generation when an explicit registry is supplied.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
@@ -128,6 +136,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers search-filter extraction regressions, including the payment-method wording that must not infer a doctor-gender filter.
 - `backend/tests/test_prompt_builder_service.py`
   - Covers the inactive prompt-builder seam: `PromptContext` creation, deterministic conversation, workflow, knowledge, and system-instruction normalization/construction, deterministic validation, Prompt Assembly Pipeline section ordering/omission, dedicated PromptRenderer behavior, deterministic block assembly, prompt-hint constraints, and character-budget truncation without touching the live request flow.
+- `backend/tests/test_llm_integration.py`
+  - Covers the inactive LLM integration seam: disconnected status by default, provider-descriptor listing through a stub registry, explicit delegation behavior, and failure when no runtime registry is configured.
 
 ## High-Value Docs
 
@@ -135,6 +145,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/llm-integration-architecture.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

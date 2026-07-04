@@ -1,0 +1,77 @@
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.llm.interfaces import LLMProviderRegistry
+from app.llm.models import (
+    LLMGenerationRequest,
+    LLMGenerationResponse,
+    LLMProviderDescriptor,
+)
+
+
+class LLMIntegrationStatus(BaseModel):
+    enabled: bool = False
+    connected_provider_names: list[str] = Field(default_factory=list)
+    default_provider_name: str | None = None
+    reason: str = Field(
+        default="LLM integration is not connected to the runtime in this phase."
+    )
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class LLMIntegrationService:
+    """Inactive architectural boundary for future provider-neutral LLM calls."""
+
+    def __init__(
+        self,
+        *,
+        provider_registry: LLMProviderRegistry | None = None,
+        default_provider_name: str | None = None,
+    ) -> None:
+        self._provider_registry = provider_registry
+        self._default_provider_name = default_provider_name
+
+    def get_status(self) -> LLMIntegrationStatus:
+        if self._provider_registry is None:
+            return LLMIntegrationStatus(default_provider_name=self._default_provider_name)
+
+        providers = self._provider_registry.list_providers()
+        return LLMIntegrationStatus(
+            enabled=False,
+            connected_provider_names=[
+                provider.provider_name for provider in providers
+            ],
+            default_provider_name=self._default_provider_name,
+        )
+
+    def list_registered_providers(self) -> list[LLMProviderDescriptor]:
+        if self._provider_registry is None:
+            return []
+        return list(self._provider_registry.list_providers())
+
+    def generate(
+        self,
+        request: LLMGenerationRequest,
+        *,
+        provider_name: str | None = None,
+    ) -> LLMGenerationResponse:
+        if self._provider_registry is None:
+            raise RuntimeError(
+                "LLM integration is inactive: no provider registry is configured."
+            )
+
+        resolved_provider_name = provider_name or self._default_provider_name
+        if not resolved_provider_name:
+            raise RuntimeError(
+                "LLM integration is inactive: no provider name was resolved."
+            )
+
+        provider = self._provider_registry.get_provider(resolved_provider_name)
+        if provider is None:
+            raise RuntimeError(
+                f"LLM integration is inactive: provider '{resolved_provider_name}' is not registered."
+            )
+
+        return provider.generate(request)
