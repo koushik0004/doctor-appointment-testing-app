@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.8 dedicated prompt renderer
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic `PromptRenderer` beneath the Prompt Assembly Pipeline so ordered `PromptAssemblySection` instances are rendered through a dedicated final stage instead of inside `PromptBuilderService`.
+- Moved section rendering, optional section-header handling, prompt joining, total prompt truncation, and truncation-marker application out of `PromptBuilderService` while preserving the exact rendered prompt output and the existing `PromptBuildRequest` and `PromptBuildResult` contracts.
+- Refactored `PromptBuilderService` into a thinner orchestrator that now builds context, validates it, assembles sections, delegates final rendering to `PromptRenderer`, and then returns the backward-compatible build result.
+- Expanded focused backend tests to cover deterministic renderer behavior, header-enabled and header-disabled rendering, empty section rendering, truncation handling, repeated rendering determinism, read-only behavior, and PromptBuilderService integration with the renderer.
+- Updated the architecture reference and AI context files so later sessions can treat `PromptRenderer` as the final deterministic stage of the inactive Prompt Builder pipeline.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.7 deterministic prompt assembly pipeline
 - Completed on: 2026-07-04
 

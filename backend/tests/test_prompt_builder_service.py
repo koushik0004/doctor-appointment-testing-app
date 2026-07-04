@@ -8,6 +8,7 @@ from app.knowledge import (
 )
 from app.services.prompt_builder import (
     PromptBuildRequest,
+    PromptAssemblySection,
     PromptAssemblySectionKind,
     PromptBuilderService,
     PromptContextAssemblyPipeline,
@@ -20,6 +21,7 @@ from app.services.prompt_builder import (
     PromptContextKnowledgeDocument,
     PromptContextMetadata,
     PromptContextRenderingOptions,
+    PromptRenderer,
     PromptContextSystemInstructionBuilder,
     PromptContextSystemInstructions,
     PromptContextUserContext,
@@ -316,6 +318,116 @@ def test_prompt_assembly_pipeline_is_deterministic_and_read_only():
         "domain": "faq",
         "audience": "patient",
     }
+
+
+def test_prompt_renderer_is_deterministic_with_headers_enabled():
+    renderer = PromptRenderer()
+    sections = [
+        PromptAssemblySection(
+            kind=PromptAssemblySectionKind.USER_MESSAGE,
+            label="User Message",
+            content="Need help booking",
+        ),
+        PromptAssemblySection(
+            kind=PromptAssemblySectionKind.CONVERSATION_STATE,
+            label="Conversation State",
+            content='{"history":[]}',
+        ),
+    ]
+    options = PromptContextRenderingOptions(include_section_headers=True)
+
+    first_result = renderer.render(
+        sections=sections,
+        rendering_options=options,
+        max_prompt_chars=400,
+    )
+    second_result = renderer.render(
+        sections=sections,
+        rendering_options=options,
+        max_prompt_chars=400,
+    )
+
+    assert first_result == second_result
+    assert first_result.truncated is False
+    assert first_result.prompt == (
+        "[User Message]\nNeed help booking\n\n"
+        "[Conversation State]\n{\"history\":[]}"
+    )
+
+
+def test_prompt_renderer_supports_headers_disabled():
+    renderer = PromptRenderer()
+    sections = [
+        PromptAssemblySection(
+            kind=PromptAssemblySectionKind.USER_MESSAGE,
+            label="User Message",
+            content="Need help booking",
+        ),
+    ]
+
+    result = renderer.render(
+        sections=sections,
+        rendering_options=PromptContextRenderingOptions(include_section_headers=False),
+        max_prompt_chars=400,
+    )
+
+    assert result.prompt == "Need help booking"
+    assert result.truncated is False
+
+
+def test_prompt_renderer_returns_empty_prompt_for_empty_sections():
+    renderer = PromptRenderer()
+
+    result = renderer.render(
+        sections=[],
+        rendering_options=PromptContextRenderingOptions(),
+        max_prompt_chars=400,
+    )
+
+    assert result.prompt == ""
+    assert result.truncated is False
+
+
+def test_prompt_renderer_applies_total_prompt_truncation_and_marker():
+    renderer = PromptRenderer()
+    sections = [
+        PromptAssemblySection(
+            kind=PromptAssemblySectionKind.USER_MESSAGE,
+            label="User Message",
+            content="A" * 80,
+        ),
+    ]
+
+    result = renderer.render(
+        sections=sections,
+        rendering_options=PromptContextRenderingOptions(truncation_marker="[CUT]"),
+        max_prompt_chars=40,
+    )
+
+    assert result.truncated is True
+    assert result.prompt.endswith("\n\n[CUT]")
+    assert len(result.prompt) <= 40
+
+
+def test_prompt_renderer_is_read_only():
+    renderer = PromptRenderer()
+    sections = [
+        PromptAssemblySection(
+            kind=PromptAssemblySectionKind.KNOWLEDGE_DOCUMENT,
+            label="Knowledge Document: Booking Help",
+            content="Summary: Bring ID",
+            metadata={"document_id": "faq.booking"},
+        ),
+    ]
+    original_sections = [section.model_copy(deep=True) for section in sections]
+
+    renderer.render(
+        sections=sections,
+        rendering_options=PromptContextRenderingOptions(),
+        max_prompt_chars=400,
+    )
+
+    assert sections == original_sections
 
 
 def test_prompt_builder_uses_system_instruction_builder_without_mutating_inputs():

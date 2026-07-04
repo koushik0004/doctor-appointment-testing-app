@@ -32,6 +32,13 @@ class PromptAssemblySection(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class PromptRenderResult(BaseModel):
+    prompt: str
+    truncated: bool = False
+
+    model_config = ConfigDict(str_strip_whitespace=False)
+
+
 class PromptContextBlock(BaseModel):
     kind: PromptContextBlockKind
     label: str = Field(min_length=1)
@@ -662,6 +669,48 @@ class PromptContextAssemblyPipeline:
         }
 
 
+class PromptRenderer:
+    """Deterministically renders assembled prompt sections into final prompt text."""
+
+    def render(
+        self,
+        *,
+        sections: list[PromptAssemblySection],
+        rendering_options: PromptContextRenderingOptions,
+        max_prompt_chars: int,
+    ) -> PromptRenderResult:
+        rendered_sections = [
+            self._render_section(
+                label=section.label,
+                content=section.content,
+                rendering_options=rendering_options,
+            )
+            for section in sections
+        ]
+
+        prompt = "\n\n".join(rendered_sections)
+        if len(prompt) <= max_prompt_chars:
+            return PromptRenderResult(prompt=prompt, truncated=False)
+
+        truncation_marker = rendering_options.truncation_marker
+        clipped_prompt = prompt[: max_prompt_chars - (len(truncation_marker) + 3)].rstrip()
+        return PromptRenderResult(
+            prompt=f"{clipped_prompt}\n\n{truncation_marker}",
+            truncated=True,
+        )
+
+    def _render_section(
+        self,
+        *,
+        label: str,
+        content: str,
+        rendering_options: PromptContextRenderingOptions,
+    ) -> str:
+        if not rendering_options.include_section_headers:
+            return content
+        return f"[{label}]\n{content}"
+
+
 class PromptBuildRequest(BaseModel):
     user_message: str = Field(min_length=1)
     conversation_state: dict[str, Any] = Field(default_factory=dict)
@@ -692,6 +741,7 @@ class PromptBuilderService:
         knowledge_collector: PromptContextKnowledgeCollector | None = None,
         system_instruction_builder: PromptContextSystemInstructionBuilder | None = None,
         assembly_pipeline: PromptContextAssemblyPipeline | None = None,
+        renderer: PromptRenderer | None = None,
     ) -> None:
         self._conversation_collector = (
             conversation_collector
@@ -718,6 +768,7 @@ class PromptBuilderService:
             if assembly_pipeline is not None
             else PromptContextAssemblyPipeline()
         )
+        self._renderer = renderer if renderer is not None else PromptRenderer()
 
     def build(self, request: PromptBuildRequest) -> PromptBuildResult:
         context = self.build_context(request)
@@ -727,17 +778,18 @@ class PromptBuilderService:
         sections = self._assembly_pipeline.assemble(context)
         blocks = self._build_blocks(sections)
 
-        prompt, truncated = self._compose_prompt(
+        render_result = self._renderer.render(
             sections=sections,
-            context=context,
+            rendering_options=context.rendering_options,
+            max_prompt_chars=context.constraints.max_prompt_chars,
         )
 
         return PromptBuildResult(
-            prompt=prompt,
+            prompt=render_result.prompt,
             blocks=blocks,
             included_document_ids=context.metadata.included_document_ids,
             excluded_document_ids=context.metadata.excluded_document_ids,
-            truncated=truncated,
+            truncated=render_result.truncated,
             requires_domain_validation=context.metadata.requires_domain_validation,
         )
 
@@ -1091,42 +1143,6 @@ class PromptBuilderService:
             )
 
         return blocks
-
-    def _compose_prompt(
-        self,
-        *,
-        sections: list[PromptAssemblySection],
-        context: PromptContext,
-    ) -> tuple[str, bool]:
-        rendered_sections = [
-            self._render_section(
-                label=section.label,
-                content=section.content,
-                rendering_options=context.rendering_options,
-            )
-            for section in sections
-        ]
-
-        prompt = "\n\n".join(rendered_sections)
-        if len(prompt) <= context.constraints.max_prompt_chars:
-            return prompt, False
-
-        truncation_marker = context.rendering_options.truncation_marker
-        clipped_prompt = prompt[
-            : context.constraints.max_prompt_chars - (len(truncation_marker) + 3)
-        ].rstrip()
-        return f"{clipped_prompt}\n\n{truncation_marker}", True
-
-    def _render_section(
-        self,
-        *,
-        label: str,
-        content: str,
-        rendering_options: PromptContextRenderingOptions,
-    ) -> str:
-        if not rendering_options.include_section_headers:
-            return content
-        return f"[{label}]\n{content}"
 
     def _format_validation_error(
         self,

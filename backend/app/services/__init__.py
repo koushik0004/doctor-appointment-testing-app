@@ -3,6 +3,7 @@
 from app.services.prompt_builder import (
     PromptBuildRequest,
     PromptBuildResult,
+    PromptRenderResult,
     PromptAssemblySection,
     PromptAssemblySectionKind,
     PromptBuilderService,
@@ -19,6 +20,7 @@ from app.services.prompt_builder import (
     PromptContextKnowledgeDocument,
     PromptContextMetadata,
     PromptContextRenderingOptions,
+    PromptRenderer,
     PromptContextSystemInstructionBuilder,
     PromptContextSystemInstructions,
     PromptContextUserContext,
@@ -31,6 +33,7 @@ from app.services.prompt_builder import (
 __all__ = [
     "PromptBuildRequest",
     "PromptBuildResult",
+    "PromptRenderResult",
     "PromptAssemblySection",
     "PromptAssemblySectionKind",
     "PromptBuilderService",
@@ -47,6 +50,7 @@ __all__ = [
     "PromptContextKnowledgeDocument",
     "PromptContextMetadata",
     "PromptContextRenderingOptions",
+    "PromptRenderer",
     "PromptContextSystemInstructionBuilder",
     "PromptContextSystemInstructions",
     "PromptContextUserContext",
