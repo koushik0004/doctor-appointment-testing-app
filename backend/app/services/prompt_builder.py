@@ -434,6 +434,32 @@ class PromptContextKnowledgeCollector:
         )
 
 
+class PromptContextSystemInstructionBuilder:
+    """Deterministically builds canonical system instructions."""
+
+    def __init__(self, application_rules: list[str] | None = None) -> None:
+        self._application_rules = list(application_rules or [])
+
+    def build(
+        self,
+        *,
+        caller_instructions: list[str],
+    ) -> PromptContextSystemInstructions:
+        ordered_instructions: list[str] = []
+        seen_instructions: set[str] = set()
+
+        for instruction in [*self._application_rules, *caller_instructions]:
+            if not isinstance(instruction, str):
+                continue
+            normalized_instruction = instruction.strip()
+            if not normalized_instruction or normalized_instruction in seen_instructions:
+                continue
+            ordered_instructions.append(normalized_instruction)
+            seen_instructions.add(normalized_instruction)
+
+        return PromptContextSystemInstructions(instructions=ordered_instructions)
+
+
 class PromptBuildRequest(BaseModel):
     user_message: str = Field(min_length=1)
     conversation_state: dict[str, Any] = Field(default_factory=dict)
@@ -462,6 +488,7 @@ class PromptBuilderService:
         conversation_collector: PromptContextConversationCollector | None = None,
         workflow_collector: PromptContextWorkflowCollector | None = None,
         knowledge_collector: PromptContextKnowledgeCollector | None = None,
+        system_instruction_builder: PromptContextSystemInstructionBuilder | None = None,
     ) -> None:
         self._conversation_collector = (
             conversation_collector
@@ -477,6 +504,11 @@ class PromptBuilderService:
             knowledge_collector
             if knowledge_collector is not None
             else PromptContextKnowledgeCollector()
+        )
+        self._system_instruction_builder = (
+            system_instruction_builder
+            if system_instruction_builder is not None
+            else PromptContextSystemInstructionBuilder()
         )
 
     def build(self, request: PromptBuildRequest) -> PromptBuildResult:
@@ -529,8 +561,8 @@ class PromptBuilderService:
             ),
             workflow_context=workflow_context,
             knowledge_context=knowledge_collection.knowledge_context,
-            system_instructions=PromptContextSystemInstructions(
-                instructions=list(request.system_instructions)
+            system_instructions=self._system_instruction_builder.build(
+                caller_instructions=request.system_instructions
             ),
             constraints=PromptContextConstraints(max_prompt_chars=request.max_prompt_chars),
         )

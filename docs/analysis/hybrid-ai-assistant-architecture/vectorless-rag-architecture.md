@@ -59,7 +59,7 @@ Markdown and JSON knowledge sources
 
 The implemented module now participates in chat orchestration as a read-only fallback. It can load, validate, cache, and deterministically select one top matching document, and `ConversationManager` uses that result only when no workflow is active before falling back to the deterministic chat engine.
 
-The inactive Prompt Builder seam under `backend/app/services/prompt_builder.py` now includes deterministic internal collectors for conversation context, workflow context, and knowledge context before PromptContext validation and rendering. These collectors are provider-agnostic normalization components only; they do not perform retrieval, ranking, semantic search, workflow execution, routing, conversation mutation, API calls, or database access.
+The inactive Prompt Builder seam under `backend/app/services/prompt_builder.py` now includes deterministic internal collectors for conversation context, workflow context, and knowledge context plus a deterministic System Instruction Builder before PromptContext validation and rendering. These components are provider-agnostic normalization and construction seams only; they do not perform retrieval, ranking, semantic search, workflow execution, routing, AI reasoning, conversation mutation, API calls, or database access.
 
 ## Proposed Folder Structure
 

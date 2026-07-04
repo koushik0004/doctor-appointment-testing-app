@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.6 internal system instruction builder
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic System Instruction Builder beneath the inactive backend Prompt Builder so application rules and caller-supplied instructions are normalized into the canonical `PromptContextSystemInstructions` section before validation and rendering.
+- The builder preserves deterministic instruction order, removes duplicates while keeping the first occurrence, trims empty instruction values, and keeps the resulting system-instruction section provider-agnostic without mutating caller input.
+- Refactored `PromptBuilderService` to delegate system-instruction construction to the builder while preserving the existing external request and result contract plus the previously rendered prompt behavior when no application rules are configured.
+- Expanded focused backend tests to cover empty instruction sets, application defaults, caller-only instructions, merged instructions, deterministic duplicate elimination, read-only behavior, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the System Instruction Builder as the dedicated read-only Prompt Builder component responsible for deterministic system-instruction construction before validation and rendering.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.5 internal knowledge context collector
 - Completed on: 2026-07-04
 
@@ -200,6 +214,7 @@
 - `backend/tests/test_prompt_builder_service.py`
 - `backend/app/services/__init__.py`
 - `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
+- `docs/ai-content/feature-map.md`
 
 ## Notes
 

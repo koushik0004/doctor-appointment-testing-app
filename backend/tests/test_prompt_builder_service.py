@@ -17,6 +17,7 @@ from app.services.prompt_builder import (
     PromptContextKnowledgeDocument,
     PromptContextMetadata,
     PromptContextRenderingOptions,
+    PromptContextSystemInstructionBuilder,
     PromptContextSystemInstructions,
     PromptContextUserContext,
     PromptContextValidationResult,
@@ -141,6 +142,114 @@ def test_prompt_builder_context_uses_deterministic_defaults_for_optional_section
     assert context.system_instructions.instructions == []
     assert context.constraints == PromptContextConstraints()
     assert context.rendering_options == PromptContextRenderingOptions()
+
+
+def test_system_instruction_builder_returns_empty_instructions_by_default():
+    builder = PromptContextSystemInstructionBuilder()
+
+    instructions = builder.build(caller_instructions=[])
+
+    assert instructions == PromptContextSystemInstructions(instructions=[])
+
+
+def test_system_instruction_builder_returns_application_rules_when_present():
+    builder = PromptContextSystemInstructionBuilder(
+        application_rules=[
+            "Use only provided context.",
+            "Keep answers provider-agnostic.",
+        ]
+    )
+
+    instructions = builder.build(caller_instructions=[])
+
+    assert instructions == PromptContextSystemInstructions(
+        instructions=[
+            "Use only provided context.",
+            "Keep answers provider-agnostic.",
+        ]
+    )
+
+
+def test_system_instruction_builder_preserves_caller_instructions():
+    builder = PromptContextSystemInstructionBuilder()
+
+    instructions = builder.build(
+        caller_instructions=[
+            "Do not invent appointment data.",
+            "Prefer deterministic summaries.",
+        ]
+    )
+
+    assert instructions == PromptContextSystemInstructions(
+        instructions=[
+            "Do not invent appointment data.",
+            "Prefer deterministic summaries.",
+        ]
+    )
+
+
+def test_system_instruction_builder_merges_rules_and_deduplicates_deterministically():
+    builder = PromptContextSystemInstructionBuilder(
+        application_rules=[
+            "Use only provided context.",
+            "Do not invent appointment data.",
+            "Use only provided context.",
+        ]
+    )
+    caller_instructions = [
+        "Do not invent appointment data.",
+        "Prefer deterministic summaries.",
+        "  Prefer deterministic summaries.  ",
+        "",
+    ]
+
+    instructions = builder.build(caller_instructions=caller_instructions)
+
+    assert instructions == PromptContextSystemInstructions(
+        instructions=[
+            "Use only provided context.",
+            "Do not invent appointment data.",
+            "Prefer deterministic summaries.",
+        ]
+    )
+    assert caller_instructions == [
+        "Do not invent appointment data.",
+        "Prefer deterministic summaries.",
+        "  Prefer deterministic summaries.  ",
+        "",
+    ]
+
+
+def test_prompt_builder_uses_system_instruction_builder_without_mutating_inputs():
+    service = PromptBuilderService(
+        system_instruction_builder=PromptContextSystemInstructionBuilder(
+            application_rules=[
+                "Use only provided context.",
+                "Do not invent appointment data.",
+            ]
+        )
+    )
+    caller_instructions = [
+        "Do not invent appointment data.",
+        "Prefer deterministic summaries.",
+    ]
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Help me book",
+            system_instructions=caller_instructions,
+        )
+    )
+
+    assert context.system_instructions.instructions == [
+        "Use only provided context.",
+        "Do not invent appointment data.",
+        "Prefer deterministic summaries.",
+    ]
+    assert caller_instructions == [
+        "Do not invent appointment data.",
+        "Prefer deterministic summaries.",
+    ]
 
 
 def test_workflow_collector_returns_none_when_no_workflow_exists():
