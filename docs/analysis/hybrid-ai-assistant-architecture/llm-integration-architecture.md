@@ -28,6 +28,13 @@ Phase 6.3 refines the canonical internal contract with:
 - provider-neutral structured-output, tool-call, reasoning, citation, and model/provider result metadata
 - capability flags for future reasoning, citation, and audio support
 
+Phase 6.4 adds an inactive orchestration layer with:
+
+- a thin coordinator between `PromptBuilderService` and `LLMIntegrationService`
+- a provider-neutral orchestration request contract for already-collected generation input
+- deterministic transformation from `PromptBuildResult` into `LLMGenerationRequest`
+- deterministic normalization from `LLMGenerationResponse` into a simple orchestration result
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -47,6 +54,7 @@ backend/app/llm/
 ├── adapters.py
 ├── interfaces.py
 ├── models.py
+├── orchestrator.py
 ├── registry.py
 └── service.py
 ```
@@ -125,6 +133,25 @@ The facade exposes three narrow responsibilities:
 
 The service does not self-configure, auto-discover providers, or attach itself to runtime execution.
 
+### `orchestrator.py`
+
+Inactive coordination layer:
+
+- `LLMGenerationOrchestrationRequest`
+- `LLMGenerationOrchestrationResult`
+- `LLMGenerationOrchestrator`
+
+The orchestrator accepts already-collected generation input, invokes the existing `PromptBuilderService`, converts `PromptBuildResult` into the canonical `LLMGenerationRequest`, delegates generation through `LLMIntegrationService`, and normalizes the canonical response into a simpler provider-neutral result.
+
+It does not:
+
+- construct prompts directly
+- know provider-native payloads
+- retrieve knowledge
+- route workflows
+- validate domain business rules
+- mutate conversation state
+
 ## Boundary Rules
 
 This layer must not:
@@ -150,7 +177,20 @@ Knowledge retrieval continues to select repository documents deterministically a
 
 ### Prompt Builder
 
-The Prompt Builder remains an inactive formatting seam that produces provider-neutral prompt context and rendered prompt text. It does not invoke the LLM layer in this phase.
+The Prompt Builder remains an inactive formatting seam that produces provider-neutral prompt context and rendered prompt text. In Phase 6.4 it is still independent; the new inactive orchestrator may call it explicitly, but the Prompt Builder itself still does not invoke the LLM layer.
+
+### LLM Generation Orchestrator
+
+The new orchestrator remains inactive and is not imported by `ConversationManager`, `WorkflowEngine`, Vector-less RAG retrieval, FastAPI routes, or frontend chat code.
+
+Its only role is to demonstrate the intended future composition order:
+
+1. already-collected generation input
+2. `PromptBuilderService`
+3. canonical `LLMGenerationRequest`
+4. `LLMIntegrationService`
+5. canonical `LLMGenerationResponse`
+6. normalized provider-neutral generation result
 
 ## Future Integration Path
 
@@ -160,7 +200,7 @@ Later phases may connect this layer in a guarded way:
 2. Keep provider-native request and response payloads private to those adapters.
 3. Register them behind an explicit `LLMProviderRegistry`.
 4. Optionally declare a default provider through configuration-owned registry setup.
-5. Introduce a narrow caller that passes already-assembled prompt input into `LLMIntegrationService`.
+5. Keep `LLMGenerationOrchestrator` as the narrow caller that passes already-collected generation input through `PromptBuilderService` and then into `LLMIntegrationService`.
 6. Keep deterministic post-processing and business validation outside the LLM layer.
 7. Preserve existing chat response contracts unless a later migration explicitly changes them.
 
@@ -187,10 +227,12 @@ Focused tests now validate:
 - canonical request and response validation remains backward compatible
 - deterministic serialization of equivalent canonical model instances
 - optional structured-output, tool, reasoning, streaming, citation, and modality fields remain provider-neutral and optional
+- orchestration order stays deterministic across Prompt Builder, canonical request mapping, LLM service delegation, and normalized result shaping
+- the default orchestrator remains inactive without explicit registry-backed LLM service setup
 
 ## Compatibility Guarantees
 
-Phase 6.3 preserves:
+Phase 6.4 preserves:
 
 - zero production behavior changes
 - zero API changes
@@ -199,6 +241,7 @@ Phase 6.3 preserves:
 - zero changes to chat orchestration order
 - zero changes to workflow ownership
 - zero changes to prompt-builder behavior
+- zero runtime wiring of the new orchestrator
 
 ## Reference Files
 
@@ -206,6 +249,8 @@ Phase 6.3 preserves:
 - `backend/app/llm/adapters.py`
 - `backend/app/llm/models.py`
 - `backend/app/llm/interfaces.py`
+- `backend/app/llm/orchestrator.py`
 - `backend/app/llm/registry.py`
 - `backend/app/llm/service.py`
 - `backend/tests/test_llm_integration.py`
+- `backend/tests/test_llm_orchestrator.py`

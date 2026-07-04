@@ -74,6 +74,8 @@
   - Shared inactive base adapter pipeline for future provider-specific request/response translation and private provider invocation.
 - `backend/app/llm/models.py`
   - Internal LLM integration request/response, capabilities, and usage models; now also carries provider-neutral structured-output, tool-calling, reasoning, streaming, citation, and multimodal-intent metadata without wiring any SDK or API schema.
+- `backend/app/llm/orchestrator.py`
+  - Inactive thin coordinator that accepts already-collected generation input, invokes `PromptBuilderService`, converts `PromptBuildResult` into canonical `LLMGenerationRequest`, delegates to `LLMIntegrationService`, and normalizes the canonical response into a simple provider-neutral result without adding runtime wiring.
 - `backend/app/llm/interfaces.py`
   - Provider translator, adapter, and provider-registry protocols for future adapter implementations.
 - `backend/app/llm/registry.py`
@@ -144,6 +146,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the inactive LLM integration seam: disconnected status by default, provider-descriptor listing through a stub registry, explicit delegation behavior, canonical adapter translation flow, inactive default-provider resolution, duplicate-registry protection, and failure when no runtime registry is configured.
 - `backend/tests/test_llm_models.py`
   - Covers the refined canonical LLM contract: model validation, backward-compatible defaults, deterministic serialization, optional future-capability fields, and provider-neutral extensibility.
+- `backend/tests/test_llm_orchestrator.py`
+  - Covers the inactive LLM generation orchestrator: orchestration order, Prompt Builder delegation, canonical request transformation, normalized result shaping, deterministic behavior, inactive-by-default runtime status, and no caller-input mutation.
 
 ## High-Value Docs
 
@@ -154,6 +158,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-integration-architecture.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-abstraction.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-canonical-llm-contract.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-generation-orchestration.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

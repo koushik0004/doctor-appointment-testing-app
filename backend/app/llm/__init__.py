@@ -1,10 +1,9 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.2. It defines only
-implementation-ready contracts for a future LLM adapter layer, including
-canonical translation boundaries and an explicit inactive registry, and is not
-wired into the current chat runtime, workflow engine, retrieval layer, or
-prompt builder.
+This package is intentionally inactive in Phase 6.4. It defines only
+implementation-ready contracts for a future LLM adapter layer and an inactive
+generation orchestrator, and is not wired into the current chat runtime,
+workflow engine, retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -38,6 +37,11 @@ from app.llm.models import (
     LLMToolChoiceMode,
     LLMToolDefinition,
 )
+from app.llm.orchestrator import (
+    LLMGenerationOrchestrationRequest,
+    LLMGenerationOrchestrationResult,
+    LLMGenerationOrchestrator,
+)
 from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
 
@@ -46,6 +50,9 @@ __all__ = [
     "LLMCitation",
     "LLMFinishReason",
     "LLMGenerationConstraints",
+    "LLMGenerationOrchestrationRequest",
+    "LLMGenerationOrchestrationResult",
+    "LLMGenerationOrchestrator",
     "LLMGenerationRequest",
     "LLMGenerationResponse",
     "LLMIntegrationService",
