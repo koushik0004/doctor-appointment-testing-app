@@ -103,6 +103,19 @@ class PromptContext(BaseModel):
     )
 
 
+class PromptContextValidationIssue(BaseModel):
+    code: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class PromptContextValidationResult(BaseModel):
+    is_valid: bool
+    issues: list[PromptContextValidationIssue] = Field(default_factory=list)
+
+
 class PromptBuildRequest(BaseModel):
     user_message: str = Field(min_length=1)
     conversation_state: dict[str, Any] = Field(default_factory=dict)
@@ -128,6 +141,9 @@ class PromptBuilderService:
 
     def build(self, request: PromptBuildRequest) -> PromptBuildResult:
         context = self.build_context(request)
+        validation = self.validate_context(context)
+        if not validation.is_valid:
+            raise ValueError(self._format_validation_error(validation.issues))
         blocks = self._build_blocks(context)
 
         prompt, truncated = self._compose_prompt(
@@ -188,6 +204,251 @@ class PromptBuilderService:
                 instructions=list(request.system_instructions)
             ),
             constraints=PromptContextConstraints(max_prompt_chars=request.max_prompt_chars),
+        )
+
+    def validate_context(self, context: PromptContext) -> PromptContextValidationResult:
+        issues: list[PromptContextValidationIssue] = []
+
+        if not isinstance(context.metadata, PromptContextMetadata):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="metadata",
+                    message="metadata must be a PromptContextMetadata instance.",
+                )
+            )
+
+        if not isinstance(context.user_context, PromptContextUserContext):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="user_context",
+                    message="user_context must be a PromptContextUserContext instance.",
+                )
+            )
+        elif not context.user_context.message.strip():
+            issues.append(
+                PromptContextValidationIssue(
+                    code="empty_user_message",
+                    path="user_context.message",
+                    message="user_context.message must be non-empty.",
+                )
+            )
+
+        if context.conversation_context is not None and not isinstance(
+            context.conversation_context, PromptContextConversationContext
+        ):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="conversation_context",
+                    message=(
+                        "conversation_context must be a PromptContextConversationContext "
+                        "instance when provided."
+                    ),
+                )
+            )
+
+        if context.workflow_context is not None and not isinstance(
+            context.workflow_context, PromptContextWorkflowContext
+        ):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="workflow_context",
+                    message=(
+                        "workflow_context must be a PromptContextWorkflowContext instance "
+                        "when provided."
+                    ),
+                )
+            )
+
+        if not isinstance(context.system_instructions, PromptContextSystemInstructions):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="system_instructions",
+                    message=(
+                        "system_instructions must be a PromptContextSystemInstructions "
+                        "instance."
+                    ),
+                )
+            )
+
+        if not isinstance(context.constraints, PromptContextConstraints):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="constraints",
+                    message="constraints must be a PromptContextConstraints instance.",
+                )
+            )
+        else:
+            if isinstance(context.rendering_options, PromptContextRenderingOptions):
+                min_prompt_chars = len(context.rendering_options.truncation_marker) + 3
+                if context.constraints.max_prompt_chars < min_prompt_chars:
+                    issues.append(
+                        PromptContextValidationIssue(
+                            code="invalid_constraint",
+                            path="constraints.max_prompt_chars",
+                            message=(
+                                "constraints.max_prompt_chars must allow space for the "
+                                "truncation marker."
+                            ),
+                        )
+                    )
+
+        if not isinstance(context.rendering_options, PromptContextRenderingOptions):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="rendering_options",
+                    message=(
+                        "rendering_options must be a PromptContextRenderingOptions instance."
+                    ),
+                )
+            )
+        else:
+            if "\n" in context.rendering_options.truncation_marker:
+                issues.append(
+                    PromptContextValidationIssue(
+                        code="invalid_rendering_option",
+                        path="rendering_options.truncation_marker",
+                        message="rendering_options.truncation_marker must be single-line.",
+                    )
+                )
+
+        if context.knowledge_context is not None and not isinstance(
+            context.knowledge_context, PromptContextKnowledgeContext
+        ):
+            issues.append(
+                PromptContextValidationIssue(
+                    code="invalid_section",
+                    path="knowledge_context",
+                    message=(
+                        "knowledge_context must be a PromptContextKnowledgeContext instance "
+                        "when provided."
+                    ),
+                )
+            )
+
+        included_ids = (
+            list(context.metadata.included_document_ids)
+            if isinstance(context.metadata, PromptContextMetadata)
+            else []
+        )
+        excluded_ids = (
+            list(context.metadata.excluded_document_ids)
+            if isinstance(context.metadata, PromptContextMetadata)
+            else []
+        )
+        included_id_set = set(included_ids)
+        excluded_id_set = set(excluded_ids)
+        overlap = sorted(included_id_set & excluded_id_set)
+        if overlap:
+            issues.append(
+                PromptContextValidationIssue(
+                    code="inconsistent_document_metadata",
+                    path="metadata.included_document_ids",
+                    message=(
+                        "included_document_ids and excluded_document_ids must be disjoint."
+                    ),
+                )
+            )
+
+        knowledge_document_ids: list[str] = []
+        if isinstance(context.knowledge_context, PromptContextKnowledgeContext):
+            for index, document in enumerate(context.knowledge_context.documents):
+                if not isinstance(document, PromptContextKnowledgeDocument):
+                    issues.append(
+                        PromptContextValidationIssue(
+                            code="invalid_section",
+                            path=f"knowledge_context.documents[{index}]",
+                            message=(
+                                "knowledge documents must be PromptContextKnowledgeDocument "
+                                "instances."
+                            ),
+                        )
+                    )
+                    continue
+                knowledge_document_ids.append(document.document_id)
+
+        duplicate_document_ids = sorted(
+            {
+                document_id
+                for document_id in knowledge_document_ids
+                if knowledge_document_ids.count(document_id) > 1
+            }
+        )
+        if duplicate_document_ids:
+            issues.append(
+                PromptContextValidationIssue(
+                    code="duplicate_document_ids",
+                    path="knowledge_context.documents",
+                    message=(
+                        "knowledge_context.documents must not contain duplicate "
+                        "document_id values."
+                    ),
+                )
+            )
+
+        if knowledge_document_ids != included_ids:
+            issues.append(
+                PromptContextValidationIssue(
+                    code="inconsistent_document_metadata",
+                    path="metadata.included_document_ids",
+                    message=(
+                        "metadata.included_document_ids must match knowledge_context "
+                        "document order exactly."
+                    ),
+                )
+            )
+
+        included_docs_in_excluded = sorted(set(knowledge_document_ids) & excluded_id_set)
+        if included_docs_in_excluded:
+            issues.append(
+                PromptContextValidationIssue(
+                    code="inconsistent_document_metadata",
+                    path="metadata.excluded_document_ids",
+                    message=(
+                        "excluded_document_ids must not reference included knowledge "
+                        "documents."
+                    ),
+                )
+            )
+
+        if isinstance(context.workflow_context, PromptContextWorkflowContext):
+            workflow_intent = context.workflow_context.active_intent
+            metadata_intent = (
+                context.metadata.active_intent
+                if isinstance(context.metadata, PromptContextMetadata)
+                else None
+            )
+            if workflow_intent and workflow_intent != metadata_intent:
+                issues.append(
+                    PromptContextValidationIssue(
+                        code="inconsistent_workflow_metadata",
+                        path="workflow_context.active_intent",
+                        message=(
+                            "workflow_context.active_intent must match metadata.active_intent."
+                        ),
+                    )
+                )
+            if not workflow_intent:
+                issues.append(
+                    PromptContextValidationIssue(
+                        code="inconsistent_workflow_metadata",
+                        path="workflow_context.active_intent",
+                        message=(
+                            "workflow_context.active_intent must be non-empty when "
+                            "workflow_context is provided."
+                        ),
+                    )
+                )
+
+        return PromptContextValidationResult(
+            is_valid=not issues,
+            issues=issues,
         )
 
     def _should_include_document(self, document: KnowledgeDocument, active_intent: str | None) -> bool:
@@ -360,3 +621,17 @@ class PromptBuilderService:
             ensure_ascii=rendering_options.json_ensure_ascii,
             separators=separators,
         )
+
+    def _format_validation_error(
+        self,
+        issues: list[PromptContextValidationIssue],
+    ) -> str:
+        serialized_issues = [
+            {
+                "code": issue.code,
+                "path": issue.path,
+                "message": issue.message,
+            }
+            for issue in issues
+        ]
+        return f"PromptContext validation failed: {json.dumps(serialized_issues, sort_keys=True)}"

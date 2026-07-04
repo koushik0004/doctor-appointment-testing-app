@@ -15,6 +15,8 @@ from app.services.prompt_builder import (
     PromptContextRenderingOptions,
     PromptContextSystemInstructions,
     PromptContextUserContext,
+    PromptContextValidationIssue,
+    PromptContextValidationResult,
     PromptContextWorkflowContext,
 )
 
@@ -33,5 +35,7 @@ __all__ = [
     "PromptContextRenderingOptions",
     "PromptContextSystemInstructions",
     "PromptContextUserContext",
+    "PromptContextValidationIssue",
+    "PromptContextValidationResult",
     "PromptContextWorkflowContext",
 ]

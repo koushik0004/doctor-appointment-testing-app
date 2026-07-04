@@ -9,8 +9,16 @@ from app.knowledge import (
 from app.services.prompt_builder import (
     PromptBuildRequest,
     PromptBuilderService,
+    PromptContext,
     PromptContextConstraints,
+    PromptContextKnowledgeContext,
+    PromptContextKnowledgeDocument,
+    PromptContextMetadata,
     PromptContextRenderingOptions,
+    PromptContextSystemInstructions,
+    PromptContextUserContext,
+    PromptContextValidationResult,
+    PromptContextWorkflowContext,
 )
 
 
@@ -130,6 +138,100 @@ def test_prompt_builder_context_uses_deterministic_defaults_for_optional_section
     assert context.rendering_options == PromptContextRenderingOptions()
 
 
+def test_prompt_builder_validates_a_valid_prompt_context():
+    service = PromptBuilderService()
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Help me book",
+            documents=[_build_document(document_id="faq.booking")],
+        )
+    )
+
+    validation = service.validate_context(context)
+
+    assert validation == PromptContextValidationResult(is_valid=True, issues=[])
+
+
+def test_prompt_builder_validation_rejects_duplicate_knowledge_document_ids():
+    service = PromptBuilderService()
+    duplicate_document = PromptContextKnowledgeDocument(
+        document_id="faq.booking",
+        title="Booking Help",
+        source_path="faq/booking.md",
+        domain="faq",
+        audience="patient",
+        summary="Booking help summary.",
+        content="Booking help content.",
+        safe_to_quote=True,
+    )
+    context = PromptContext(
+        metadata=PromptContextMetadata(
+            included_document_ids=["faq.booking", "faq.booking"],
+        ),
+        user_context=PromptContextUserContext(message="Help me book"),
+        knowledge_context=PromptContextKnowledgeContext(
+            documents=[duplicate_document, duplicate_document]
+        ),
+    )
+
+    validation = service.validate_context(context)
+
+    assert validation.is_valid is False
+    assert any(issue.code == "duplicate_document_ids" for issue in validation.issues)
+
+
+def test_prompt_builder_validation_rejects_invalid_constraints():
+    service = PromptBuilderService()
+    context = PromptContext.model_construct(
+        metadata=PromptContextMetadata(),
+        user_context=PromptContextUserContext(message="Need help"),
+        system_instructions=PromptContextSystemInstructions(),
+        constraints=PromptContextConstraints.model_construct(max_prompt_chars=5),
+        rendering_options=PromptContextRenderingOptions(),
+    )
+
+    validation = service.validate_context(context)
+
+    assert validation.is_valid is False
+    assert any(issue.code == "invalid_constraint" for issue in validation.issues)
+
+
+def test_prompt_builder_validation_rejects_invalid_rendering_options():
+    service = PromptBuilderService()
+    context = PromptContext.model_construct(
+        metadata=PromptContextMetadata(),
+        user_context=PromptContextUserContext(message="Need help"),
+        system_instructions=PromptContextSystemInstructions(),
+        constraints=PromptContextConstraints(),
+        rendering_options=PromptContextRenderingOptions.model_construct(
+            include_section_headers=True,
+            json_sort_keys=True,
+            json_ensure_ascii=True,
+            json_compact=True,
+            truncation_marker="[TRUNCATED]\nMORE",
+        ),
+    )
+
+    validation = service.validate_context(context)
+
+    assert validation.is_valid is False
+    assert any(issue.code == "invalid_rendering_option" for issue in validation.issues)
+
+
+def test_prompt_builder_validation_rejects_inconsistent_workflow_metadata():
+    service = PromptBuilderService()
+    context = PromptContext(
+        metadata=PromptContextMetadata(active_intent="BOOK_APPOINTMENT"),
+        user_context=PromptContextUserContext(message="Need help"),
+        workflow_context=PromptContextWorkflowContext(active_intent="CANCEL_APPOINTMENT"),
+    )
+
+    validation = service.validate_context(context)
+
+    assert validation.is_valid is False
+    assert any(issue.code == "inconsistent_workflow_metadata" for issue in validation.issues)
+
+
 def test_prompt_builder_applies_prompt_hints_as_constraints():
     service = PromptBuilderService()
     included_document = _build_document(
@@ -156,6 +258,30 @@ def test_prompt_builder_applies_prompt_hints_as_constraints():
     assert result.requires_domain_validation is True
     assert "Quoted content omitted because the document is not marked safe_to_quote." in result.prompt
     assert "faq.excluded" not in result.prompt
+
+
+def test_prompt_builder_raises_deterministic_validation_error_before_rendering():
+    class InvalidContextPromptBuilderService(PromptBuilderService):
+        def build_context(self, request: PromptBuildRequest) -> PromptContext:
+            return PromptContext.model_construct(
+                metadata=PromptContextMetadata(),
+                user_context=PromptContextUserContext.model_construct(message=" "),
+                system_instructions=PromptContextSystemInstructions(),
+                constraints=PromptContextConstraints(),
+                rendering_options=PromptContextRenderingOptions(),
+            )
+
+    service = InvalidContextPromptBuilderService()
+
+    try:
+        service.build(PromptBuildRequest(user_message="Ignored by override"))
+    except ValueError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("Expected validation error")
+
+    assert message.startswith("PromptContext validation failed:")
+    assert '"code": "empty_user_message"' in message
 
 
 def test_prompt_builder_enforces_document_and_total_prompt_budgets():

@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.2.5 PromptContext validation
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added a dedicated deterministic validation layer to the inactive backend Prompt Builder so assembled `PromptContext` instances are checked before block generation and prompt rendering.
+- Validation now verifies section structure, non-empty user messages, supported constraint values, rendering-option consistency, duplicate knowledge-document IDs, included/excluded document metadata consistency, and workflow metadata consistency.
+- Validation failures return deterministic debug-friendly error payloads through the existing service path without changing any production chat, API, frontend, workflow, retrieval, or database behavior.
+- Expanded focused backend tests to cover valid contexts, validation failures, duplicate documents, invalid constraints, invalid rendering options, workflow metadata mismatches, and backward-compatible prompt rendering for valid requests.
+- Updated the architecture reference and AI context files so later sessions can treat validation as the final deterministic gate before prompt rendering.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.2 deterministic Prompt Context model
 - Completed on: 2026-07-04
 
@@ -147,5 +161,5 @@
 
 ## Notes
 
-- The prompt builder and its new canonical `PromptContext` model are intentionally inactive in production and currently have no callers in the request path.
+- The prompt builder, its canonical `PromptContext` model, and the new validation gate are intentionally inactive in production and currently have no callers in the request path.
 - No API, UI, workflow, retrieval, or database behavior changed in this phase.
