@@ -6,7 +6,12 @@ from app.knowledge import (
     KnowledgeDocumentStatus,
     KnowledgePromptHints,
 )
-from app.services.prompt_builder import PromptBuildRequest, PromptBuilderService
+from app.services.prompt_builder import (
+    PromptBuildRequest,
+    PromptBuilderService,
+    PromptContextConstraints,
+    PromptContextRenderingOptions,
+)
 
 
 def _build_document(
@@ -68,6 +73,61 @@ def test_prompt_builder_builds_deterministic_prompt_with_context_blocks():
     assert "[System Instructions]" in result.prompt
     assert '"missing":["date"]' in result.prompt
     assert '"steps":["choose doctor","pick time"]' in result.prompt
+
+
+def test_prompt_builder_creates_canonical_prompt_context_with_optional_sections():
+    service = PromptBuilderService()
+    document = _build_document(
+        document_id="faq.booking",
+        title="Booking Help",
+        include_when_intents=["BOOK_APPOINTMENT"],
+        requires_domain_validation=True,
+    )
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Help me book",
+            conversation_state={"draft": {"doctor_id": 1}},
+            documents=[document],
+            active_intent="BOOK_APPOINTMENT",
+            system_instructions=["Use only provided context."],
+            max_prompt_chars=2500,
+        )
+    )
+
+    assert context.metadata.active_intent == "BOOK_APPOINTMENT"
+    assert context.metadata.included_document_ids == ["faq.booking"]
+    assert context.metadata.excluded_document_ids == []
+    assert context.metadata.requires_domain_validation is True
+    assert context.user_context.message == "Help me book"
+    assert context.conversation_context is not None
+    assert context.conversation_context.state == {"draft": {"doctor_id": 1}}
+    assert context.workflow_context is not None
+    assert context.workflow_context.active_intent == "BOOK_APPOINTMENT"
+    assert context.knowledge_context is not None
+    assert context.knowledge_context.documents[0].document_id == "faq.booking"
+    assert context.system_instructions.instructions == ["Use only provided context."]
+    assert context.constraints.max_prompt_chars == 2500
+
+
+def test_prompt_builder_context_uses_deterministic_defaults_for_optional_sections():
+    service = PromptBuilderService()
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Hello there",
+        )
+    )
+
+    assert context.metadata.included_document_ids == []
+    assert context.metadata.excluded_document_ids == []
+    assert context.metadata.requires_domain_validation is False
+    assert context.conversation_context is None
+    assert context.workflow_context is None
+    assert context.knowledge_context is None
+    assert context.system_instructions.instructions == []
+    assert context.constraints == PromptContextConstraints()
+    assert context.rendering_options == PromptContextRenderingOptions()
 
 
 def test_prompt_builder_applies_prompt_hints_as_constraints():

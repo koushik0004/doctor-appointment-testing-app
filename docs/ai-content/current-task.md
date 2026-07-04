@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.2 deterministic Prompt Context model
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added a canonical internal `PromptContext` model beneath the inactive backend Prompt Builder, with structured sections for metadata, user context, conversation context, workflow context, knowledge context, system instructions, constraints, and rendering options.
+- Refactored `PromptBuilderService` to build and validate `PromptContext` first, then deterministically render the same external `PromptBuildResult` contract and prompt text behavior as Phase 5.1.
+- Kept the new model provider-agnostic and fully outside live `ConversationManager`, retrieval, workflow, API, frontend, and database paths.
+- Expanded focused backend tests to cover `PromptContext` creation, optional section omission, deterministic defaults, and backward compatibility of the existing prompt builder output.
+- Updated the architecture reference and AI context files so future sessions can continue Prompt Builder work without re-deriving the internal contract.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.1 standalone prompt builder module
 - Completed on: 2026-07-04
 
@@ -128,9 +142,10 @@
 
 - `backend/app/services/prompt_builder.py`
 - `backend/tests/test_prompt_builder_service.py`
+- `backend/app/services/__init__.py`
 - `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 
 ## Notes
 
-- The prompt builder is intentionally inactive in production and currently has no callers in the request path.
+- The prompt builder and its new canonical `PromptContext` model are intentionally inactive in production and currently have no callers in the request path.
 - No API, UI, workflow, retrieval, or database behavior changed in this phase.

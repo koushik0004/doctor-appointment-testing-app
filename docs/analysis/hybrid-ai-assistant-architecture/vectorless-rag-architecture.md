@@ -368,6 +368,7 @@ The retrieval service sits on top of the repository. It performs deterministic t
 The Prompt Builder should be a later layer that receives already-selected knowledge documents and formats them into bounded context for a future LLM or deterministic response composer.
 
 Phase 5.1 now provides an inactive standalone backend implementation of this seam as a deterministic service module. It remains outside the production request flow and only formats caller-provided context.
+Phase 5.2 adds a canonical internal `PromptContext` model beneath that service. The Prompt Builder now first validates caller inputs into structured metadata, user, conversation, workflow, knowledge, instruction, constraint, and rendering sections before deterministically rendering the same bounded prompt text as before.
 
 Planned contract:
 
@@ -389,6 +390,7 @@ Important boundary:
 - The Prompt Builder should not mutate workflow state.
 - The Prompt Builder should not bypass appointment or doctor services for live data.
 - The Prompt Builder should treat `prompt_hints` as constraints, not as executable instructions.
+- `PromptContext` is the canonical internal representation for prompt construction, but it remains provider-agnostic and is not an LLM API payload by itself.
 
 ## Future Integration Path
 
