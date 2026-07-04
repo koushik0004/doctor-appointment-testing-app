@@ -75,15 +75,25 @@ class PromptContextKnowledgeDocument(BaseModel):
     audience: str = Field(min_length=1)
     summary: str = Field(min_length=1)
     content: str | dict[str, Any]
+    include_when_intents: list[str] = Field(default_factory=list)
+    exclude_when_intents: list[str] = Field(default_factory=list)
     safe_to_quote: bool = False
     requires_domain_validation: bool = False
     max_context_chars: int | None = Field(default=None, gt=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class PromptContextKnowledgeContext(BaseModel):
     documents: list[PromptContextKnowledgeDocument] = Field(default_factory=list)
+
+
+class PromptContextKnowledgeCollection(BaseModel):
+    knowledge_context: PromptContextKnowledgeContext | None = None
+    included_document_ids: list[str] = Field(default_factory=list)
+    excluded_document_ids: list[str] = Field(default_factory=list)
+    requires_domain_validation: bool = False
 
 
 class PromptContextSystemInstructions(BaseModel):
@@ -352,6 +362,78 @@ class PromptContextWorkflowCollector:
         }
 
 
+class PromptContextKnowledgeCollector:
+    """Deterministically normalizes already-selected knowledge documents."""
+
+    def collect(
+        self,
+        *,
+        documents: list[KnowledgeDocument],
+        active_intent: str | None,
+    ) -> PromptContextKnowledgeCollection:
+        included_documents: list[PromptContextKnowledgeDocument] = []
+        included_document_ids: list[str] = []
+        excluded_document_ids: list[str] = []
+        requires_domain_validation = False
+
+        for document in documents:
+            if not self._should_include_document(document, active_intent):
+                excluded_document_ids.append(document.id)
+                continue
+
+            context_document = self._to_context_document(document)
+            included_documents.append(context_document)
+            included_document_ids.append(document.id)
+            if context_document.requires_domain_validation:
+                requires_domain_validation = True
+
+        return PromptContextKnowledgeCollection(
+            knowledge_context=(
+                PromptContextKnowledgeContext(documents=included_documents)
+                if included_documents
+                else None
+            ),
+            included_document_ids=included_document_ids,
+            excluded_document_ids=excluded_document_ids,
+            requires_domain_validation=requires_domain_validation,
+        )
+
+    def _should_include_document(
+        self,
+        document: KnowledgeDocument,
+        active_intent: str | None,
+    ) -> bool:
+        hints = document.prompt_hints
+        if hints is None or active_intent is None:
+            return True
+
+        if active_intent in hints.exclude_when_intents:
+            return False
+        if hints.include_when_intents and active_intent not in hints.include_when_intents:
+            return False
+        return True
+
+    def _to_context_document(self, document: KnowledgeDocument) -> PromptContextKnowledgeDocument:
+        hints = document.prompt_hints
+        return PromptContextKnowledgeDocument(
+            document_id=document.id,
+            title=document.title,
+            source_path=document.source_path,
+            domain=document.domain.value,
+            audience=document.audience.value,
+            summary=document.summary,
+            content=deepcopy(document.content),
+            include_when_intents=list(hints.include_when_intents) if hints is not None else [],
+            exclude_when_intents=list(hints.exclude_when_intents) if hints is not None else [],
+            safe_to_quote=hints.safe_to_quote if hints is not None else False,
+            requires_domain_validation=(
+                hints.requires_domain_validation if hints is not None else False
+            ),
+            max_context_chars=hints.max_context_chars if hints is not None else None,
+            metadata=deepcopy(document.metadata),
+        )
+
+
 class PromptBuildRequest(BaseModel):
     user_message: str = Field(min_length=1)
     conversation_state: dict[str, Any] = Field(default_factory=dict)
@@ -379,6 +461,7 @@ class PromptBuilderService:
         self,
         conversation_collector: PromptContextConversationCollector | None = None,
         workflow_collector: PromptContextWorkflowCollector | None = None,
+        knowledge_collector: PromptContextKnowledgeCollector | None = None,
     ) -> None:
         self._conversation_collector = (
             conversation_collector
@@ -389,6 +472,11 @@ class PromptBuilderService:
             workflow_collector
             if workflow_collector is not None
             else PromptContextWorkflowCollector()
+        )
+        self._knowledge_collector = (
+            knowledge_collector
+            if knowledge_collector is not None
+            else PromptContextKnowledgeCollector()
         )
 
     def build(self, request: PromptBuildRequest) -> PromptBuildResult:
@@ -422,28 +510,17 @@ class PromptBuilderService:
             if workflow_context is not None and workflow_context.active_intent
             else request.active_intent
         )
-        included_documents: list[PromptContextKnowledgeDocument] = []
-        included_document_ids: list[str] = []
-        excluded_document_ids: list[str] = []
-        requires_domain_validation = False
-
-        for document in request.documents:
-            if not self._should_include_document(document, resolved_active_intent):
-                excluded_document_ids.append(document.id)
-                continue
-
-            context_document = self._to_context_document(document)
-            included_documents.append(context_document)
-            included_document_ids.append(document.id)
-            if context_document.requires_domain_validation:
-                requires_domain_validation = True
+        knowledge_collection = self._knowledge_collector.collect(
+            documents=request.documents,
+            active_intent=resolved_active_intent,
+        )
 
         return PromptContext(
             metadata=PromptContextMetadata(
                 active_intent=resolved_active_intent,
-                included_document_ids=included_document_ids,
-                excluded_document_ids=excluded_document_ids,
-                requires_domain_validation=requires_domain_validation,
+                included_document_ids=knowledge_collection.included_document_ids,
+                excluded_document_ids=knowledge_collection.excluded_document_ids,
+                requires_domain_validation=knowledge_collection.requires_domain_validation,
             ),
             user_context=PromptContextUserContext(message=request.user_message),
             conversation_context=self._conversation_collector.collect(
@@ -451,11 +528,7 @@ class PromptBuilderService:
                 conversation_state=request.conversation_state,
             ),
             workflow_context=workflow_context,
-            knowledge_context=(
-                PromptContextKnowledgeContext(documents=included_documents)
-                if included_documents
-                else None
-            ),
+            knowledge_context=knowledge_collection.knowledge_context,
             system_instructions=PromptContextSystemInstructions(
                 instructions=list(request.system_instructions)
             ),
@@ -753,34 +826,6 @@ class PromptBuilderService:
         return PromptContextValidationResult(
             is_valid=not issues,
             issues=issues,
-        )
-
-    def _should_include_document(self, document: KnowledgeDocument, active_intent: str | None) -> bool:
-        hints = document.prompt_hints
-        if hints is None or active_intent is None:
-            return True
-
-        if active_intent in hints.exclude_when_intents:
-            return False
-        if hints.include_when_intents and active_intent not in hints.include_when_intents:
-            return False
-        return True
-
-    def _to_context_document(self, document: KnowledgeDocument) -> PromptContextKnowledgeDocument:
-        hints = document.prompt_hints
-        return PromptContextKnowledgeDocument(
-            document_id=document.id,
-            title=document.title,
-            source_path=document.source_path,
-            domain=document.domain.value,
-            audience=document.audience.value,
-            summary=document.summary,
-            content=document.content,
-            safe_to_quote=hints.safe_to_quote if hints is not None else False,
-            requires_domain_validation=(
-                hints.requires_domain_validation if hints is not None else False
-            ),
-            max_context_chars=hints.max_context_chars if hints is not None else None,
         )
 
     def _build_blocks(self, context: PromptContext) -> list[PromptContextBlock]:

@@ -12,6 +12,7 @@ from app.services.prompt_builder import (
     PromptContext,
     PromptContextConstraints,
     PromptContextConversationCollector,
+    PromptContextKnowledgeCollector,
     PromptContextKnowledgeContext,
     PromptContextKnowledgeDocument,
     PromptContextMetadata,
@@ -35,6 +36,7 @@ def _build_document(
     safe_to_quote: bool = True,
     requires_domain_validation: bool = False,
     max_context_chars: int | None = None,
+    metadata: dict | None = None,
 ) -> KnowledgeDocument:
     return KnowledgeDocument(
         id=document_id,
@@ -54,6 +56,7 @@ def _build_document(
             requires_domain_validation=requires_domain_validation,
             max_context_chars=max_context_chars,
         ),
+        metadata=metadata or {},
     )
 
 
@@ -146,6 +149,17 @@ def test_workflow_collector_returns_none_when_no_workflow_exists():
     context = collector.collect(active_intent=None, conversation_state={})
 
     assert context is None
+
+
+def test_knowledge_collector_returns_empty_collection_for_no_documents():
+    collector = PromptContextKnowledgeCollector()
+
+    context = collector.collect(documents=[], active_intent=None)
+
+    assert context.knowledge_context is None
+    assert context.included_document_ids == []
+    assert context.excluded_document_ids == []
+    assert context.requires_domain_validation is False
 
 
 def test_conversation_collector_returns_none_for_empty_state():
@@ -398,6 +412,128 @@ def test_prompt_builder_keeps_active_intent_only_workflow_context_for_backward_c
     assert context.workflow_context.missing_fields == []
     assert context.workflow_context.metadata == {}
     assert context.workflow_context.state == {}
+
+
+def test_prompt_builder_normalizes_single_knowledge_document_metadata_and_hints():
+    service = PromptBuilderService()
+    document = _build_document(
+        document_id="faq.policy",
+        title="Booking Policy",
+        summary="Policy summary.",
+        content={"policy": "Bring ID"},
+        include_when_intents=["BOOK_APPOINTMENT"],
+        exclude_when_intents=["CANCEL_APPOINTMENT"],
+        safe_to_quote=True,
+        requires_domain_validation=True,
+        max_context_chars=120,
+        metadata={"locale": "en-IN", "revision": 3},
+    )
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="What should I bring?",
+            active_intent="BOOK_APPOINTMENT",
+            documents=[document],
+        )
+    )
+
+    assert context.metadata.included_document_ids == ["faq.policy"]
+    assert context.metadata.excluded_document_ids == []
+    assert context.metadata.requires_domain_validation is True
+    assert context.knowledge_context is not None
+    assert context.knowledge_context.documents == [
+        PromptContextKnowledgeDocument(
+            document_id="faq.policy",
+            title="Booking Policy",
+            source_path="faq/faq.policy.md",
+            domain="faq",
+            audience="patient",
+            summary="Policy summary.",
+            content={"policy": "Bring ID"},
+            include_when_intents=["BOOK_APPOINTMENT"],
+            exclude_when_intents=["CANCEL_APPOINTMENT"],
+            safe_to_quote=True,
+            requires_domain_validation=True,
+            max_context_chars=120,
+            metadata={"locale": "en-IN", "revision": 3},
+        )
+    ]
+
+
+def test_prompt_builder_normalizes_multiple_knowledge_documents_deterministically_without_mutation():
+    service = PromptBuilderService()
+    documents = [
+        _build_document(
+            document_id="faq.first",
+            title="First Doc",
+            content={"steps": ["one", "two"]},
+            metadata={"rank": 1},
+        ),
+        _build_document(
+            document_id="faq.second",
+            title="Second Doc",
+            content="Second content.",
+            safe_to_quote=False,
+            metadata={"rank": 2},
+        ),
+    ]
+
+    first_context = service.build_context(
+        PromptBuildRequest(
+            user_message="Need help",
+            documents=documents,
+        )
+    )
+    second_context = service.build_context(
+        PromptBuildRequest(
+            user_message="Need help",
+            documents=documents,
+        )
+    )
+
+    assert first_context.knowledge_context == second_context.knowledge_context
+    assert first_context.metadata.included_document_ids == ["faq.first", "faq.second"]
+    assert first_context.knowledge_context is not None
+    assert [
+        document.document_id for document in first_context.knowledge_context.documents
+    ] == ["faq.first", "faq.second"]
+    assert documents[0].content == {"steps": ["one", "two"]}
+    assert documents[0].metadata == {"rank": 1}
+    assert documents[1].metadata == {"rank": 2}
+
+
+def test_prompt_builder_knowledge_collector_tracks_include_and_exclude_deterministically():
+    service = PromptBuilderService()
+    allowed_document = _build_document(
+        document_id="faq.allowed",
+        include_when_intents=["BOOK_APPOINTMENT"],
+    )
+    excluded_document = _build_document(
+        document_id="faq.excluded",
+        exclude_when_intents=["BOOK_APPOINTMENT"],
+    )
+    unrelated_document = _build_document(
+        document_id="faq.other-intent",
+        include_when_intents=["CANCEL_APPOINTMENT"],
+    )
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Help me book",
+            active_intent="BOOK_APPOINTMENT",
+            documents=[allowed_document, excluded_document, unrelated_document],
+        )
+    )
+
+    assert context.metadata.included_document_ids == ["faq.allowed"]
+    assert context.metadata.excluded_document_ids == [
+        "faq.excluded",
+        "faq.other-intent",
+    ]
+    assert context.knowledge_context is not None
+    assert [document.document_id for document in context.knowledge_context.documents] == [
+        "faq.allowed"
+    ]
 
 
 def test_prompt_builder_validates_a_valid_prompt_context():

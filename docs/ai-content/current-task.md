@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.5 internal knowledge context collector
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Knowledge Context Collector beneath the inactive backend Prompt Builder so caller-supplied `KnowledgeDocument` objects are normalized before `PromptContext` validation and rendering.
+- The canonical `PromptContext` knowledge section now preserves deterministic document order, included and excluded document tracking, prompt-hint include and exclude metadata, safe-to-quote flags, domain-validation flags, context limits, and per-document metadata without mutating caller input or changing runtime chat behavior.
+- Refactored `PromptBuilderService` to delegate knowledge normalization to the collector while preserving the existing external request and result contract plus the previously rendered prompt output behavior.
+- Expanded focused backend tests to cover empty knowledge sets, single and multiple document normalization, deterministic ordering, include and exclude behavior, prompt-hint preservation, read-only handling, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the Knowledge Context Collector as the dedicated read-only Prompt Builder component responsible for deterministic knowledge normalization before validation and rendering.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.4 internal workflow context collector
 - Completed on: 2026-07-04
 
