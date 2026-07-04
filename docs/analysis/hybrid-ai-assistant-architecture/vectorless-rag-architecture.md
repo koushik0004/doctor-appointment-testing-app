@@ -367,6 +367,8 @@ The retrieval service sits on top of the repository. It performs deterministic t
 
 The Prompt Builder should be a later layer that receives already-selected knowledge documents and formats them into bounded context for a future LLM or deterministic response composer.
 
+Phase 5.1 now provides an inactive standalone backend implementation of this seam as a deterministic service module. It remains outside the production request flow and only formats caller-provided context.
+
 Planned contract:
 
 ```python

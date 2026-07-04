@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.1 standalone prompt builder module
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an inactive backend `PromptBuilderService` with a deterministic internal contract for composing prompt text from caller-supplied user message, conversation state, and preselected knowledge documents.
+- Kept the new module fully outside the live `ConversationManager`, `WorkflowEngine`, Vector-less RAG retrieval, business-service, API, and frontend widget request paths.
+- Applied prompt-hint constraints only as bounded formatting rules during prompt construction, including intent-based document inclusion, safe-to-quote handling, and optional per-document context clipping.
+- Added focused backend tests covering deterministic prompt assembly, prompt-hint constraint handling, and character-budget truncation behavior.
+- Updated the compact AI context and architecture reference so future sessions can find the new prompt-builder seam without re-scanning the repository.
+
+## Prior Work
+
+- Status: completed
 - Task: refresh test data health without causing data loss
 - Completed on: 2026-07-03
 
@@ -112,18 +126,11 @@
 
 ## Required Files for This Task
 
-- `backend/scripts/seed_test_data.py`
-- `backend/app/services/appointment_service.py`
-- `backend/app/services/availability_service.py`
-- `backend/app/services/schedule_service.py`
-- `backend/app/models/doctor.py`
-- `backend/app/models/patient.py`
-- `backend/app/models/appointment.py`
-- `backend/app/models/availability.py`
-- `docs/reports/test-data-health-report.md`
+- `backend/app/services/prompt_builder.py`
+- `backend/tests/test_prompt_builder_service.py`
+- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 
 ## Notes
 
-- No database writes were performed during this refresh run.
-- Historical `doctor_availability` rows were retained intentionally to avoid data loss; the current implementation uses generated schedule slots instead.
-- The stray root-level `doctor_appointment.db` file remains outside the active backend DB path and was not modified.
+- The prompt builder is intentionally inactive in production and currently has no callers in the request path.
+- No API, UI, workflow, retrieval, or database behavior changed in this phase.
