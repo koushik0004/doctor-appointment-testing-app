@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from enum import Enum
 from typing import Any
@@ -41,6 +42,18 @@ class PromptContextUserContext(BaseModel):
 
 class PromptContextConversationContext(BaseModel):
     state: dict[str, Any] = Field(default_factory=dict)
+    current_user_message: str | None = None
+    previous_turns: list["PromptContextConversationTurn"] = Field(default_factory=list)
+    assistant_turns: list["PromptContextConversationTurn"] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PromptContextConversationTurn(BaseModel):
+    role: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class PromptContextWorkflowContext(BaseModel):
@@ -116,6 +129,103 @@ class PromptContextValidationResult(BaseModel):
     issues: list[PromptContextValidationIssue] = Field(default_factory=list)
 
 
+class PromptContextConversationCollector:
+    """Deterministically normalizes caller-supplied conversation state."""
+
+    _HISTORY_KEYS = ("history", "turns", "messages")
+    _TEXT_KEYS = ("text", "message", "content")
+    _METADATA_SKIP_KEYS = frozenset({"history", "turns", "messages"})
+    _TURN_SKIP_KEYS = frozenset({"role", "text", "message", "content"})
+    _SUPPORTED_ROLES = frozenset({"user", "assistant", "system"})
+
+    def collect(
+        self,
+        *,
+        user_message: str,
+        conversation_state: dict[str, Any],
+    ) -> PromptContextConversationContext | None:
+        if not conversation_state:
+            return None
+
+        raw_state = deepcopy(conversation_state)
+        turns = self._normalize_turns(conversation_state)
+        previous_turns = list(turns)
+
+        if previous_turns and self._is_current_user_turn(previous_turns[-1], user_message):
+            previous_turns = previous_turns[:-1]
+
+        assistant_turns = [turn for turn in previous_turns if turn.role == "assistant"]
+
+        return PromptContextConversationContext(
+            state=raw_state,
+            current_user_message=user_message,
+            previous_turns=previous_turns,
+            assistant_turns=assistant_turns,
+            metadata=self._collect_metadata(conversation_state),
+        )
+
+    def _normalize_turns(
+        self,
+        conversation_state: dict[str, Any],
+    ) -> list[PromptContextConversationTurn]:
+        history_items = self._extract_history_items(conversation_state)
+        normalized_turns: list[PromptContextConversationTurn] = []
+
+        for item in history_items:
+            if not isinstance(item, dict):
+                continue
+
+            role = str(item.get("role", "")).strip().lower()
+            if role not in self._SUPPORTED_ROLES:
+                continue
+
+            message = self._extract_turn_message(item)
+            if message is None:
+                continue
+
+            normalized_turns.append(
+                PromptContextConversationTurn(
+                    role=role,
+                    message=message,
+                    metadata={
+                        key: deepcopy(value)
+                        for key, value in item.items()
+                        if key not in self._TURN_SKIP_KEYS
+                    },
+                )
+            )
+
+        return normalized_turns
+
+    def _extract_history_items(self, conversation_state: dict[str, Any]) -> list[Any]:
+        for key in self._HISTORY_KEYS:
+            value = conversation_state.get(key)
+            if isinstance(value, list):
+                return value
+        return []
+
+    def _extract_turn_message(self, item: dict[str, Any]) -> str | None:
+        for key in self._TEXT_KEYS:
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    def _is_current_user_turn(
+        self,
+        turn: PromptContextConversationTurn,
+        user_message: str,
+    ) -> bool:
+        return turn.role == "user" and turn.message == user_message.strip()
+
+    def _collect_metadata(self, conversation_state: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: deepcopy(value)
+            for key, value in conversation_state.items()
+            if key not in self._METADATA_SKIP_KEYS
+        }
+
+
 class PromptBuildRequest(BaseModel):
     user_message: str = Field(min_length=1)
     conversation_state: dict[str, Any] = Field(default_factory=dict)
@@ -138,6 +248,16 @@ class PromptBuildResult(BaseModel):
 
 class PromptBuilderService:
     """Deterministically formats already-selected context into prompt text."""
+
+    def __init__(
+        self,
+        conversation_collector: PromptContextConversationCollector | None = None,
+    ) -> None:
+        self._conversation_collector = (
+            conversation_collector
+            if conversation_collector is not None
+            else PromptContextConversationCollector()
+        )
 
     def build(self, request: PromptBuildRequest) -> PromptBuildResult:
         context = self.build_context(request)
@@ -185,10 +305,9 @@ class PromptBuilderService:
                 requires_domain_validation=requires_domain_validation,
             ),
             user_context=PromptContextUserContext(message=request.user_message),
-            conversation_context=(
-                PromptContextConversationContext(state=request.conversation_state)
-                if request.conversation_state
-                else None
+            conversation_context=self._conversation_collector.collect(
+                user_message=request.user_message,
+                conversation_state=request.conversation_state,
             ),
             workflow_context=(
                 PromptContextWorkflowContext(active_intent=request.active_intent)
@@ -248,6 +367,42 @@ class PromptBuilderService:
                     ),
                 )
             )
+        elif context.conversation_context is not None:
+            for index, turn in enumerate(context.conversation_context.previous_turns):
+                if not isinstance(turn, PromptContextConversationTurn):
+                    issues.append(
+                        PromptContextValidationIssue(
+                            code="invalid_section",
+                            path=f"conversation_context.previous_turns[{index}]",
+                            message=(
+                                "conversation_context.previous_turns must contain "
+                                "PromptContextConversationTurn instances."
+                            ),
+                        )
+                    )
+            for index, turn in enumerate(context.conversation_context.assistant_turns):
+                if not isinstance(turn, PromptContextConversationTurn):
+                    issues.append(
+                        PromptContextValidationIssue(
+                            code="invalid_section",
+                            path=f"conversation_context.assistant_turns[{index}]",
+                            message=(
+                                "conversation_context.assistant_turns must contain "
+                                "PromptContextConversationTurn instances."
+                            ),
+                        )
+                    )
+                elif turn.role != "assistant":
+                    issues.append(
+                        PromptContextValidationIssue(
+                            code="invalid_conversation_metadata",
+                            path=f"conversation_context.assistant_turns[{index}].role",
+                            message=(
+                                "conversation_context.assistant_turns may only contain "
+                                "assistant turns."
+                            ),
+                        )
+                    )
 
         if context.workflow_context is not None and not isinstance(
             context.workflow_context, PromptContextWorkflowContext
@@ -488,13 +643,15 @@ class PromptBuilderService:
             )
         ]
 
-        if context.conversation_context is not None and context.conversation_context.state:
+        if context.conversation_context is not None and self._has_conversation_context_content(
+            context.conversation_context
+        ):
             blocks.append(
                 PromptContextBlock(
                     kind=PromptContextBlockKind.CONVERSATION_STATE,
                     label="Conversation State",
                     content=self._serialize_json(
-                        context.conversation_context.state,
+                        self._serialize_conversation_context(context.conversation_context),
                         context.rendering_options,
                     ),
                 )
@@ -621,6 +778,55 @@ class PromptBuilderService:
             ensure_ascii=rendering_options.json_ensure_ascii,
             separators=separators,
         )
+
+    def _has_conversation_context_content(
+        self,
+        conversation_context: PromptContextConversationContext,
+    ) -> bool:
+        return bool(
+            conversation_context.state
+            or conversation_context.current_user_message
+            or conversation_context.previous_turns
+            or conversation_context.assistant_turns
+            or conversation_context.metadata
+        )
+
+    def _serialize_conversation_context(
+        self,
+        conversation_context: PromptContextConversationContext,
+    ) -> dict[str, Any]:
+        if (
+            not conversation_context.previous_turns
+            and not conversation_context.assistant_turns
+            and not conversation_context.metadata
+            and conversation_context.current_user_message is None
+        ):
+            return deepcopy(conversation_context.state)
+
+        serialized: dict[str, Any] = {
+            "current_user_message": conversation_context.current_user_message,
+            "previous_turns": [
+                self._serialize_conversation_turn(turn)
+                for turn in conversation_context.previous_turns
+            ],
+            "assistant_turns": [
+                self._serialize_conversation_turn(turn)
+                for turn in conversation_context.assistant_turns
+            ],
+            "metadata": deepcopy(conversation_context.metadata),
+            "state": deepcopy(conversation_context.state),
+        }
+        return serialized
+
+    def _serialize_conversation_turn(
+        self,
+        turn: PromptContextConversationTurn,
+    ) -> dict[str, Any]:
+        return {
+            "role": turn.role,
+            "message": turn.message,
+            "metadata": deepcopy(turn.metadata),
+        }
 
     def _format_validation_error(
         self,

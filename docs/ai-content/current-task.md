@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.3 internal conversation context collector
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Conversation Context Collector beneath the inactive backend Prompt Builder so caller-supplied conversation state is normalized before PromptContext validation and rendering.
+- The canonical `PromptContext` conversation section now preserves the current user message, chronological previous turns, assistant-only turns, preserved conversation metadata, and the original caller state without mutating input data or changing runtime chat behavior.
+- Refactored `PromptBuilderService` to delegate conversation normalization to the collector while preserving the existing external request/result contract and existing prompt output for legacy conversation-state inputs.
+- Expanded focused backend tests to cover empty, single-turn, and multi-turn conversation normalization, deterministic collector behavior, metadata preservation, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the collector as an internal read-only Prompt Builder component that runs before validation and rendering.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.2.5 PromptContext validation
 - Completed on: 2026-07-04
 

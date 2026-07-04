@@ -11,6 +11,7 @@ from app.services.prompt_builder import (
     PromptBuilderService,
     PromptContext,
     PromptContextConstraints,
+    PromptContextConversationCollector,
     PromptContextKnowledgeContext,
     PromptContextKnowledgeDocument,
     PromptContextMetadata,
@@ -136,6 +137,109 @@ def test_prompt_builder_context_uses_deterministic_defaults_for_optional_section
     assert context.system_instructions.instructions == []
     assert context.constraints == PromptContextConstraints()
     assert context.rendering_options == PromptContextRenderingOptions()
+
+
+def test_conversation_collector_returns_none_for_empty_state():
+    collector = PromptContextConversationCollector()
+
+    context = collector.collect(user_message="Hello", conversation_state={})
+
+    assert context is None
+
+
+def test_prompt_builder_normalizes_single_turn_conversation_state():
+    service = PromptBuilderService()
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="I need help booking",
+            conversation_state={
+                "conversation_id": "conv-1",
+                "history": [{"role": "user", "text": "I need help booking"}],
+            },
+        )
+    )
+
+    assert context.conversation_context is not None
+    assert context.conversation_context.current_user_message == "I need help booking"
+    assert context.conversation_context.previous_turns == []
+    assert context.conversation_context.assistant_turns == []
+    assert context.conversation_context.metadata == {"conversation_id": "conv-1"}
+
+
+def test_prompt_builder_normalizes_multi_turn_conversation_state_deterministically():
+    service = PromptBuilderService()
+    conversation_state = {
+        "conversation_id": "conv-2",
+        "context": {"turn_count": 3, "last_intent": "BOOK_APPOINTMENT"},
+        "metadata": {"source": "chat-api"},
+        "history": [
+            {"role": "user", "text": "I want to see a dermatologist"},
+            {"role": "assistant", "text": "Do you have a preferred date?", "intent": "ASK_DATE"},
+            {"role": "user", "text": "Tomorrow morning"},
+        ],
+    }
+
+    first_context = service.build_context(
+        PromptBuildRequest(
+            user_message="Tomorrow morning",
+            conversation_state=conversation_state,
+        )
+    )
+    second_context = service.build_context(
+        PromptBuildRequest(
+            user_message="Tomorrow morning",
+            conversation_state=conversation_state,
+        )
+    )
+
+    assert first_context.conversation_context == second_context.conversation_context
+    assert first_context.conversation_context is not None
+    assert [turn.role for turn in first_context.conversation_context.previous_turns] == [
+        "user",
+        "assistant",
+    ]
+    assert [turn.message for turn in first_context.conversation_context.previous_turns] == [
+        "I want to see a dermatologist",
+        "Do you have a preferred date?",
+    ]
+    assert [turn.message for turn in first_context.conversation_context.assistant_turns] == [
+        "Do you have a preferred date?"
+    ]
+    assert first_context.conversation_context.metadata == {
+        "conversation_id": "conv-2",
+        "context": {"turn_count": 3, "last_intent": "BOOK_APPOINTMENT"},
+        "metadata": {"source": "chat-api"},
+    }
+
+
+def test_prompt_builder_renders_normalized_conversation_context_without_mutating_input():
+    service = PromptBuilderService()
+    conversation_state = {
+        "conversation_id": "conv-3",
+        "history": [
+            {"role": "user", "text": "Find me a cardiologist"},
+            {"role": "assistant", "text": "What day works for you?"},
+        ],
+    }
+
+    result = service.build(
+        PromptBuildRequest(
+            user_message="Friday afternoon",
+            conversation_state=conversation_state,
+        )
+    )
+
+    assert '"current_user_message":"Friday afternoon"' in result.prompt
+    assert '"previous_turns":[{"message":"Find me a cardiologist","metadata":{},"role":"user"}' in result.prompt
+    assert '"assistant_turns":[{"message":"What day works for you?","metadata":{},"role":"assistant"}]' in result.prompt
+    assert conversation_state == {
+        "conversation_id": "conv-3",
+        "history": [
+            {"role": "user", "text": "Find me a cardiologist"},
+            {"role": "assistant", "text": "What day works for you?"},
+        ],
+    }
 
 
 def test_prompt_builder_validates_a_valid_prompt_context():
