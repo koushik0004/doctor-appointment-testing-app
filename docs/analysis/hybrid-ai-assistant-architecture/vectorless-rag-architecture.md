@@ -2,7 +2,7 @@
 
 ## Status
 
-Prototype implementation in progress. Phase 4.2 added the passive knowledge repository; Phase 4.3 added deterministic top-document retrieval; Phase 4.4 wired the retrieval service into `ConversationManager` as a read-only fallback when no workflow is active. The module still does not change APIs, prompt building, LLM calls, embeddings, or a vector database.
+Prototype implementation in progress. Phase 4.2 added the passive knowledge repository; Phase 4.3 added deterministic top-document retrieval; Phase 4.4 wired the retrieval service into `ConversationManager` as a read-only fallback when no workflow is active. The module still does not change APIs, live prompt building, LLM calls, embeddings, or a vector database.
 
 ## Purpose
 
@@ -58,6 +58,8 @@ Markdown and JSON knowledge sources
 ```
 
 The implemented module now participates in chat orchestration as a read-only fallback. It can load, validate, cache, and deterministically select one top matching document, and `ConversationManager` uses that result only when no workflow is active before falling back to the deterministic chat engine.
+
+The inactive Prompt Builder seam under `backend/app/services/prompt_builder.py` now includes deterministic internal collectors for conversation context and workflow context before PromptContext validation and rendering. These collectors are provider-agnostic normalization components only; they do not execute workflows, perform routing, mutate conversation state, call APIs, access the database, or invoke retrieval.
 
 ## Proposed Folder Structure
 

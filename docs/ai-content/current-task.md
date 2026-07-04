@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.4 internal workflow context collector
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Workflow Context Collector beneath the inactive backend Prompt Builder so caller-supplied workflow state is normalized before PromptContext validation and rendering.
+- The canonical `PromptContext` workflow section now preserves active workflow identity, workflow status, collected fields, missing fields, workflow metadata, and the original workflow state without mutating caller input or changing runtime chat behavior.
+- Refactored `PromptBuilderService` to delegate workflow normalization to the collector while preserving the existing external request/result contract and backward-compatible prompt output behavior.
+- Expanded focused backend tests to cover no-workflow, booking, cancellation, partial, and completed workflow normalization plus deterministic collector behavior, metadata preservation, read-only handling, and backward compatibility.
+- Updated the architecture reference and AI context files so later sessions can treat the Workflow Context Collector as an internal read-only Prompt Builder component that runs before validation and rendering.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.3 internal conversation context collector
 - Completed on: 2026-07-04
 

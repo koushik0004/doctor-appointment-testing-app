@@ -58,6 +58,11 @@ class PromptContextConversationTurn(BaseModel):
 
 class PromptContextWorkflowContext(BaseModel):
     active_intent: str | None = None
+    workflow_status: str | None = None
+    collected_fields: dict[str, Any] = Field(default_factory=dict)
+    missing_fields: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    state: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -226,6 +231,127 @@ class PromptContextConversationCollector:
         }
 
 
+class PromptContextWorkflowCollector:
+    """Deterministically normalizes caller-supplied workflow state."""
+
+    _WORKFLOW_CONTAINER_KEYS = ("current_workflow", "workflow_state", "workflow")
+    _WORKFLOW_IDENTITY_KEYS = ("workflow_type", "workflow", "active_intent", "intent")
+    _WORKFLOW_STATUS_KEYS = ("status", "workflow_status", "state")
+    _COLLECTED_FIELDS_KEYS = ("draft", "collected_fields", "fields")
+    _MISSING_FIELDS_KEYS = ("missing_fields", "missing")
+    _WORKFLOW_SKIP_KEYS = frozenset(
+        {
+            "workflow_type",
+            "workflow",
+            "active_intent",
+            "intent",
+            "status",
+            "workflow_status",
+            "state",
+            "draft",
+            "collected_fields",
+            "fields",
+            "missing_fields",
+            "missing",
+        }
+    )
+
+    def collect(
+        self,
+        *,
+        active_intent: str | None,
+        conversation_state: dict[str, Any],
+    ) -> PromptContextWorkflowContext | None:
+        workflow_state = self._extract_workflow_state(conversation_state)
+        if workflow_state is None:
+            if not active_intent:
+                return None
+            return PromptContextWorkflowContext(active_intent=active_intent)
+
+        raw_state = deepcopy(workflow_state)
+        workflow_identity = self._extract_first_string(
+            workflow_state,
+            self._WORKFLOW_IDENTITY_KEYS,
+        )
+        workflow_status = self._extract_first_string(
+            workflow_state,
+            self._WORKFLOW_STATUS_KEYS,
+        )
+        collected_fields = self._extract_collected_fields(workflow_state)
+        missing_fields = self._extract_missing_fields(workflow_state)
+
+        return PromptContextWorkflowContext(
+            active_intent=workflow_identity or active_intent,
+            workflow_status=workflow_status,
+            collected_fields=collected_fields,
+            missing_fields=missing_fields,
+            metadata=self._collect_metadata(workflow_state),
+            state=raw_state,
+        )
+
+    def _extract_workflow_state(
+        self,
+        conversation_state: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        context_value = conversation_state.get("context")
+        if isinstance(context_value, dict):
+            current_workflow = context_value.get("current_workflow")
+            if isinstance(current_workflow, dict):
+                return current_workflow
+
+        for key in self._WORKFLOW_CONTAINER_KEYS:
+            value = conversation_state.get(key)
+            if isinstance(value, dict):
+                return value
+
+        if any(key in conversation_state for key in self._WORKFLOW_IDENTITY_KEYS):
+            return conversation_state
+
+        return None
+
+    def _extract_first_string(
+        self,
+        workflow_state: dict[str, Any],
+        keys: tuple[str, ...],
+    ) -> str | None:
+        for key in keys:
+            value = workflow_state.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    def _extract_collected_fields(
+        self,
+        workflow_state: dict[str, Any],
+    ) -> dict[str, Any]:
+        for key in self._COLLECTED_FIELDS_KEYS:
+            value = workflow_state.get(key)
+            if isinstance(value, dict):
+                return deepcopy(value)
+        return {}
+
+    def _extract_missing_fields(
+        self,
+        workflow_state: dict[str, Any],
+    ) -> list[str]:
+        for key in self._MISSING_FIELDS_KEYS:
+            value = workflow_state.get(key)
+            if isinstance(value, list):
+                normalized: list[str] = []
+                for item in value:
+                    if isinstance(item, str) and item.strip():
+                        normalized.append(item.strip())
+                return normalized
+        return []
+
+    def _collect_metadata(self, workflow_state: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: deepcopy(value)
+            for key, value in workflow_state.items()
+            if key not in self._WORKFLOW_SKIP_KEYS
+        }
+
+
 class PromptBuildRequest(BaseModel):
     user_message: str = Field(min_length=1)
     conversation_state: dict[str, Any] = Field(default_factory=dict)
@@ -252,11 +378,17 @@ class PromptBuilderService:
     def __init__(
         self,
         conversation_collector: PromptContextConversationCollector | None = None,
+        workflow_collector: PromptContextWorkflowCollector | None = None,
     ) -> None:
         self._conversation_collector = (
             conversation_collector
             if conversation_collector is not None
             else PromptContextConversationCollector()
+        )
+        self._workflow_collector = (
+            workflow_collector
+            if workflow_collector is not None
+            else PromptContextWorkflowCollector()
         )
 
     def build(self, request: PromptBuildRequest) -> PromptBuildResult:
@@ -281,13 +413,22 @@ class PromptBuilderService:
         )
 
     def build_context(self, request: PromptBuildRequest) -> PromptContext:
+        workflow_context = self._workflow_collector.collect(
+            active_intent=request.active_intent,
+            conversation_state=request.conversation_state,
+        )
+        resolved_active_intent = (
+            workflow_context.active_intent
+            if workflow_context is not None and workflow_context.active_intent
+            else request.active_intent
+        )
         included_documents: list[PromptContextKnowledgeDocument] = []
         included_document_ids: list[str] = []
         excluded_document_ids: list[str] = []
         requires_domain_validation = False
 
         for document in request.documents:
-            if not self._should_include_document(document, request.active_intent):
+            if not self._should_include_document(document, resolved_active_intent):
                 excluded_document_ids.append(document.id)
                 continue
 
@@ -299,7 +440,7 @@ class PromptBuilderService:
 
         return PromptContext(
             metadata=PromptContextMetadata(
-                active_intent=request.active_intent,
+                active_intent=resolved_active_intent,
                 included_document_ids=included_document_ids,
                 excluded_document_ids=excluded_document_ids,
                 requires_domain_validation=requires_domain_validation,
@@ -309,11 +450,7 @@ class PromptBuilderService:
                 user_message=request.user_message,
                 conversation_state=request.conversation_state,
             ),
-            workflow_context=(
-                PromptContextWorkflowContext(active_intent=request.active_intent)
-                if request.active_intent
-                else None
-            ),
+            workflow_context=workflow_context,
             knowledge_context=(
                 PromptContextKnowledgeContext(documents=included_documents)
                 if included_documents
@@ -416,7 +553,7 @@ class PromptBuilderService:
                         "when provided."
                     ),
                 )
-            )
+        )
 
         if not isinstance(context.system_instructions, PromptContextSystemInstructions):
             issues.append(
@@ -579,6 +716,18 @@ class PromptBuilderService:
                 if isinstance(context.metadata, PromptContextMetadata)
                 else None
             )
+            for index, field_name in enumerate(context.workflow_context.missing_fields):
+                if not isinstance(field_name, str) or not field_name.strip():
+                    issues.append(
+                        PromptContextValidationIssue(
+                            code="invalid_workflow_metadata",
+                            path=f"workflow_context.missing_fields[{index}]",
+                            message=(
+                                "workflow_context.missing_fields must contain non-empty "
+                                "string values."
+                            ),
+                        )
+                    )
             if workflow_intent and workflow_intent != metadata_intent:
                 issues.append(
                     PromptContextValidationIssue(

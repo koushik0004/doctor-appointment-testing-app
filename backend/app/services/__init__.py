@@ -19,6 +19,7 @@ from app.services.prompt_builder import (
     PromptContextUserContext,
     PromptContextValidationIssue,
     PromptContextValidationResult,
+    PromptContextWorkflowCollector,
     PromptContextWorkflowContext,
 )
 
@@ -41,5 +42,6 @@ __all__ = [
     "PromptContextUserContext",
     "PromptContextValidationIssue",
     "PromptContextValidationResult",
+    "PromptContextWorkflowCollector",
     "PromptContextWorkflowContext",
 ]

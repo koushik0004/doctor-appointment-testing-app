@@ -19,6 +19,7 @@ from app.services.prompt_builder import (
     PromptContextSystemInstructions,
     PromptContextUserContext,
     PromptContextValidationResult,
+    PromptContextWorkflowCollector,
     PromptContextWorkflowContext,
 )
 
@@ -139,6 +140,14 @@ def test_prompt_builder_context_uses_deterministic_defaults_for_optional_section
     assert context.rendering_options == PromptContextRenderingOptions()
 
 
+def test_workflow_collector_returns_none_when_no_workflow_exists():
+    collector = PromptContextWorkflowCollector()
+
+    context = collector.collect(active_intent=None, conversation_state={})
+
+    assert context is None
+
+
 def test_conversation_collector_returns_none_for_empty_state():
     collector = PromptContextConversationCollector()
 
@@ -242,6 +251,155 @@ def test_prompt_builder_renders_normalized_conversation_context_without_mutating
     }
 
 
+def test_prompt_builder_normalizes_booking_workflow_from_nested_conversation_context():
+    service = PromptBuilderService()
+    conversation_state = {
+        "conversation_id": "conv-4",
+        "context": {
+            "current_workflow": {
+                "workflow_type": "BOOK_APPOINTMENT",
+                "status": "INPUT_REQUIRED",
+                "draft": {
+                    "doctor_id": 1,
+                    "doctor_name": "Dr. Sarah Jenkins",
+                    "appointment_date": "2026-07-10",
+                },
+                "missing_fields": ["start_time", "patient_email"],
+                "last_transition": "awaiting_patient_details",
+            }
+        },
+    }
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Tomorrow at 10 AM",
+            conversation_state=conversation_state,
+            active_intent="BOOK_APPOINTMENT",
+        )
+    )
+
+    assert context.workflow_context is not None
+    assert context.workflow_context.active_intent == "BOOK_APPOINTMENT"
+    assert context.workflow_context.workflow_status == "INPUT_REQUIRED"
+    assert context.workflow_context.collected_fields == {
+        "doctor_id": 1,
+        "doctor_name": "Dr. Sarah Jenkins",
+        "appointment_date": "2026-07-10",
+    }
+    assert context.workflow_context.missing_fields == ["start_time", "patient_email"]
+    assert context.workflow_context.metadata == {
+        "last_transition": "awaiting_patient_details"
+    }
+    assert context.workflow_context.state == {
+        "workflow_type": "BOOK_APPOINTMENT",
+        "status": "INPUT_REQUIRED",
+        "draft": {
+            "doctor_id": 1,
+            "doctor_name": "Dr. Sarah Jenkins",
+            "appointment_date": "2026-07-10",
+        },
+        "missing_fields": ["start_time", "patient_email"],
+        "last_transition": "awaiting_patient_details",
+    }
+
+
+def test_prompt_builder_normalizes_legacy_cancellation_workflow_shape():
+    service = PromptBuilderService()
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Cancel my appointment",
+            conversation_state={
+                "workflow": "CANCEL_APPOINTMENT",
+                "status": "INPUT_REQUIRED",
+                "missing": ["appointment_reference"],
+                "source": "legacy",
+            },
+            active_intent="CANCEL_APPOINTMENT",
+        )
+    )
+
+    assert context.workflow_context is not None
+    assert context.workflow_context.active_intent == "CANCEL_APPOINTMENT"
+    assert context.workflow_context.workflow_status == "INPUT_REQUIRED"
+    assert context.workflow_context.collected_fields == {}
+    assert context.workflow_context.missing_fields == ["appointment_reference"]
+    assert context.workflow_context.metadata == {"source": "legacy"}
+
+
+def test_prompt_builder_normalizes_completed_workflow_deterministically_without_mutation():
+    service = PromptBuilderService()
+    conversation_state = {
+        "workflow_state": {
+            "workflow_type": "APPOINTMENT_CONFIRMATION",
+            "status": "COMPLETED",
+            "draft": {
+                "appointment_id": 42,
+                "confirmation_code": "CN-12345-AB",
+            },
+            "missing_fields": [],
+            "result_summary": "Appointment confirmed",
+        }
+    }
+
+    first_context = service.build_context(
+        PromptBuildRequest(
+            user_message="Show my appointment",
+            conversation_state=conversation_state,
+            active_intent="APPOINTMENT_CONFIRMATION",
+        )
+    )
+    second_context = service.build_context(
+        PromptBuildRequest(
+            user_message="Show my appointment",
+            conversation_state=conversation_state,
+            active_intent="APPOINTMENT_CONFIRMATION",
+        )
+    )
+
+    assert first_context.workflow_context == second_context.workflow_context
+    assert first_context.workflow_context is not None
+    assert first_context.workflow_context.workflow_status == "COMPLETED"
+    assert first_context.workflow_context.collected_fields == {
+        "appointment_id": 42,
+        "confirmation_code": "CN-12345-AB",
+    }
+    assert first_context.workflow_context.metadata == {
+        "result_summary": "Appointment confirmed"
+    }
+    assert conversation_state == {
+        "workflow_state": {
+            "workflow_type": "APPOINTMENT_CONFIRMATION",
+            "status": "COMPLETED",
+            "draft": {
+                "appointment_id": 42,
+                "confirmation_code": "CN-12345-AB",
+            },
+            "missing_fields": [],
+            "result_summary": "Appointment confirmed",
+        }
+    }
+
+
+def test_prompt_builder_keeps_active_intent_only_workflow_context_for_backward_compatibility():
+    service = PromptBuilderService()
+
+    context = service.build_context(
+        PromptBuildRequest(
+            user_message="Help me book",
+            active_intent="BOOK_APPOINTMENT",
+        )
+    )
+
+    assert context.workflow_context is not None
+    assert context.workflow_context.active_intent == "BOOK_APPOINTMENT"
+    assert context.workflow_context.workflow_status is None
+    assert context.workflow_context.collected_fields == {}
+    assert context.workflow_context.missing_fields == []
+    assert context.workflow_context.metadata == {}
+    assert context.workflow_context.state == {}
+
+
 def test_prompt_builder_validates_a_valid_prompt_context():
     service = PromptBuilderService()
     context = service.build_context(
@@ -334,6 +492,26 @@ def test_prompt_builder_validation_rejects_inconsistent_workflow_metadata():
 
     assert validation.is_valid is False
     assert any(issue.code == "inconsistent_workflow_metadata" for issue in validation.issues)
+
+
+def test_prompt_builder_validation_rejects_invalid_workflow_missing_fields():
+    service = PromptBuilderService()
+    context = PromptContext.model_construct(
+        metadata=PromptContextMetadata(active_intent="BOOK_APPOINTMENT"),
+        user_context=PromptContextUserContext(message="Need help"),
+        workflow_context=PromptContextWorkflowContext.model_construct(
+            active_intent="BOOK_APPOINTMENT",
+            missing_fields=["patient_email", ""],
+        ),
+        system_instructions=PromptContextSystemInstructions(),
+        constraints=PromptContextConstraints(),
+        rendering_options=PromptContextRenderingOptions(),
+    )
+
+    validation = service.validate_context(context)
+
+    assert validation.is_valid is False
+    assert any(issue.code == "invalid_workflow_metadata" for issue in validation.issues)
 
 
 def test_prompt_builder_applies_prompt_hints_as_constraints():
