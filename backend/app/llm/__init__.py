@@ -15,6 +15,7 @@ from app.llm.interfaces import (
     LLMResponseTranslator,
 )
 from app.llm.models import (
+    LLMCitation,
     LLMFinishReason,
     LLMGenerationConstraints,
     LLMGenerationRequest,
@@ -23,13 +24,26 @@ from app.llm.models import (
     LLMMessageRole,
     LLMProviderCapabilities,
     LLMProviderDescriptor,
+    LLMReasoningConfig,
+    LLMReasoningEffort,
+    LLMReasoningResult,
+    LLMRequestedModality,
+    LLMStreamingMetadata,
+    LLMStreamingOptions,
+    LLMStructuredOutputMode,
+    LLMStructuredOutputSchema,
     LLMTokenUsage,
+    LLMToolCall,
+    LLMToolChoice,
+    LLMToolChoiceMode,
+    LLMToolDefinition,
 )
 from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
 
 __all__ = [
     "BaseLLMProviderAdapter",
+    "LLMCitation",
     "LLMFinishReason",
     "LLMGenerationConstraints",
     "LLMGenerationRequest",
@@ -42,8 +56,20 @@ __all__ = [
     "LLMProviderCapabilities",
     "LLMProviderDescriptor",
     "LLMProviderRegistry",
+    "LLMReasoningConfig",
+    "LLMReasoningEffort",
+    "LLMReasoningResult",
     "LLMRequestTranslator",
+    "LLMRequestedModality",
     "LLMResponseTranslator",
+    "LLMStreamingMetadata",
+    "LLMStreamingOptions",
+    "LLMStructuredOutputMode",
+    "LLMStructuredOutputSchema",
     "LLMTokenUsage",
+    "LLMToolCall",
+    "LLMToolChoice",
+    "LLMToolChoiceMode",
+    "LLMToolDefinition",
     "InMemoryLLMProviderRegistry",
 ]

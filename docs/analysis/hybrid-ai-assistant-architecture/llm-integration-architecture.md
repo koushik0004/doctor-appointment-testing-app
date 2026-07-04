@@ -21,6 +21,13 @@ Phase 6.2 refines that seam with:
 - a shared base adapter pipeline for future provider adapters
 - an explicit in-memory registry implementation for inactive provider resolution
 
+Phase 6.3 refines the canonical internal contract with:
+
+- explicit model-selection fields on canonical requests
+- provider-neutral structured-output, tool, reasoning, and streaming request metadata
+- provider-neutral structured-output, tool-call, reasoning, citation, and model/provider result metadata
+- capability flags for future reasoning, citation, and audio support
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -59,6 +66,15 @@ Provider-neutral data contracts for future LLM calls:
 - token-usage and finish-reason models
 
 These models define an internal integration contract only. They are not API schemas and are not tied to any provider payload format.
+
+Phase 6.3 keeps the contract provider-neutral while making room for future:
+
+- structured JSON output requests and results
+- tool definitions, tool choice, and tool-call results
+- reasoning controls and reasoning metadata
+- streaming request intent and streaming result metadata
+- multimodal intent metadata
+- citations plus separated provider/model metadata
 
 ### `interfaces.py`
 
@@ -115,6 +131,7 @@ This layer must not:
 
 - import or initialize any external LLM SDK
 - expose provider-native payload shapes to upstream callers
+- encode OpenAI, Claude, Gemini, Bedrock, Vertex, Ollama, or other provider request/response schemas into canonical models
 - load prompt context directly from files or repositories
 - perform retrieval, ranking, workflow execution, booking, or domain validation
 - mutate conversation state
@@ -154,6 +171,7 @@ Future adapter implementations should:
 - accept only canonical `LLMGenerationRequest` input from upstream
 - emit only canonical `LLMGenerationResponse` output upstream
 - translate provider-native payloads entirely inside the adapter
+- map future provider-native structured output, tool-calling, reasoning, streaming, citation, and multimodal fields back into canonical metadata models
 - keep SDK clients, auth, retry policy, and transport details inside the adapter
 - avoid leaking provider-specific enums, IDs, tool-call payloads, or message formats outside `backend/app/llm/`
 - rely on deterministic domain validation outside the adapter after model output returns
@@ -166,10 +184,13 @@ Focused tests now validate:
 - explicit provider listing and default-provider resolution remain inactive-only
 - the shared adapter pipeline translates canonical requests and responses without exposing provider-native payloads upstream
 - duplicate provider registration is rejected deterministically
+- canonical request and response validation remains backward compatible
+- deterministic serialization of equivalent canonical model instances
+- optional structured-output, tool, reasoning, streaming, citation, and modality fields remain provider-neutral and optional
 
 ## Compatibility Guarantees
 
-Phase 6.2 preserves:
+Phase 6.3 preserves:
 
 - zero production behavior changes
 - zero API changes

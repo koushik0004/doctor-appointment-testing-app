@@ -73,7 +73,7 @@
 - `backend/app/llm/adapters.py`
   - Shared inactive base adapter pipeline for future provider-specific request/response translation and private provider invocation.
 - `backend/app/llm/models.py`
-  - Internal LLM integration request/response, capabilities, and usage models; provider-neutral and not wired to API schemas or any SDK.
+  - Internal LLM integration request/response, capabilities, and usage models; now also carries provider-neutral structured-output, tool-calling, reasoning, streaming, citation, and multimodal-intent metadata without wiring any SDK or API schema.
 - `backend/app/llm/interfaces.py`
   - Provider translator, adapter, and provider-registry protocols for future adapter implementations.
 - `backend/app/llm/registry.py`
@@ -142,6 +142,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the inactive prompt-builder seam: `PromptContext` creation, deterministic conversation, workflow, knowledge, and system-instruction normalization/construction, deterministic validation, Prompt Assembly Pipeline section ordering/omission, dedicated PromptRenderer behavior, deterministic block assembly, prompt-hint constraints, and character-budget truncation without touching the live request flow.
 - `backend/tests/test_llm_integration.py`
   - Covers the inactive LLM integration seam: disconnected status by default, provider-descriptor listing through a stub registry, explicit delegation behavior, canonical adapter translation flow, inactive default-provider resolution, duplicate-registry protection, and failure when no runtime registry is configured.
+- `backend/tests/test_llm_models.py`
+  - Covers the refined canonical LLM contract: model validation, backward-compatible defaults, deterministic serialization, optional future-capability fields, and provider-neutral extensibility.
 
 ## High-Value Docs
 
@@ -151,6 +153,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-integration-architecture.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-abstraction.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-canonical-llm-contract.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

@@ -3,6 +3,19 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.3 canonical LLM request/response contract refinement for the inactive LLM integration seam
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Refined `backend/app/llm/models.py` so the canonical internal LLM contract can represent future provider-neutral model selection, structured output, tool definitions and tool calls, reasoning controls and metadata, streaming intent and streaming metadata, citations, provider/model metadata, and multimodal request intent without exposing any provider-specific payload shape.
+- Preserved full backward compatibility by keeping all new request and response fields optional and leaving the inactive adapter, registry, and integration-service boundaries unchanged.
+- Added focused backend model tests covering canonical validation, deterministic serialization, backward-compatible defaults, optional field handling, and future extensibility while keeping provider tests and runtime wiring out of scope.
+- Updated the Phase 6 architecture/report/context documentation so future sessions can discover the refined canonical contract directly from the compact AI context files.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 6.2 provider abstraction for the inactive LLM integration seam
 - Completed on: 2026-07-04
 
