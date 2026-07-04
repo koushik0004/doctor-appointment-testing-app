@@ -16,6 +16,22 @@ class PromptContextBlockKind(str, Enum):
     KNOWLEDGE_DOCUMENT = "knowledge_document"
 
 
+class PromptAssemblySectionKind(str, Enum):
+    SYSTEM_INSTRUCTIONS = "system_instructions"
+    USER_MESSAGE = "user_message"
+    CONVERSATION_STATE = "conversation_state"
+    KNOWLEDGE_DOCUMENT = "knowledge_document"
+
+
+class PromptAssemblySection(BaseModel):
+    kind: PromptAssemblySectionKind
+    label: str = Field(min_length=1)
+    content: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 class PromptContextBlock(BaseModel):
     kind: PromptContextBlockKind
     label: str = Field(min_length=1)
@@ -460,6 +476,192 @@ class PromptContextSystemInstructionBuilder:
         return PromptContextSystemInstructions(instructions=ordered_instructions)
 
 
+class PromptContextAssemblyPipeline:
+    """Deterministically assembles validated prompt context into renderable sections."""
+
+    def assemble(self, context: PromptContext) -> list[PromptAssemblySection]:
+        sections: list[PromptAssemblySection] = []
+
+        system_instruction_content = self._build_system_instruction_content(
+            context.system_instructions
+        )
+        self._append_section(
+            sections,
+            kind=PromptAssemblySectionKind.SYSTEM_INSTRUCTIONS,
+            label="System Instructions",
+            content=system_instruction_content,
+        )
+        self._append_section(
+            sections,
+            kind=PromptAssemblySectionKind.USER_MESSAGE,
+            label="User Message",
+            content=context.user_context.message,
+        )
+
+        if context.conversation_context is not None and self._has_conversation_context_content(
+            context.conversation_context
+        ):
+            self._append_section(
+                sections,
+                kind=PromptAssemblySectionKind.CONVERSATION_STATE,
+                label="Conversation State",
+                content=self._serialize_json(
+                    self._serialize_conversation_context(context.conversation_context),
+                    context.rendering_options,
+                ),
+            )
+
+        if context.knowledge_context is None:
+            return sections
+
+        for document in context.knowledge_context.documents:
+            self._append_section(
+                sections,
+                kind=PromptAssemblySectionKind.KNOWLEDGE_DOCUMENT,
+                label=f"Knowledge Document: {document.title}",
+                content=self._format_context_document(document, context.rendering_options),
+                metadata={
+                    "document_id": document.document_id,
+                    "source_path": document.source_path,
+                    "domain": document.domain,
+                    "audience": document.audience,
+                },
+            )
+
+        return sections
+
+    def _append_section(
+        self,
+        sections: list[PromptAssemblySection],
+        *,
+        kind: PromptAssemblySectionKind,
+        label: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        normalized_content = content.strip()
+        if not normalized_content:
+            return
+        sections.append(
+            PromptAssemblySection(
+                kind=kind,
+                label=label,
+                content=normalized_content,
+                metadata=deepcopy(metadata or {}),
+            )
+        )
+
+    def _build_system_instruction_content(
+        self,
+        system_instructions: PromptContextSystemInstructions,
+    ) -> str:
+        if not system_instructions.instructions:
+            return ""
+        return "\n".join(f"- {instruction}" for instruction in system_instructions.instructions)
+
+    def _format_context_document(
+        self,
+        document: PromptContextKnowledgeDocument,
+        rendering_options: PromptContextRenderingOptions,
+    ) -> str:
+        summary = f"Summary: {document.summary}"
+
+        if not document.safe_to_quote:
+            return "\n".join(
+                [
+                    f"Document ID: {document.document_id}",
+                    f"Source: {document.source_path}",
+                    summary,
+                    "Quoted content omitted because the document is not marked safe_to_quote.",
+                ]
+            )
+
+        content = self._serialize_content(document.content, rendering_options)
+        if document.max_context_chars is not None and len(content) > document.max_context_chars:
+            content = content[: document.max_context_chars].rstrip()
+
+        return "\n".join(
+            [
+                f"Document ID: {document.document_id}",
+                f"Source: {document.source_path}",
+                summary,
+                "Content:",
+                content,
+            ]
+        )
+
+    def _serialize_content(
+        self,
+        content: str | dict[str, Any],
+        rendering_options: PromptContextRenderingOptions,
+    ) -> str:
+        if isinstance(content, str):
+            return content.strip()
+        return self._serialize_json(content, rendering_options)
+
+    def _serialize_json(
+        self,
+        value: Any,
+        rendering_options: PromptContextRenderingOptions,
+    ) -> str:
+        separators = (",", ":") if rendering_options.json_compact else None
+        return json.dumps(
+            value,
+            sort_keys=rendering_options.json_sort_keys,
+            ensure_ascii=rendering_options.json_ensure_ascii,
+            separators=separators,
+        )
+
+    def _has_conversation_context_content(
+        self,
+        conversation_context: PromptContextConversationContext,
+    ) -> bool:
+        return bool(
+            conversation_context.state
+            or conversation_context.current_user_message
+            or conversation_context.previous_turns
+            or conversation_context.assistant_turns
+            or conversation_context.metadata
+        )
+
+    def _serialize_conversation_context(
+        self,
+        conversation_context: PromptContextConversationContext,
+    ) -> dict[str, Any]:
+        if (
+            not conversation_context.previous_turns
+            and not conversation_context.assistant_turns
+            and not conversation_context.metadata
+            and conversation_context.current_user_message is None
+        ):
+            return deepcopy(conversation_context.state)
+
+        serialized: dict[str, Any] = {
+            "current_user_message": conversation_context.current_user_message,
+            "previous_turns": [
+                self._serialize_conversation_turn(turn)
+                for turn in conversation_context.previous_turns
+            ],
+            "assistant_turns": [
+                self._serialize_conversation_turn(turn)
+                for turn in conversation_context.assistant_turns
+            ],
+            "metadata": deepcopy(conversation_context.metadata),
+            "state": deepcopy(conversation_context.state),
+        }
+        return serialized
+
+    def _serialize_conversation_turn(
+        self,
+        turn: PromptContextConversationTurn,
+    ) -> dict[str, Any]:
+        return {
+            "role": turn.role,
+            "message": turn.message,
+            "metadata": deepcopy(turn.metadata),
+        }
+
+
 class PromptBuildRequest(BaseModel):
     user_message: str = Field(min_length=1)
     conversation_state: dict[str, Any] = Field(default_factory=dict)
@@ -489,6 +691,7 @@ class PromptBuilderService:
         workflow_collector: PromptContextWorkflowCollector | None = None,
         knowledge_collector: PromptContextKnowledgeCollector | None = None,
         system_instruction_builder: PromptContextSystemInstructionBuilder | None = None,
+        assembly_pipeline: PromptContextAssemblyPipeline | None = None,
     ) -> None:
         self._conversation_collector = (
             conversation_collector
@@ -510,16 +713,22 @@ class PromptBuilderService:
             if system_instruction_builder is not None
             else PromptContextSystemInstructionBuilder()
         )
+        self._assembly_pipeline = (
+            assembly_pipeline
+            if assembly_pipeline is not None
+            else PromptContextAssemblyPipeline()
+        )
 
     def build(self, request: PromptBuildRequest) -> PromptBuildResult:
         context = self.build_context(request)
         validation = self.validate_context(context)
         if not validation.is_valid:
             raise ValueError(self._format_validation_error(validation.issues))
-        blocks = self._build_blocks(context)
+        sections = self._assembly_pipeline.assemble(context)
+        blocks = self._build_blocks(sections)
 
         prompt, truncated = self._compose_prompt(
-            blocks=blocks,
+            sections=sections,
             context=context,
         )
 
@@ -860,109 +1069,45 @@ class PromptBuilderService:
             issues=issues,
         )
 
-    def _build_blocks(self, context: PromptContext) -> list[PromptContextBlock]:
-        blocks = [
-            PromptContextBlock(
-                kind=PromptContextBlockKind.USER_MESSAGE,
-                label="User Message",
-                content=context.user_context.message,
-            )
-        ]
+    def _build_blocks(self, sections: list[PromptAssemblySection]) -> list[PromptContextBlock]:
+        section_kind_to_block_kind = {
+            PromptAssemblySectionKind.USER_MESSAGE: PromptContextBlockKind.USER_MESSAGE,
+            PromptAssemblySectionKind.CONVERSATION_STATE: PromptContextBlockKind.CONVERSATION_STATE,
+            PromptAssemblySectionKind.KNOWLEDGE_DOCUMENT: PromptContextBlockKind.KNOWLEDGE_DOCUMENT,
+        }
+        blocks: list[PromptContextBlock] = []
 
-        if context.conversation_context is not None and self._has_conversation_context_content(
-            context.conversation_context
-        ):
+        for section in sections:
+            block_kind = section_kind_to_block_kind.get(section.kind)
+            if block_kind is None:
+                continue
             blocks.append(
                 PromptContextBlock(
-                    kind=PromptContextBlockKind.CONVERSATION_STATE,
-                    label="Conversation State",
-                    content=self._serialize_json(
-                        self._serialize_conversation_context(context.conversation_context),
-                        context.rendering_options,
-                    ),
-                )
-            )
-
-        if context.knowledge_context is None:
-            return blocks
-
-        for document in context.knowledge_context.documents:
-            blocks.append(
-                PromptContextBlock(
-                    kind=PromptContextBlockKind.KNOWLEDGE_DOCUMENT,
-                    label=f"Knowledge Document: {document.title}",
-                    content=self._format_context_document(document, context.rendering_options),
-                    metadata={
-                        "document_id": document.document_id,
-                        "source_path": document.source_path,
-                        "domain": document.domain,
-                        "audience": document.audience,
-                    },
+                    kind=block_kind,
+                    label=section.label,
+                    content=section.content,
+                    metadata=deepcopy(section.metadata),
                 )
             )
 
         return blocks
 
-    def _format_context_document(
-        self,
-        document: PromptContextKnowledgeDocument,
-        rendering_options: PromptContextRenderingOptions,
-    ) -> str:
-        summary = f"Summary: {document.summary}"
-
-        if not document.safe_to_quote:
-            return "\n".join(
-                [
-                    f"Document ID: {document.document_id}",
-                    f"Source: {document.source_path}",
-                    summary,
-                    "Quoted content omitted because the document is not marked safe_to_quote.",
-                ]
-            )
-
-        content = self._serialize_content(document.content, rendering_options)
-        if document.max_context_chars is not None and len(content) > document.max_context_chars:
-            content = content[: document.max_context_chars].rstrip()
-
-        return "\n".join(
-            [
-                f"Document ID: {document.document_id}",
-                f"Source: {document.source_path}",
-                summary,
-                "Content:",
-                content,
-            ]
-        )
-
     def _compose_prompt(
         self,
         *,
-        blocks: list[PromptContextBlock],
+        sections: list[PromptAssemblySection],
         context: PromptContext,
     ) -> tuple[str, bool]:
-        sections: list[str] = []
-        if context.system_instructions.instructions:
-            instructions = "\n".join(
-                f"- {instruction}" for instruction in context.system_instructions.instructions
+        rendered_sections = [
+            self._render_section(
+                label=section.label,
+                content=section.content,
+                rendering_options=context.rendering_options,
             )
-            sections.append(
-                self._render_section(
-                    label="System Instructions",
-                    content=instructions,
-                    rendering_options=context.rendering_options,
-                )
-            )
+            for section in sections
+        ]
 
-        for block in blocks:
-            sections.append(
-                self._render_section(
-                    label=block.label,
-                    content=block.content,
-                    rendering_options=context.rendering_options,
-                )
-            )
-
-        prompt = "\n\n".join(sections)
+        prompt = "\n\n".join(rendered_sections)
         if len(prompt) <= context.constraints.max_prompt_chars:
             return prompt, False
 
@@ -982,77 +1127,6 @@ class PromptBuilderService:
         if not rendering_options.include_section_headers:
             return content
         return f"[{label}]\n{content}"
-
-    def _serialize_content(
-        self,
-        content: str | dict[str, Any],
-        rendering_options: PromptContextRenderingOptions,
-    ) -> str:
-        if isinstance(content, str):
-            return content.strip()
-        return self._serialize_json(content, rendering_options)
-
-    def _serialize_json(
-        self,
-        value: Any,
-        rendering_options: PromptContextRenderingOptions,
-    ) -> str:
-        separators = (",", ":") if rendering_options.json_compact else None
-        return json.dumps(
-            value,
-            sort_keys=rendering_options.json_sort_keys,
-            ensure_ascii=rendering_options.json_ensure_ascii,
-            separators=separators,
-        )
-
-    def _has_conversation_context_content(
-        self,
-        conversation_context: PromptContextConversationContext,
-    ) -> bool:
-        return bool(
-            conversation_context.state
-            or conversation_context.current_user_message
-            or conversation_context.previous_turns
-            or conversation_context.assistant_turns
-            or conversation_context.metadata
-        )
-
-    def _serialize_conversation_context(
-        self,
-        conversation_context: PromptContextConversationContext,
-    ) -> dict[str, Any]:
-        if (
-            not conversation_context.previous_turns
-            and not conversation_context.assistant_turns
-            and not conversation_context.metadata
-            and conversation_context.current_user_message is None
-        ):
-            return deepcopy(conversation_context.state)
-
-        serialized: dict[str, Any] = {
-            "current_user_message": conversation_context.current_user_message,
-            "previous_turns": [
-                self._serialize_conversation_turn(turn)
-                for turn in conversation_context.previous_turns
-            ],
-            "assistant_turns": [
-                self._serialize_conversation_turn(turn)
-                for turn in conversation_context.assistant_turns
-            ],
-            "metadata": deepcopy(conversation_context.metadata),
-            "state": deepcopy(conversation_context.state),
-        }
-        return serialized
-
-    def _serialize_conversation_turn(
-        self,
-        turn: PromptContextConversationTurn,
-    ) -> dict[str, Any]:
-        return {
-            "role": turn.role,
-            "message": turn.message,
-            "metadata": deepcopy(turn.metadata),
-        }
 
     def _format_validation_error(
         self,

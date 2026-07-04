@@ -8,10 +8,13 @@ from app.knowledge import (
 )
 from app.services.prompt_builder import (
     PromptBuildRequest,
+    PromptAssemblySectionKind,
     PromptBuilderService,
+    PromptContextAssemblyPipeline,
     PromptContext,
     PromptContextConstraints,
     PromptContextConversationCollector,
+    PromptContextConversationContext,
     PromptContextKnowledgeCollector,
     PromptContextKnowledgeContext,
     PromptContextKnowledgeDocument,
@@ -218,6 +221,101 @@ def test_system_instruction_builder_merges_rules_and_deduplicates_deterministica
         "  Prefer deterministic summaries.  ",
         "",
     ]
+
+
+def test_prompt_assembly_pipeline_orders_sections_deterministically():
+    pipeline = PromptContextAssemblyPipeline()
+    context = PromptContext(
+        metadata=PromptContextMetadata(included_document_ids=["faq.booking"]),
+        user_context=PromptContextUserContext(message="Help me book"),
+        conversation_context=PromptContextConversationContext(
+            state={"conversation_id": "conv-1"},
+            current_user_message="Help me book",
+        ),
+        knowledge_context=PromptContextKnowledgeContext(
+            documents=[
+                PromptContextKnowledgeDocument(
+                    document_id="faq.booking",
+                    title="Booking Help",
+                    source_path="faq/booking.md",
+                    domain="faq",
+                    audience="patient",
+                    summary="Booking summary.",
+                    content="Booking content.",
+                    safe_to_quote=True,
+                )
+            ]
+        ),
+        system_instructions=PromptContextSystemInstructions(
+            instructions=["Use only provided context."]
+        ),
+    )
+
+    sections = pipeline.assemble(context)
+
+    assert [section.kind for section in sections] == [
+        PromptAssemblySectionKind.SYSTEM_INSTRUCTIONS,
+        PromptAssemblySectionKind.USER_MESSAGE,
+        PromptAssemblySectionKind.CONVERSATION_STATE,
+        PromptAssemblySectionKind.KNOWLEDGE_DOCUMENT,
+    ]
+    assert sections[0].label == "System Instructions"
+    assert sections[3].metadata == {
+        "document_id": "faq.booking",
+        "source_path": "faq/booking.md",
+        "domain": "faq",
+        "audience": "patient",
+    }
+
+
+def test_prompt_assembly_pipeline_omits_empty_sections_automatically():
+    pipeline = PromptContextAssemblyPipeline()
+    context = PromptContext(
+        metadata=PromptContextMetadata(),
+        user_context=PromptContextUserContext(message="Hello there"),
+        conversation_context=PromptContextConversationContext(),
+        system_instructions=PromptContextSystemInstructions(instructions=[]),
+    )
+
+    sections = pipeline.assemble(context)
+
+    assert [section.kind for section in sections] == [PromptAssemblySectionKind.USER_MESSAGE]
+
+
+def test_prompt_assembly_pipeline_is_deterministic_and_read_only():
+    pipeline = PromptContextAssemblyPipeline()
+    context = PromptContext(
+        metadata=PromptContextMetadata(included_document_ids=["faq.policy"]),
+        user_context=PromptContextUserContext(message="What should I bring?"),
+        knowledge_context=PromptContextKnowledgeContext(
+            documents=[
+                PromptContextKnowledgeDocument(
+                    document_id="faq.policy",
+                    title="Booking Policy",
+                    source_path="faq/policy.md",
+                    domain="faq",
+                    audience="patient",
+                    summary="Bring ID.",
+                    content={"policy": "Bring ID"},
+                    safe_to_quote=True,
+                    metadata={"revision": 3},
+                )
+            ]
+        ),
+    )
+    original_context = context.model_copy(deep=True)
+
+    first_sections = pipeline.assemble(context)
+    second_sections = pipeline.assemble(context)
+
+    assert first_sections == second_sections
+    assert context == original_context
+    assert first_sections[1].metadata == {
+        "document_id": "faq.policy",
+        "source_path": "faq/policy.md",
+        "domain": "faq",
+        "audience": "patient",
+    }
 
 
 def test_prompt_builder_uses_system_instruction_builder_without_mutating_inputs():
@@ -785,6 +883,26 @@ def test_prompt_builder_applies_prompt_hints_as_constraints():
     assert result.requires_domain_validation is True
     assert "Quoted content omitted because the document is not marked safe_to_quote." in result.prompt
     assert "faq.excluded" not in result.prompt
+
+
+def test_prompt_builder_pipeline_preserves_renderer_compatibility_and_block_contract():
+    service = PromptBuilderService()
+
+    result = service.build(
+        PromptBuildRequest(
+            user_message="Need help",
+            conversation_state={"history": [{"role": "assistant", "text": "How can I help?"}]},
+            system_instructions=["Use only provided context."],
+        )
+    )
+
+    assert result.blocks[0].kind.value == "user_message"
+    assert result.blocks[1].kind.value == "conversation_state"
+    assert result.blocks[0].label == "User Message"
+    assert result.blocks[1].label == "Conversation State"
+    assert "[System Instructions]" in result.prompt
+    assert "[User Message]" in result.prompt
+    assert "[Conversation State]" in result.prompt
 
 
 def test_prompt_builder_raises_deterministic_validation_error_before_rendering():

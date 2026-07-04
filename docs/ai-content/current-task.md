@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 5.7 deterministic prompt assembly pipeline
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Prompt Assembly Pipeline beneath the inactive backend Prompt Builder so validated `PromptContext` instances are converted into ordered renderable prompt sections before rendering.
+- Introduced an intermediate assembly-section model that preserves section kind, label, content, and metadata while automatically omitting empty sections and keeping section assembly separate from rendering.
+- Refactored `PromptBuilderService` to delegate ordered section assembly to the pipeline, then derive the legacy `blocks` result contract from assembled sections while preserving the existing rendered prompt output exactly.
+- Expanded focused backend tests to cover section ordering, omission of empty sections, repeated-build determinism, renderer compatibility, read-only behavior, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the Prompt Assembly Pipeline as the dedicated deterministic component responsible for ordered section construction before rendering.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.6 internal system instruction builder
 - Completed on: 2026-07-04
 
