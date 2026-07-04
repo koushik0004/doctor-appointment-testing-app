@@ -3,10 +3,150 @@
 ## Active Work
 
 - Status: completed
-- Task: fix Phase 4 booking workflow business-validation failures returning HTTP 500/503
+- Task: implement Phase 5.8 dedicated prompt renderer
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic `PromptRenderer` beneath the Prompt Assembly Pipeline so ordered `PromptAssemblySection` instances are rendered through a dedicated final stage instead of inside `PromptBuilderService`.
+- Moved section rendering, optional section-header handling, prompt joining, total prompt truncation, and truncation-marker application out of `PromptBuilderService` while preserving the exact rendered prompt output and the existing `PromptBuildRequest` and `PromptBuildResult` contracts.
+- Refactored `PromptBuilderService` into a thinner orchestrator that now builds context, validates it, assembles sections, delegates final rendering to `PromptRenderer`, and then returns the backward-compatible build result.
+- Expanded focused backend tests to cover deterministic renderer behavior, header-enabled and header-disabled rendering, empty section rendering, truncation handling, repeated rendering determinism, read-only behavior, and PromptBuilderService integration with the renderer.
+- Updated the architecture reference and AI context files so later sessions can treat `PromptRenderer` as the final deterministic stage of the inactive Prompt Builder pipeline.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.7 deterministic prompt assembly pipeline
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Prompt Assembly Pipeline beneath the inactive backend Prompt Builder so validated `PromptContext` instances are converted into ordered renderable prompt sections before rendering.
+- Introduced an intermediate assembly-section model that preserves section kind, label, content, and metadata while automatically omitting empty sections and keeping section assembly separate from rendering.
+- Refactored `PromptBuilderService` to delegate ordered section assembly to the pipeline, then derive the legacy `blocks` result contract from assembled sections while preserving the existing rendered prompt output exactly.
+- Expanded focused backend tests to cover section ordering, omission of empty sections, repeated-build determinism, renderer compatibility, read-only behavior, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the Prompt Assembly Pipeline as the dedicated deterministic component responsible for ordered section construction before rendering.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.6 internal system instruction builder
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic System Instruction Builder beneath the inactive backend Prompt Builder so application rules and caller-supplied instructions are normalized into the canonical `PromptContextSystemInstructions` section before validation and rendering.
+- The builder preserves deterministic instruction order, removes duplicates while keeping the first occurrence, trims empty instruction values, and keeps the resulting system-instruction section provider-agnostic without mutating caller input.
+- Refactored `PromptBuilderService` to delegate system-instruction construction to the builder while preserving the existing external request and result contract plus the previously rendered prompt behavior when no application rules are configured.
+- Expanded focused backend tests to cover empty instruction sets, application defaults, caller-only instructions, merged instructions, deterministic duplicate elimination, read-only behavior, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the System Instruction Builder as the dedicated read-only Prompt Builder component responsible for deterministic system-instruction construction before validation and rendering.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.5 internal knowledge context collector
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Knowledge Context Collector beneath the inactive backend Prompt Builder so caller-supplied `KnowledgeDocument` objects are normalized before `PromptContext` validation and rendering.
+- The canonical `PromptContext` knowledge section now preserves deterministic document order, included and excluded document tracking, prompt-hint include and exclude metadata, safe-to-quote flags, domain-validation flags, context limits, and per-document metadata without mutating caller input or changing runtime chat behavior.
+- Refactored `PromptBuilderService` to delegate knowledge normalization to the collector while preserving the existing external request and result contract plus the previously rendered prompt output behavior.
+- Expanded focused backend tests to cover empty knowledge sets, single and multiple document normalization, deterministic ordering, include and exclude behavior, prompt-hint preservation, read-only handling, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the Knowledge Context Collector as the dedicated read-only Prompt Builder component responsible for deterministic knowledge normalization before validation and rendering.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.4 internal workflow context collector
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Workflow Context Collector beneath the inactive backend Prompt Builder so caller-supplied workflow state is normalized before PromptContext validation and rendering.
+- The canonical `PromptContext` workflow section now preserves active workflow identity, workflow status, collected fields, missing fields, workflow metadata, and the original workflow state without mutating caller input or changing runtime chat behavior.
+- Refactored `PromptBuilderService` to delegate workflow normalization to the collector while preserving the existing external request/result contract and backward-compatible prompt output behavior.
+- Expanded focused backend tests to cover no-workflow, booking, cancellation, partial, and completed workflow normalization plus deterministic collector behavior, metadata preservation, read-only handling, and backward compatibility.
+- Updated the architecture reference and AI context files so later sessions can treat the Workflow Context Collector as an internal read-only Prompt Builder component that runs before validation and rendering.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.3 internal conversation context collector
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an internal deterministic Conversation Context Collector beneath the inactive backend Prompt Builder so caller-supplied conversation state is normalized before PromptContext validation and rendering.
+- The canonical `PromptContext` conversation section now preserves the current user message, chronological previous turns, assistant-only turns, preserved conversation metadata, and the original caller state without mutating input data or changing runtime chat behavior.
+- Refactored `PromptBuilderService` to delegate conversation normalization to the collector while preserving the existing external request/result contract and existing prompt output for legacy conversation-state inputs.
+- Expanded focused backend tests to cover empty, single-turn, and multi-turn conversation normalization, deterministic collector behavior, metadata preservation, and backward-compatible prompt building.
+- Updated the architecture reference and AI context files so later sessions can treat the collector as an internal read-only Prompt Builder component that runs before validation and rendering.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.2.5 PromptContext validation
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added a dedicated deterministic validation layer to the inactive backend Prompt Builder so assembled `PromptContext` instances are checked before block generation and prompt rendering.
+- Validation now verifies section structure, non-empty user messages, supported constraint values, rendering-option consistency, duplicate knowledge-document IDs, included/excluded document metadata consistency, and workflow metadata consistency.
+- Validation failures return deterministic debug-friendly error payloads through the existing service path without changing any production chat, API, frontend, workflow, retrieval, or database behavior.
+- Expanded focused backend tests to cover valid contexts, validation failures, duplicate documents, invalid constraints, invalid rendering options, workflow metadata mismatches, and backward-compatible prompt rendering for valid requests.
+- Updated the architecture reference and AI context files so later sessions can treat validation as the final deterministic gate before prompt rendering.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.2 deterministic Prompt Context model
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added a canonical internal `PromptContext` model beneath the inactive backend Prompt Builder, with structured sections for metadata, user context, conversation context, workflow context, knowledge context, system instructions, constraints, and rendering options.
+- Refactored `PromptBuilderService` to build and validate `PromptContext` first, then deterministically render the same external `PromptBuildResult` contract and prompt text behavior as Phase 5.1.
+- Kept the new model provider-agnostic and fully outside live `ConversationManager`, retrieval, workflow, API, frontend, and database paths.
+- Expanded focused backend tests to cover `PromptContext` creation, optional section omission, deterministic defaults, and backward compatibility of the existing prompt builder output.
+- Updated the architecture reference and AI context files so future sessions can continue Prompt Builder work without re-deriving the internal contract.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 5.1 standalone prompt builder module
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an inactive backend `PromptBuilderService` with a deterministic internal contract for composing prompt text from caller-supplied user message, conversation state, and preselected knowledge documents.
+- Kept the new module fully outside the live `ConversationManager`, `WorkflowEngine`, Vector-less RAG retrieval, business-service, API, and frontend widget request paths.
+- Applied prompt-hint constraints only as bounded formatting rules during prompt construction, including intent-based document inclusion, safe-to-quote handling, and optional per-document context clipping.
+- Added focused backend tests covering deterministic prompt assembly, prompt-hint constraint handling, and character-budget truncation behavior.
+- Updated the compact AI context and architecture reference so future sessions can find the new prompt-builder seam without re-scanning the repository.
+
+## Prior Work
+
+- Status: completed
+- Task: refresh test data health without causing data loss
 - Completed on: 2026-07-03
 
 ## Outcome
+
+- Inspected the live `backend/app.db` schema and data against the current models and booking/search services with an explicit no-data-loss policy.
+- Verified the current doctor, patient, and appointment rows remain valid for implemented workflows; no orphaned relationships, duplicate appointment-slot conflicts, or broken demo appointments were found.
+- Confirmed the three future `@example.com` demo bookings still behave correctly under generated availability for July 7, July 8, and July 9, 2026.
+- Detected one retained legacy inconsistency in `doctor_availability` where Dr. Sarah Jenkins has a historical `TELEMEDICINE` row despite the live profile supporting only `IN_PERSON`, but intentionally did not mutate it because the table is historical and the current flow no longer depends on it.
+- Generated `docs/reports/test-data-health-report.md` documenting schema checks, skipped legacy repair candidates, and the fact that zero rows were inserted, updated, or deleted.
+
+## Prior Work
+
+- Status: completed
+- Task: fix Phase 4 booking workflow business-validation failures returning HTTP 500/503
+- Completed on: 2026-07-03
+
+## Prior Outcome
 
 - Booking workflow execution now converts expected booking validation failures into structured chat workflow responses instead of surfacing them as transport errors from `/api/chat`.
 - Covered business validation scenarios include past appointment date, invalid or unavailable appointment time, already-booked slot / duplicate booking, invalid doctor context, and invalid patient email data.
@@ -98,15 +238,13 @@
 
 ## Required Files for This Task
 
-- `backend/app/services/chat_entity_extractor.py`
-- `backend/app/services/workflow_engine.py`
-- `backend/app/services/conversation_manager.py`
-- `backend/tests/test_chat_entity_extractor.py`
-- `backend/tests/test_conversation_manager.py`
-- `backend/tests/test_chat_api.py`
+- `backend/app/services/prompt_builder.py`
+- `backend/tests/test_prompt_builder_service.py`
+- `backend/app/services/__init__.py`
+- `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
+- `docs/ai-content/feature-map.md`
 
 ## Notes
 
-- Keep Phase 3 workflow-first routing intact: `ConversationManager` should continue deferring to the workflow engine before knowledge retrieval or deterministic fallback.
-- Booking regressions in this area are most likely to come from deterministic extraction or draft-merging behavior inside `WorkflowEngine`, not from the Phase 4 knowledge layer.
-- Validate with `backend/.venv/bin/python -m pytest backend/tests/test_chat_entity_extractor.py backend/tests/test_knowledge_repository.py backend/tests/test_conversation_manager.py backend/tests/test_chat_api.py -q` when changing this area.
+- The prompt builder, its canonical `PromptContext` model, and the new validation gate are intentionally inactive in production and currently have no callers in the request path.
+- No API, UI, workflow, retrieval, or database behavior changed in this phase.

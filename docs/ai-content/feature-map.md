@@ -100,6 +100,7 @@
   - `backend/app/api/chat.py`
   - `backend/app/services/conversation_manager.py`
   - `backend/app/services/workflow_engine.py`
+  - `backend/app/services/prompt_builder.py`
   - `backend/app/services/chat_service.py`
   - `backend/app/services/chat_intent_detector.py`
   - `backend/app/services/chat_entity_extractor.py`
@@ -123,6 +124,7 @@
   - Redirects successful chat-driven bookings into the existing appointment confirmation page.
   - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
   - Supports deterministic top-document retrieval over repository documents with weighted title, alias, keyword, synonym, category, and body-text matching while filtering broad tokens that would otherwise interfere with doctor-search, availability, fee, or unrelated fallback flows.
+  - Exposes an inactive standalone Prompt Builder seam that now normalizes caller inputs into a canonical internal `PromptContext` model, uses internal Conversation, Workflow, and Knowledge Context Collectors plus a System Instruction Builder to normalize conversation state, workflow state, already-selected documents, and system instructions deterministically, validates that context, assembles ordered prompt sections through a dedicated Prompt Assembly Pipeline, and delegates final bounded prompt rendering and truncation to a dedicated PromptRenderer without changing live chat behavior.
   - Resolves informational FAQ prompts such as online consultation, payment methods, appointment preparation, consultation hours, insurance, and parking through the knowledge layer before the legacy deterministic fallback when no workflow is active.
   - Includes a dedicated manual test checklist that covers positive, negative, edge, regression, workflow, and existing chatbot scenarios.
 - Limitation:

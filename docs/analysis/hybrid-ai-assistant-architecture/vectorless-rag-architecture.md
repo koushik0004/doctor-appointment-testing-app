@@ -2,7 +2,7 @@
 
 ## Status
 
-Prototype implementation in progress. Phase 4.2 added the passive knowledge repository; Phase 4.3 added deterministic top-document retrieval; Phase 4.4 wired the retrieval service into `ConversationManager` as a read-only fallback when no workflow is active. The module still does not change APIs, prompt building, LLM calls, embeddings, or a vector database.
+Prototype implementation in progress. Phase 4.2 added the passive knowledge repository; Phase 4.3 added deterministic top-document retrieval; Phase 4.4 wired the retrieval service into `ConversationManager` as a read-only fallback when no workflow is active. The module still does not change APIs, live prompt building, LLM calls, embeddings, or a vector database.
 
 ## Purpose
 
@@ -58,6 +58,8 @@ Markdown and JSON knowledge sources
 ```
 
 The implemented module now participates in chat orchestration as a read-only fallback. It can load, validate, cache, and deterministically select one top matching document, and `ConversationManager` uses that result only when no workflow is active before falling back to the deterministic chat engine.
+
+The inactive Prompt Builder seam under `backend/app/services/prompt_builder.py` now includes deterministic internal collectors for conversation context, workflow context, and knowledge context plus a deterministic System Instruction Builder, PromptContext validation, a Prompt Assembly Pipeline, and a dedicated PromptRenderer as the final rendering stage. These components are provider-agnostic normalization, construction, validation, section-assembly, and rendering seams only; they do not perform retrieval, ranking, semantic search, workflow execution, routing, AI reasoning, conversation mutation, API calls, or database access.
 
 ## Proposed Folder Structure
 
@@ -367,6 +369,9 @@ The retrieval service sits on top of the repository. It performs deterministic t
 
 The Prompt Builder should be a later layer that receives already-selected knowledge documents and formats them into bounded context for a future LLM or deterministic response composer.
 
+Phase 5.1 now provides an inactive standalone backend implementation of this seam as a deterministic service module. It remains outside the production request flow and only formats caller-provided context.
+Phase 5.2 adds a canonical internal `PromptContext` model beneath that service. Phase 5.2.5 adds a dedicated deterministic validation gate over that model. Phase 5.3 adds an internal Conversation Context Collector, and later Phase 5 additions layer in Workflow and Knowledge Context Collectors, a System Instruction Builder, a Prompt Assembly Pipeline, and a dedicated PromptRenderer. The Prompt Builder now deterministically normalizes caller-supplied context, validates the full `PromptContext`, assembles ordered prompt sections, and only then renders bounded prompt text.
+
 Planned contract:
 
 ```python
@@ -387,6 +392,11 @@ Important boundary:
 - The Prompt Builder should not mutate workflow state.
 - The Prompt Builder should not bypass appointment or doctor services for live data.
 - The Prompt Builder should treat `prompt_hints` as constraints, not as executable instructions.
+- `PromptContext` is the canonical internal representation for prompt construction, but it remains provider-agnostic and is not an LLM API payload by itself.
+- The internal Conversation Context Collector is responsible only for deterministic and read-only conversation normalization; it must not do routing, summarization, extraction, or workflow work.
+- PromptContext validation is the final deterministic and read-only gate before section assembly and prompt rendering begin.
+- The Prompt Assembly Pipeline is responsible only for deterministic ordered section construction.
+- The PromptRenderer is responsible only for deterministic section rendering, section-header handling, prompt joining, and total prompt truncation.
 
 ## Future Integration Path
 

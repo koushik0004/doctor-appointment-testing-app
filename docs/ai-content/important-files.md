@@ -14,6 +14,10 @@
   - Registers all API domains in one place.
 - `backend/app/db/database.py`
   - Engine/session creation, schema initialization, and startup seeding.
+- `backend/scripts/seed_test_data.py`
+  - Idempotent manual-test data seeding utility; now adds extra doctor demo profiles, books a small set of valid future appointments through the service layer, pins the default DB target to `backend/app.db`, and writes `docs/reports/test-data-report.md`.
+- `docs/reports/test-data-health-report.md`
+  - Latest zero-write data-health audit for `backend/app.db`; records schema validation, retained legacy availability issues, and explicit no-data-loss decisions.
 
 ## Core Frontend Feature Files
 
@@ -62,6 +66,8 @@
   - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, and uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns.
 - `backend/app/services/workflow_engine.py`
   - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file.
+- `backend/app/services/prompt_builder.py`
+  - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; it does not do retrieval, routing, workflow execution, API calls, database access, or AI reasoning.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
@@ -120,6 +126,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers routing order guarantees: workflow-first, knowledge-before-deterministic fallback, and active-workflow exclusion from retrieval.
 - `backend/tests/test_chat_entity_extractor.py`
   - Covers search-filter extraction regressions, including the payment-method wording that must not infer a doctor-gender filter.
+- `backend/tests/test_prompt_builder_service.py`
+  - Covers the inactive prompt-builder seam: `PromptContext` creation, deterministic conversation, workflow, knowledge, and system-instruction normalization/construction, deterministic validation, Prompt Assembly Pipeline section ordering/omission, dedicated PromptRenderer behavior, deterministic block assembly, prompt-hint constraints, and character-budget truncation without touching the live request flow.
 
 ## High-Value Docs
 
@@ -135,3 +143,5 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/feature-04-confirmation-email.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-04-manual-test-checklist.md`
   - Manual QA checklist for the Vector-less RAG prototype, including positive, negative, edge, regression, workflow, and existing chatbot coverage.
+- `docs/reports/test-data-report.md`
+  - Latest manual-test data execution report with row counts, inserted demo bookings, duplicate handling, and validation notes.
