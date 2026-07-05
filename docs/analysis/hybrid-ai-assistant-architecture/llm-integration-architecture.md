@@ -111,6 +111,14 @@ Phase 7.4 extends that same facade with a policy-gated controlled-generation bra
 - the same Prompt Builder and `LLMGenerationOrchestrator` path is reused for visible generation requests
 - generation failures are caught and fall back to the existing deterministic behavior without exposing provider errors
 
+Phase 7.5 extends that same facade with a provider-neutral runtime-response validation branch:
+
+- the facade still owns the final quality gate before any visible LLM output
+- canonical validation runs only on `LLMGenerationOrchestrationResult` data and never inspects provider-native payloads
+- validation covers empty responses, whitespace-only responses, malformed structured output, invalid finish reasons, and canonical metadata issues
+- validation failures return deterministic fallback behavior without exposing validation exceptions or provider internals
+- the validator remains outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
+
 ## Package Structure
 
 ```txt

@@ -3,15 +3,15 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 7.4 controlled runtime generation
+- Task: implement Phase 7.5 provider-neutral runtime response validation
 - Completed on: 2026-07-05
 
 ## Outcome
 
-- Added a policy-gated controlled-generation path on `backend/app/llm/facade.py` that reuses the existing execution-policy service, prompt builder, and orchestrator without changing the default deterministic chat path.
-- Kept runtime behavior safe by returning the existing deterministic outcome whenever generation is not explicitly allowed or when controlled generation fails, while never surfacing provider errors.
-- Added focused backend tests covering enabled generation, disabled generation, failure fallback, and deterministic compatibility, alongside the existing shadow-mode regression coverage.
-- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the controlled runtime generation seam directly.
+- Added a provider-neutral runtime-response validation seam under `backend/app/llm/validation.py` and wired the `LLMRuntimeFacade` to validate controlled generation results before exposing any generated runtime output.
+- Kept runtime behavior safe by rejecting empty, whitespace-only, malformed-structured-output, invalid-finish-reason, and invalid-metadata cases through deterministic fallback without exposing provider or validation internals.
+- Added focused backend tests covering valid runtime responses, empty and whitespace rejection, malformed structured-output rejection, invalid finish reasons, diagnostics, and deterministic fallback after validation failure.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response validation seam directly.
 
 ## Prior Work
 

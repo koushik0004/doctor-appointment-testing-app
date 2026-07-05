@@ -6,8 +6,9 @@ configuration and generation-budget seams, explicit concrete provider adapters,
 an inactive runtime composition root, a runtime activation policy seam, an
 execution-policy and runtime-routing seam, a production-readiness operations
 seam, an inactive runtime facade, a policy-gated controlled-generation branch,
-and an inactive generation orchestrator. It is not wired into the current chat
-runtime, workflow engine, retrieval layer, or prompt builder.
+a provider-neutral runtime-response validator, and an inactive generation
+orchestrator. It is not wired into the current chat runtime, workflow engine,
+retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -154,6 +155,13 @@ from app.llm.providers import (
 )
 from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
+from app.llm.validation import (
+    LLMRuntimeResponseValidationIssue,
+    LLMRuntimeResponseValidationRequest,
+    LLMRuntimeResponseValidationResult,
+    LLMRuntimeResponseValidationStatus,
+    LLMRuntimeResponseValidator,
+)
 
 __all__ = [
     "AIExecutionActivationSnapshot",
@@ -252,6 +260,11 @@ __all__ = [
     "LLMRuntimeCompositionRoot",
     "LLMRuntimeFacade",
     "LLMRuntimeFacadeSnapshot",
+    "LLMRuntimeResponseValidationIssue",
+    "LLMRuntimeResponseValidationRequest",
+    "LLMRuntimeResponseValidationResult",
+    "LLMRuntimeResponseValidationStatus",
+    "LLMRuntimeResponseValidator",
     "LLMShadowExecutionRunner",
     "LLMShadowModeDiagnostic",
     "LLMShadowModeDispatchResult",

@@ -33,6 +33,11 @@ from app.llm.orchestrator import (
     LLMGenerationOrchestrationResult,
 )
 from app.llm.service import LLMIntegrationStatus
+from app.llm.validation import (
+    LLMRuntimeResponseValidationRequest,
+    LLMRuntimeResponseValidationResult,
+    LLMRuntimeResponseValidator,
+)
 
 
 class LLMRuntimeFacadeSnapshot(BaseModel):
@@ -126,6 +131,7 @@ class LLMControlledGenerationResult(BaseModel):
     decision: AIExecutionDecision
     status: LLMControlledGenerationStatus
     generated_result: LLMGenerationOrchestrationResult | None = None
+    validation_result: LLMRuntimeResponseValidationResult | None = None
     fallback_reason: str | None = None
     error_message: str | None = None
     error_type: str | None = None
@@ -161,6 +167,7 @@ class LLMRuntimeFacade:
         *,
         composition_root: LLMRuntimeCompositionRoot,
         shadow_execution_runner: LLMShadowExecutionRunner | None = None,
+        runtime_response_validator: LLMRuntimeResponseValidator | None = None,
         shadow_history_limit: int = 100,
     ) -> None:
         self._composition_root = composition_root
@@ -168,6 +175,11 @@ class LLMRuntimeFacade:
             shadow_execution_runner
             if shadow_execution_runner is not None
             else ThreadedLLMShadowExecutionRunner()
+        )
+        self._runtime_response_validator = (
+            runtime_response_validator
+            if runtime_response_validator is not None
+            else LLMRuntimeResponseValidator()
         )
         self._shadow_history: deque[LLMShadowModeDiagnostic] = deque(
             maxlen=shadow_history_limit
@@ -249,6 +261,30 @@ class LLMRuntimeFacade:
             generated_result = self.compose().orchestrator.generate(
                 request.orchestration_request
             )
+            validation_result = self._runtime_response_validator.validate(
+                LLMRuntimeResponseValidationRequest(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    orchestration_request=request.orchestration_request,
+                    orchestration_result=generated_result,
+                    metadata={
+                        "parent_execution_id": request.parent_execution_id,
+                        **deepcopy(request.orchestration_request.metadata),
+                    },
+                )
+            )
+            if not validation_result.is_valid:
+                return LLMControlledGenerationResult(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    decision=decision,
+                    status=LLMControlledGenerationStatus.FAILED,
+                    validation_result=validation_result,
+                    fallback_reason=(
+                        "Controlled runtime generation failed validation and "
+                        "preserved the existing deterministic response."
+                    ),
+                )
         except Exception as exc:
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
@@ -269,6 +305,7 @@ class LLMRuntimeFacade:
             decision=decision,
             status=LLMControlledGenerationStatus.SUCCEEDED,
             generated_result=generated_result,
+            validation_result=validation_result,
         )
 
     def list_shadow_diagnostics(self) -> list[LLMShadowModeDiagnostic]:

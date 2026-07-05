@@ -2,15 +2,20 @@ from app.llm import (
     AIExecutionOwner,
     AIExecutionMode,
     AIExecutionPolicyRequest,
+    LLMFinishReason,
     LLMControlledGenerationRequest,
     LLMControlledGenerationStatus,
     InlineLLMShadowExecutionRunner,
     LLMConfigurationSettings,
+    LLMGenerationOrchestrationResult,
+    LLMMessage,
+    LLMMessageRole,
     LLMProviderName,
     LLMRuntimeCompositionRoot,
     LLMRuntimeFacade,
     LLMRuntimeFacadeSnapshot,
     LLMGenerationOrchestrationRequest,
+    LLMRuntimeResponseValidationStatus,
     LLMShadowModeRequest,
     LLMShadowModeStatus,
 )
@@ -181,6 +186,8 @@ def test_runtime_facade_runs_controlled_generation_when_policy_and_activation_al
 
     assert result.status is LLMControlledGenerationStatus.SUCCEEDED
     assert result.generated_result is not None
+    assert result.validation_result is not None
+    assert result.validation_result.status is LLMRuntimeResponseValidationStatus.VALID
     assert result.generated_result.provider_name == "openai"
     assert result.generated_result.prompt is not None
     assert "[Workflow State]" in result.generated_result.prompt
@@ -254,6 +261,62 @@ def test_runtime_facade_falls_back_when_controlled_generation_fails():
     assert result.generated_result is None
     assert result.error_message is not None
     assert result.error_type == "RuntimeError"
+
+
+def test_runtime_facade_falls_back_when_controlled_generation_validation_fails():
+    transport = StaticTransport(
+        {
+            "content": "Generated runtime answer",
+            "finish_reason": "stop",
+            "model": "gpt-4.1-mini",
+        }
+    )
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=PromptBuilderService(),
+            configuration_settings=_base_settings(allow_generation=True),
+            transport_factory=StaticTransportFactory({"openai": transport}),
+        )
+    )
+    composition = facade.compose()
+    invalid_result = LLMGenerationOrchestrationResult.model_construct(
+        prompt="Rendered prompt",
+        response_message=LLMMessage.model_construct(
+            role=LLMMessageRole.ASSISTANT,
+            content="   ",
+        ),
+        finish_reason=LLMFinishReason.STOP,
+        provider_name="openai",
+        model_name="gpt-4.1-mini",
+        structured_output={"answer": "Generated runtime answer"},
+        provider_metadata={},
+        model_metadata={},
+        metadata={},
+    )
+    composition.orchestrator.generate = lambda request: invalid_result  # type: ignore[assignment]
+    facade.compose = lambda: composition  # type: ignore[assignment]
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.LLM_ONLY,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="Generate a runtime answer.",
+                provider_name="openai",
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.FAILED
+    assert result.generated_result is None
+    assert result.validation_result is not None
+    assert result.validation_result.is_valid is False
+    assert any(
+        issue.code == "whitespace_runtime_response"
+        for issue in result.validation_result.issues
+    )
+    assert result.fallback_reason is not None
 
 
 def test_runtime_facade_keeps_deterministic_compatibility_for_non_llm_policies():
