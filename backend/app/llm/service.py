@@ -27,7 +27,7 @@ class LLMIntegrationService:
     def __init__(
         self,
         *,
-        provider_registry: LLMProviderRegistry | None = None,
+        provider_registry: LLMProviderRegistry,
         default_provider_name: str | None = None,
     ) -> None:
         self._provider_registry = provider_registry
@@ -35,9 +35,6 @@ class LLMIntegrationService:
 
     def get_status(self) -> LLMIntegrationStatus:
         default_provider_name = self._default_provider_name
-        if self._provider_registry is None:
-            return LLMIntegrationStatus(default_provider_name=default_provider_name)
-
         if default_provider_name is None:
             default_provider_name = self._provider_registry.get_default_provider_name()
 
@@ -51,8 +48,6 @@ class LLMIntegrationService:
         )
 
     def list_registered_providers(self) -> list[LLMProviderDescriptor]:
-        if self._provider_registry is None:
-            return []
         return list(self._provider_registry.list_providers())
 
     def generate(
@@ -61,11 +56,6 @@ class LLMIntegrationService:
         *,
         provider_name: str | None = None,
     ) -> LLMGenerationResponse:
-        if self._provider_registry is None:
-            raise RuntimeError(
-                "LLM integration is inactive: no provider registry is configured."
-            )
-
         resolved_provider_name = (
             provider_name
             or self._default_provider_name

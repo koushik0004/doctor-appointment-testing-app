@@ -84,17 +84,11 @@ class LLMGenerationOrchestrator:
     def __init__(
         self,
         *,
-        prompt_builder: PromptBuilderService | None = None,
-        llm_integration_service: LLMIntegrationService | None = None,
+        prompt_builder: PromptBuilderService,
+        llm_integration_service: LLMIntegrationService,
     ) -> None:
-        self._prompt_builder = (
-            prompt_builder if prompt_builder is not None else PromptBuilderService()
-        )
-        self._llm_integration_service = (
-            llm_integration_service
-            if llm_integration_service is not None
-            else LLMIntegrationService()
-        )
+        self._prompt_builder = prompt_builder
+        self._llm_integration_service = llm_integration_service
 
     def generate(
         self,

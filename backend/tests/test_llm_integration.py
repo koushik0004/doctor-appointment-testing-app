@@ -79,7 +79,7 @@ class StubRegistry:
 
 
 def test_llm_integration_service_reports_inactive_status_without_registry():
-    service = LLMIntegrationService()
+    service = LLMIntegrationService(provider_registry=InMemoryLLMProviderRegistry())
 
     status = service.get_status()
 
@@ -126,7 +126,7 @@ def test_llm_integration_service_delegates_to_registered_provider_when_explicitl
 
 
 def test_llm_integration_service_rejects_generate_without_registry():
-    service = LLMIntegrationService()
+    service = LLMIntegrationService(provider_registry=InMemoryLLMProviderRegistry())
 
     try:
         service.generate(

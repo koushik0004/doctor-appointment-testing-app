@@ -69,25 +69,27 @@
 - `backend/app/services/prompt_builder.py`
   - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; it does not do retrieval, routing, workflow execution, API calls, database access, or AI reasoning.
 - `backend/app/llm/__init__.py`
-  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts and the disconnected integration facade.
+  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime composition seam, and disconnected integration facade.
 - `backend/app/llm/budget.py`
-  - Inactive provider-neutral generation-budget seam for future adapters; defines canonical generation profiles, token/latency/quality/cost controls, deterministic profile resolution, and adapter-facing translation contracts without runtime wiring.
+  - Inactive provider-neutral generation-budget seam for future adapters; defines canonical generation profiles, token/latency/quality/cost controls, deterministic profile resolution, and now frozen resolved budget models without runtime wiring.
+- `backend/app/llm/composition.py`
+  - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, and composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`.
 - `backend/app/llm/config.py`
-  - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, and configuration-backed generation-budget profiles without runtime wiring.
+  - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, configuration-backed generation-budget profiles, and frozen resolved configuration models without runtime wiring.
 - `backend/app/llm/providers.py`
-  - Inactive concrete provider adapters for OpenAI, Claude, Gemini, OpenRouter, and Ollama; keeps provider-private request/response and generation-budget translation inside adapter classes, requires explicit transport injection, and includes a config-backed adapter factory for future registry setup.
+  - Inactive concrete provider adapters for OpenAI, Claude, Gemini, OpenRouter, and Ollama; keeps provider-private request/response and generation-budget translation inside adapter classes, requires explicit transport injection, and includes a config-backed adapter factory for adapter creation only.
 - `backend/app/llm/adapters.py`
   - Shared inactive base adapter pipeline for future provider-specific request/response translation and private provider invocation.
 - `backend/app/llm/models.py`
   - Internal LLM integration request/response, capabilities, and usage models; now also carries provider-neutral structured-output, tool-calling, reasoning, streaming, citation, and multimodal-intent metadata without wiring any SDK or API schema.
 - `backend/app/llm/orchestrator.py`
-  - Inactive thin coordinator that accepts already-collected generation input, invokes `PromptBuilderService`, converts `PromptBuildResult` into canonical `LLMGenerationRequest`, delegates to `LLMIntegrationService`, and normalizes the canonical response into a simple provider-neutral result without adding runtime wiring.
+  - Inactive thin coordinator that accepts already-collected generation input, invokes `PromptBuilderService`, converts `PromptBuildResult` into canonical `LLMGenerationRequest`, delegates to `LLMIntegrationService`, and normalizes the canonical response into a simple provider-neutral result; Phase 6.7 now requires explicit dependency injection instead of self-construction.
 - `backend/app/llm/interfaces.py`
   - Provider translator, adapter, and provider-registry protocols for future adapter implementations.
 - `backend/app/llm/registry.py`
   - Inactive explicit in-memory provider registry with deterministic listing, lookup, duplicate protection, and optional default-provider resolution.
 - `backend/app/llm/service.py`
-  - Inactive `LLMIntegrationService` facade that reports disconnected status by default and only delegates generation when an explicit registry is supplied, honoring an optional registry default provider when present.
+  - Inactive `LLMIntegrationService` facade that reports disconnected status from the explicit registry state and delegates generation only through constructor-injected provider registries, honoring an optional registry default provider when present.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
@@ -158,8 +160,10 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the inactive LLM configuration seam: deterministic loading, nested environment mapping, provider validation, default propagation, configuration-backed generation-budget overrides, required-key enforcement for enabled providers, and backward-compatible inactive defaults.
 - `backend/tests/test_llm_budget.py`
   - Covers the inactive generation-budget seam: deterministic budget validation, reusable profile resolution, override behavior, serialization determinism, and provider neutrality.
+- `backend/tests/test_llm_composition.py`
+  - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, explicit dependency-graph construction, and preserved inactive behavior without transports.
 - `backend/tests/test_llm_provider_adapters.py`
-  - Covers the inactive concrete adapter layer: provider-private request translation, canonical response normalization, config-backed registry construction, and inactive transport enforcement.
+  - Covers the inactive concrete adapter layer: provider-private request translation, canonical response normalization, composition-compatible adapter creation, and inactive transport enforcement.
 
 ## High-Value Docs
 
@@ -168,12 +172,14 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-integration-architecture.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/llm-runtime-composition-architecture.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-abstraction.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-canonical-llm-contract.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-generation-orchestration.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-configuration.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-generation-budget-architecture.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-concrete-provider-adapters.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-runtime-composition-dependency-assembly.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

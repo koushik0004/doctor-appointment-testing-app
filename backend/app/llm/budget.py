@@ -48,7 +48,7 @@ class LLMGenerationBudget(BaseModel):
     cost_preference: LLMGenerationBudgetCostPreference | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
 
     @model_validator(mode="after")
     def validate_token_budget_relationship(self) -> LLMGenerationBudget:
@@ -73,7 +73,7 @@ class LLMGenerationBudgetOverrides(BaseModel):
     cost_preference: LLMGenerationBudgetCostPreference | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
 
     def apply_to(
         self,
@@ -123,12 +123,14 @@ class LLMGenerationBudgetProfile(BaseModel):
     budget: LLMGenerationBudget
     description: str | None = None
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
 
 
 class LLMGenerationBudgetProfileCatalog(BaseModel):
     default_profile: LLMGenerationProfileName = LLMGenerationProfileName.BALANCED
     profiles: list[LLMGenerationBudgetProfile] = Field(default_factory=list)
+
+    model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="after")
     def validate_profiles(self) -> LLMGenerationBudgetProfileCatalog:

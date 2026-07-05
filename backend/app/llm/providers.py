@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
 from typing import Any, Protocol
 
 from app.llm.adapters import BaseLLMProviderAdapter
-from app.llm.config import LLMConfiguration, LLMProviderConfiguration, LLMProviderName
+from app.llm.config import LLMProviderConfiguration, LLMProviderName
 from app.llm.models import (
     LLMFinishReason,
     LLMGenerationRequest,
@@ -19,9 +18,6 @@ from app.llm.models import (
     LLMTokenUsage,
     LLMToolCall,
 )
-from app.llm.registry import InMemoryLLMProviderRegistry
-
-
 ProviderPayload = dict[str, Any]
 
 
@@ -825,38 +821,3 @@ class LLMProviderAdapterFactory:
     ) -> ConfigurableLLMProviderAdapter:
         adapter_type = self._adapter_types[configuration.provider_name]
         return adapter_type(configuration, transport=transport)
-
-    def create_registry(
-        self,
-        configuration: LLMConfiguration,
-        *,
-        transports: Mapping[str, LLMProviderTransport] | None = None,
-        default_provider_name: str | None = None,
-    ) -> InMemoryLLMProviderRegistry:
-        providers = []
-        for provider_config in configuration.providers:
-            if not provider_config.enabled:
-                continue
-            provider_transport = None
-            if transports is not None:
-                provider_transport = transports.get(provider_config.provider_name.value)
-            providers.append(
-                self.create_adapter(
-                    provider_config,
-                    transport=provider_transport,
-                )
-            )
-
-        resolved_default = default_provider_name
-        if (
-            resolved_default is None
-            and configuration.selected_provider_name is not None
-            and configuration.get_provider(configuration.selected_provider_name) is not None
-            and configuration.get_provider(configuration.selected_provider_name).enabled
-        ):
-            resolved_default = configuration.selected_provider_name.value
-
-        return InMemoryLLMProviderRegistry(
-            providers,
-            default_provider_name=resolved_default,
-        )

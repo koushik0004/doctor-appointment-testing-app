@@ -34,6 +34,8 @@ class LLMProviderFeatureFlags(BaseModel):
     reasoning: bool = False
     citations: bool = False
 
+    model_config = ConfigDict(frozen=True)
+
 
 class LLMGenerationBudgetEnvironmentOverride(BaseModel):
     reasoning_effort: LLMGenerationBudgetReasoningEffort | None = None
@@ -76,6 +78,8 @@ class LLMGenerationBudgetEnvironmentSettings(BaseModel):
         default_factory=LLMGenerationBudgetEnvironmentOverride
     )
 
+    model_config = ConfigDict(frozen=True)
+
 
 class LLMProviderEnvironmentSettings(BaseModel):
     enabled: bool = False
@@ -92,7 +96,7 @@ class LLMProviderEnvironmentSettings(BaseModel):
         default_factory=LLMGenerationBudgetEnvironmentSettings
     )
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, frozen=True)
 
 
 class LLMProviderConfiguration(BaseModel):
@@ -134,6 +138,8 @@ class LLMProviderConfiguration(BaseModel):
 class LLMConfiguration(BaseModel):
     selected_provider_name: LLMProviderName | None = None
     providers: list[LLMProviderConfiguration] = Field(default_factory=list)
+
+    model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="after")
     def validate_selected_provider(self) -> LLMConfiguration:

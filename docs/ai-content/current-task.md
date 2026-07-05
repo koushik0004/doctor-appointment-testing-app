@@ -3,13 +3,27 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.7 inactive runtime composition and dependency assembly for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/composition.py` with a single inactive `LLMRuntimeCompositionRoot` that loads canonical configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, and composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`.
+- Added a dedicated `LLMProviderTransportFactory` seam with an `InactiveLLMProviderTransportFactory` default so the assembled subsystem stays disconnected from any live provider runtime.
+- Tightened the inactive dependency rules by making `LLMIntegrationService` and `LLMGenerationOrchestrator` constructor-composed only, moving registry construction out of `LLMProviderAdapterFactory`, and freezing resolved provider and generation-budget configuration models.
+- Added focused backend tests covering deterministic composition-root caching, one-time configuration loading, enabled-provider-only registration, disabled-provider exclusion, transport injection, explicit orchestrator/service composition, and continued inactive behavior without transports.
+- Updated the LLM runtime composition architecture reference, LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the composed inactive dependency graph directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 6.6 inactive concrete provider adapters for the LLM seam
 - Completed on: 2026-07-05
 
 ## Outcome
 
 - Added `backend/app/llm/providers.py` with explicit inactive concrete adapters for OpenAI, Claude, Gemini, OpenRouter, and Ollama that keep provider-private request/response translation inside the adapter boundary.
-- Added an explicit `LLMProviderTransport` seam plus `LLMProviderAdapterFactory` so canonical provider configuration can produce inactive concrete adapters and optional registries without SDK integration or hidden runtime setup.
+- Added an explicit `LLMProviderTransport` seam plus `LLMProviderAdapterFactory` so canonical provider configuration can produce inactive concrete adapters without SDK integration or hidden runtime setup.
 - Kept generation-budget translation private to each adapter while preserving the canonical upstream request/response contract and leaving `ConversationManager`, `WorkflowEngine`, `PromptBuilderService`, and `LLMGenerationOrchestrator` unchanged.
 - Added focused backend tests covering concrete adapter request translation, response normalization, config-backed registry construction, and inactive transport enforcement.
 - Updated the LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the new inactive concrete adapter seam directly.

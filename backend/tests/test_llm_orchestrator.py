@@ -15,6 +15,8 @@ from app.llm import (
     LLMGenerationOrchestrationResult,
     LLMGenerationOrchestrator,
     LLMGenerationResponse,
+    LLMIntegrationService,
+    InMemoryLLMProviderRegistry,
     LLMMessage,
     LLMMessageRole,
     LLMReasoningConfig,
@@ -211,8 +213,13 @@ def test_orchestrator_build_llm_request_is_deterministic_for_equal_inputs():
     assert llm_request_a.model_dump(mode="json") == llm_request_b.model_dump(mode="json")
 
 
-def test_orchestrator_has_no_runtime_wiring_by_default():
-    orchestrator = LLMGenerationOrchestrator()
+def test_orchestrator_requires_explicit_dependencies_and_stays_inactive_with_empty_registry():
+    orchestrator = LLMGenerationOrchestrator(
+        prompt_builder=PromptBuilderService(),
+        llm_integration_service=LLMIntegrationService(
+            provider_registry=InMemoryLLMProviderRegistry()
+        ),
+    )
 
     try:
         orchestrator.generate(
@@ -222,7 +229,7 @@ def test_orchestrator_has_no_runtime_wiring_by_default():
         assert "inactive" in str(exc)
     else:
         raise AssertionError(
-            "Expected default orchestrator to remain inactive without an explicit LLM registry."
+            "Expected explicitly composed orchestrator to remain inactive without a registered provider."
         )
 
 

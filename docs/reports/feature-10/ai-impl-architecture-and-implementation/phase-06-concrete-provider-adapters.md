@@ -42,10 +42,9 @@ Concrete adapters require an injected transport. Without one they raise an inact
 
 - create the correct concrete adapter for a canonical `LLMProviderConfiguration`
 - optionally attach an explicit transport per provider
-- build an `InMemoryLLMProviderRegistry` from enabled providers in `LLMConfiguration`
-- preserve a configured selected provider as the inactive registry default
+- keep adapter creation separate from future registry ownership
 
-This keeps configuration ownership inside `config.py` while avoiding any hidden runtime auto-wiring.
+This keeps configuration ownership inside `config.py` while avoiding any hidden runtime auto-wiring. In Phase 6.7, registry construction moves into the dedicated runtime composition root.
 
 ## Validation
 
@@ -54,7 +53,7 @@ Focused tests in `backend/tests/test_llm_provider_adapters.py` verify:
 - OpenAI request translation from canonical fields into provider-private payload fields
 - Claude response normalization back into canonical response models
 - inactive transport enforcement for concrete adapters
-- config-backed registry construction from enabled providers
+- composition-compatible adapter creation from enabled providers
 - explicit transport-backed generation delegation through a factory-built adapter
 
 The focused LLM suite passed:

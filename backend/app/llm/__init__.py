@@ -1,10 +1,11 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.6. It defines only
+This package is intentionally inactive in Phase 6.7. It defines only
 implementation-ready contracts for a future LLM adapter layer, provider-neutral
 configuration and generation-budget seams, explicit concrete provider adapters,
-and an inactive generation orchestrator. It is not wired into the current chat
-runtime, workflow engine, retrieval layer, or prompt builder.
+an inactive runtime composition root, and an inactive generation orchestrator.
+It is not wired into the current chat runtime, workflow engine, retrieval
+layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -20,6 +21,12 @@ from app.llm.budget import (
     LLMGenerationBudgetTranslator,
     LLMGenerationProfileName,
     build_default_generation_budget_profile_catalog,
+)
+from app.llm.composition import (
+    InactiveLLMProviderTransportFactory,
+    LLMProviderTransportFactory,
+    LLMRuntimeComposition,
+    LLMRuntimeCompositionRoot,
 )
 from app.llm.config import (
     LLMConfiguration,
@@ -86,6 +93,7 @@ __all__ = [
     "ClaudeProviderAdapter",
     "ConfigurableLLMProviderAdapter",
     "GeminiProviderAdapter",
+    "InactiveLLMProviderTransportFactory",
     "LLMConfiguration",
     "LLMConfigurationLoader",
     "LLMConfigurationSettings",
@@ -122,6 +130,7 @@ __all__ = [
     "LLMProviderFeatureFlags",
     "LLMProviderName",
     "LLMProviderRegistry",
+    "LLMProviderTransportFactory",
     "LLMProviderTransport",
     "LLMReasoningConfig",
     "LLMReasoningEffort",
@@ -129,6 +138,8 @@ __all__ = [
     "LLMRequestTranslator",
     "LLMRequestedModality",
     "LLMResponseTranslator",
+    "LLMRuntimeComposition",
+    "LLMRuntimeCompositionRoot",
     "LLMStreamingMetadata",
     "LLMStreamingOptions",
     "LLMStructuredOutputMode",

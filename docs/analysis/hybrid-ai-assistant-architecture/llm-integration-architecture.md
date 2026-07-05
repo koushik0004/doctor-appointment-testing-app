@@ -54,7 +54,15 @@ Phase 6.6 adds explicit inactive concrete provider adapters with:
 - config-backed adapter classes for OpenAI, Claude, Gemini, OpenRouter, and Ollama
 - provider-private request and response translation inside each adapter
 - explicit transport injection so adapters remain testable without any SDK or live API
-- an inactive adapter factory that builds concrete adapters and optional registries from canonical configuration
+- an inactive adapter factory that builds concrete adapters from canonical configuration
+
+Phase 6.7 adds an inactive runtime composition layer with:
+
+- a single `LLMRuntimeCompositionRoot` responsible for one-time configuration loading and dependency assembly
+- a dedicated transport-factory seam that keeps transport construction outside provider adapters
+- explicit registry construction in the composition layer instead of the adapter factory
+- constructor-only composition for `LLMIntegrationService` and `LLMGenerationOrchestrator`
+- immutable resolved configuration objects for provider and generation-budget settings
 
 It is intentionally disconnected from:
 
@@ -74,6 +82,7 @@ backend/app/llm/
 ├── __init__.py
 ├── adapters.py
 ├── budget.py
+├── composition.py
 ├── config.py
 ├── interfaces.py
 ├── models.py
@@ -122,6 +131,27 @@ Inactive concrete provider adapters:
 - `LLMProviderAdapterFactory`
 
 These adapters stay inside the inactive boundary. They accept canonical requests, translate them into provider-private payload dictionaries, require an explicit injected transport for invocation, and map provider-private responses back into canonical response models.
+
+Phase 6.7 keeps adapter ownership narrow: the factory now creates adapters only, while registry construction moves to the composition layer.
+
+### `composition.py`
+
+Inactive runtime composition seam:
+
+- `LLMProviderTransportFactory`
+- `InactiveLLMProviderTransportFactory`
+- `LLMRuntimeComposition`
+- `LLMRuntimeCompositionRoot`
+
+This module assembles the full inactive dependency graph in one place:
+
+- load canonical configuration exactly once
+- create provider transports separately from adapters
+- instantiate enabled provider adapters only
+- build the explicit provider registry
+- resolve the configured default provider
+- compose `LLMIntegrationService`
+- compose `LLMGenerationOrchestrator`
 
 ### `budget.py`
 
@@ -200,7 +230,7 @@ The facade exposes three narrow responsibilities:
 - resolve the explicit or registry-default provider name
 - delegate generation only when an explicit provider registry is supplied
 
-The service does not self-configure, auto-discover providers, or attach itself to runtime execution.
+Phase 6.7 keeps the service constructor-only: it does not self-configure, auto-discover providers, lazily create a registry, or attach itself to runtime execution.
 
 ### `orchestrator.py`
 
@@ -211,6 +241,8 @@ Inactive coordination layer:
 - `LLMGenerationOrchestrator`
 
 The orchestrator accepts already-collected generation input, invokes the existing `PromptBuilderService`, converts `PromptBuildResult` into the canonical `LLMGenerationRequest`, delegates generation through `LLMIntegrationService`, and normalizes the canonical response into a simpler provider-neutral result.
+
+Phase 6.7 keeps the orchestrator constructor-only: it receives its `PromptBuilderService` and `LLMIntegrationService` dependencies explicitly from the composition root.
 
 It does not:
 

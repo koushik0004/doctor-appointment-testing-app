@@ -9,6 +9,7 @@ from app.llm import (
     LLMGenerationBudgetQualityPreference,
     LLMGenerationBudgetReasoningEffort,
     LLMGenerationProfileName,
+    InMemoryLLMProviderRegistry,
     LLMMessage,
     LLMMessageRole,
     LLMProviderAdapterFactory,
@@ -197,7 +198,16 @@ def test_factory_builds_registry_from_enabled_provider_configurations():
         )
     )
 
-    registry = LLMProviderAdapterFactory().create_registry(configuration)
+    factory = LLMProviderAdapterFactory()
+    providers = [
+        factory.create_adapter(provider_config)
+        for provider_config in configuration.providers
+        if provider_config.enabled
+    ]
+    registry = InMemoryLLMProviderRegistry(
+        providers,
+        default_provider_name=configuration.selected_provider_name.value,
+    )
 
     assert registry.get_default_provider_name() == "openai"
     assert [provider.provider_name for provider in registry.list_providers()] == [
