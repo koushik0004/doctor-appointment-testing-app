@@ -21,6 +21,11 @@ from app.llm.execution_policy import (
     AIExecutionOwner,
     AIExecutionPolicyRequest,
 )
+from app.llm.eligibility import (
+    LLMRuntimeResponseEligibilityEvaluator,
+    LLMRuntimeResponseEligibilityRequest,
+    LLMRuntimeResponseEligibilityResult,
+)
 from app.llm.operations import (
     LLMAuditTrailRecord,
     LLMObservabilityRecord,
@@ -132,6 +137,7 @@ class LLMControlledGenerationResult(BaseModel):
     status: LLMControlledGenerationStatus
     generated_result: LLMGenerationOrchestrationResult | None = None
     validation_result: LLMRuntimeResponseValidationResult | None = None
+    eligibility_result: LLMRuntimeResponseEligibilityResult | None = None
     fallback_reason: str | None = None
     error_message: str | None = None
     error_type: str | None = None
@@ -168,6 +174,7 @@ class LLMRuntimeFacade:
         composition_root: LLMRuntimeCompositionRoot,
         shadow_execution_runner: LLMShadowExecutionRunner | None = None,
         runtime_response_validator: LLMRuntimeResponseValidator | None = None,
+        runtime_response_eligibility_evaluator: LLMRuntimeResponseEligibilityEvaluator | None = None,
         shadow_history_limit: int = 100,
     ) -> None:
         self._composition_root = composition_root
@@ -180,6 +187,11 @@ class LLMRuntimeFacade:
             runtime_response_validator
             if runtime_response_validator is not None
             else LLMRuntimeResponseValidator()
+        )
+        self._runtime_response_eligibility_evaluator = (
+            runtime_response_eligibility_evaluator
+            if runtime_response_eligibility_evaluator is not None
+            else LLMRuntimeResponseEligibilityEvaluator()
         )
         self._shadow_history: deque[LLMShadowModeDiagnostic] = deque(
             maxlen=shadow_history_limit
@@ -257,6 +269,7 @@ class LLMRuntimeFacade:
                 fallback_reason=decision.fallback_reason or decision.routing_reason,
             )
 
+        eligibility_result: LLMRuntimeResponseEligibilityResult | None = None
         try:
             generated_result = self.compose().orchestrator.generate(
                 request.orchestration_request
@@ -285,6 +298,29 @@ class LLMRuntimeFacade:
                         "preserved the existing deterministic response."
                     ),
                 )
+            eligibility_result = self._runtime_response_eligibility_evaluator.evaluate(
+                LLMRuntimeResponseEligibilityRequest(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    policy_decision=decision,
+                    validation_result=validation_result,
+                    orchestration_request=request.orchestration_request,
+                    metadata={
+                        "parent_execution_id": request.parent_execution_id,
+                        **deepcopy(request.orchestration_request.metadata),
+                    },
+                )
+            )
+            if not eligibility_result.is_eligible:
+                return LLMControlledGenerationResult(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    decision=decision,
+                    status=LLMControlledGenerationStatus.SKIPPED,
+                    validation_result=validation_result,
+                    eligibility_result=eligibility_result,
+                    fallback_reason=eligibility_result.fallback_reason,
+                )
         except Exception as exc:
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
@@ -306,6 +342,7 @@ class LLMRuntimeFacade:
             status=LLMControlledGenerationStatus.SUCCEEDED,
             generated_result=generated_result,
             validation_result=validation_result,
+            eligibility_result=eligibility_result,
         )
 
     def list_shadow_diagnostics(self) -> list[LLMShadowModeDiagnostic]:

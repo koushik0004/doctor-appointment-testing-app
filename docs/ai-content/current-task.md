@@ -3,6 +3,19 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 7.6 controlled user-visible LLM responses with runtime response eligibility
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added a provider-neutral runtime-response eligibility seam under `backend/app/llm/eligibility.py` and wired the `LLMRuntimeFacade` to expose validated LLM output only for explicitly low-risk conversational scenarios.
+- Kept user-visible runtime behavior safe by rejecting workflow-owned and non-approved requests after successful validation, preserving deterministic fallback without exposing provider, validator, or eligibility internals.
+- Added focused backend tests covering eligible conversational responses, booking and cancellation rejection, validation-plus-eligibility interaction, deterministic fallback, and serialization determinism.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response eligibility seam and user-visible response flow directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 7.5 provider-neutral runtime response validation
 - Completed on: 2026-07-05
 

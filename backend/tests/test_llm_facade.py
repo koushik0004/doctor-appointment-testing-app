@@ -2,6 +2,7 @@ from app.llm import (
     AIExecutionOwner,
     AIExecutionMode,
     AIExecutionPolicyRequest,
+    AIExecutionPolicyResult,
     LLMFinishReason,
     LLMControlledGenerationRequest,
     LLMControlledGenerationStatus,
@@ -15,6 +16,7 @@ from app.llm import (
     LLMRuntimeFacade,
     LLMRuntimeFacadeSnapshot,
     LLMGenerationOrchestrationRequest,
+    LLMRuntimeResponseEligibilityStatus,
     LLMRuntimeResponseValidationStatus,
     LLMShadowModeRequest,
     LLMShadowModeStatus,
@@ -188,6 +190,8 @@ def test_runtime_facade_runs_controlled_generation_when_policy_and_activation_al
     assert result.generated_result is not None
     assert result.validation_result is not None
     assert result.validation_result.status is LLMRuntimeResponseValidationStatus.VALID
+    assert result.eligibility_result is not None
+    assert result.eligibility_result.status is LLMRuntimeResponseEligibilityStatus.ELIGIBLE
     assert result.generated_result.provider_name == "openai"
     assert result.generated_result.prompt is not None
     assert "[Workflow State]" in result.generated_result.prompt
@@ -234,6 +238,62 @@ def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled(
     assert result.fallback_reason is not None
     assert len(prompt_builder.calls) == 0
     assert len(transport.calls) == 0
+
+
+def test_runtime_facade_skips_controlled_generation_when_runtime_response_is_not_low_risk():
+    transport = StaticTransport(
+        {
+            "content": "Generated runtime answer",
+            "finish_reason": "stop",
+            "model": "gpt-4.1-mini",
+        }
+    )
+    prompt_builder = RecordingPromptBuilder()
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=prompt_builder,
+            configuration_settings=_base_settings(allow_generation=True),
+            transport_factory=StaticTransportFactory({"openai": transport}),
+        )
+    )
+    composition = facade.compose()
+    approved_decision = composition.execution_policy_service.evaluate(
+        AIExecutionPolicyRequest(
+            preferred_mode=AIExecutionMode.LLM_ONLY,
+        )
+    ).decision
+    composition.execution_policy_service.evaluate = lambda request: AIExecutionPolicyResult(  # type: ignore[assignment]
+        decision=approved_decision
+    )
+    facade.compose = lambda: composition  # type: ignore[assignment]
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.LLM_ONLY,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="Generate a runtime answer.",
+                active_intent="BOOK_APPOINTMENT",
+                provider_name="openai",
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.SKIPPED
+    assert result.generated_result is None
+    assert result.validation_result is not None
+    assert result.validation_result.is_valid is True
+    assert result.eligibility_result is not None
+    assert result.eligibility_result.is_eligible is False
+    assert result.eligibility_result.status is LLMRuntimeResponseEligibilityStatus.INELIGIBLE
+    assert any(
+        issue.code == "non_eligible_intent"
+        for issue in result.eligibility_result.issues
+    )
+    assert result.fallback_reason is not None
+    assert len(prompt_builder.calls) == 1
+    assert len(transport.calls) == 1
 
 
 def test_runtime_facade_falls_back_when_controlled_generation_fails():
@@ -316,6 +376,7 @@ def test_runtime_facade_falls_back_when_controlled_generation_validation_fails()
         issue.code == "whitespace_runtime_response"
         for issue in result.validation_result.issues
     )
+    assert result.eligibility_result is None
     assert result.fallback_reason is not None
 
 

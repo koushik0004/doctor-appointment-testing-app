@@ -119,6 +119,14 @@ Phase 7.5 extends that same facade with a provider-neutral runtime-response vali
 - validation failures return deterministic fallback behavior without exposing validation exceptions or provider internals
 - the validator remains outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
 
+Phase 7.6 extends that same facade with a provider-neutral runtime-response eligibility branch:
+
+- the facade now decides whether a validated response may be exposed to the user
+- canonical eligibility uses only execution policy, validation output, and canonical orchestration metadata
+- only explicitly approved low-risk conversational scenarios can become visible LLM replies
+- workflow-owned requests and other non-approved scenarios remain deterministic after validation
+- the eligibility gate remains outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
+
 ## Package Structure
 
 ```txt
@@ -133,6 +141,7 @@ backend/app/llm/
 ├── interfaces.py
 ├── models.py
 ├── operations.py
+├── eligibility.py
 ├── orchestrator.py
 ├── providers.py
 ├── registry.py
@@ -245,6 +254,18 @@ Inactive operational-readiness seam:
 - `LLMOperationalReadinessService`
 
 This module defines the provider-neutral contracts needed for future production observability, accounting, health monitoring, retry/timeout policy, auditability, privacy controls, rollout strategy, and performance tracking while remaining fully outside the live chat runtime.
+
+### `eligibility.py`
+
+Inactive runtime response eligibility seam:
+
+- `LLMRuntimeResponseEligibilityIssue`
+- `LLMRuntimeResponseEligibilityRequest`
+- `LLMRuntimeResponseEligibilityResult`
+- `LLMRuntimeResponseEligibilityStatus`
+- `LLMRuntimeResponseEligibilityEvaluator`
+
+This module determines whether a validated runtime response is safe to expose to the user by applying a deterministic low-risk allowlist over canonical execution-policy and orchestration metadata.
 
 ### `budget.py`
 
