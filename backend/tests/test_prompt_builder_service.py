@@ -88,9 +88,11 @@ def test_prompt_builder_builds_deterministic_prompt_with_context_blocks():
     assert result.excluded_document_ids == []
     assert result.blocks[0].label == "User Message"
     assert result.blocks[1].label == "Conversation State"
-    assert result.blocks[2].metadata["document_id"] == "faq.booking"
+    assert result.blocks[2].label == "Workflow State"
+    assert result.blocks[3].metadata["document_id"] == "faq.booking"
     assert "[System Instructions]" in result.prompt
     assert '"missing":["date"]' in result.prompt
+    assert '"active_intent":"BOOK_APPOINTMENT"' in result.prompt
     assert '"steps":["choose doctor","pick time"]' in result.prompt
 
 
@@ -234,6 +236,12 @@ def test_prompt_assembly_pipeline_orders_sections_deterministically():
             state={"conversation_id": "conv-1"},
             current_user_message="Help me book",
         ),
+        workflow_context=PromptContextWorkflowContext(
+            active_intent="BOOK_APPOINTMENT",
+            workflow_status="INPUT_REQUIRED",
+            collected_fields={"doctor_name": "Dr. Smith"},
+            missing_fields=["appointment_date"],
+        ),
         knowledge_context=PromptContextKnowledgeContext(
             documents=[
                 PromptContextKnowledgeDocument(
@@ -259,10 +267,14 @@ def test_prompt_assembly_pipeline_orders_sections_deterministically():
         PromptAssemblySectionKind.SYSTEM_INSTRUCTIONS,
         PromptAssemblySectionKind.USER_MESSAGE,
         PromptAssemblySectionKind.CONVERSATION_STATE,
+        PromptAssemblySectionKind.WORKFLOW_STATE,
         PromptAssemblySectionKind.KNOWLEDGE_DOCUMENT,
     ]
     assert sections[0].label == "System Instructions"
-    assert sections[3].metadata == {
+    assert sections[3].label == "Workflow State"
+    assert '"active_intent":"BOOK_APPOINTMENT"' in sections[3].content
+    assert '"missing_fields":["appointment_date"]' in sections[3].content
+    assert sections[4].metadata == {
         "document_id": "faq.booking",
         "source_path": "faq/booking.md",
         "domain": "faq",
@@ -333,6 +345,11 @@ def test_prompt_renderer_is_deterministic_with_headers_enabled():
             label="Conversation State",
             content='{"history":[]}',
         ),
+        PromptAssemblySection(
+            kind=PromptAssemblySectionKind.WORKFLOW_STATE,
+            label="Workflow State",
+            content='{"active_intent":"BOOK_APPOINTMENT"}',
+        ),
     ]
     options = PromptContextRenderingOptions(include_section_headers=True)
 
@@ -351,7 +368,8 @@ def test_prompt_renderer_is_deterministic_with_headers_enabled():
     assert first_result.truncated is False
     assert first_result.prompt == (
         "[User Message]\nNeed help booking\n\n"
-        "[Conversation State]\n{\"history\":[]}"
+        "[Conversation State]\n{\"history\":[]}\n\n"
+        "[Workflow State]\n{\"active_intent\":\"BOOK_APPOINTMENT\"}"
     )
 
 

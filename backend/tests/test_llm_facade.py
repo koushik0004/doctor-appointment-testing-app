@@ -9,7 +9,17 @@ from app.llm import (
     LLMShadowModeRequest,
     LLMShadowModeStatus,
 )
-from app.services.prompt_builder import PromptBuilderService
+from app.services.prompt_builder import PromptBuildRequest, PromptBuilderService
+
+
+class RecordingPromptBuilder(PromptBuilderService):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[PromptBuildRequest] = []
+
+    def build(self, request: PromptBuildRequest):  # type: ignore[override]
+        self.calls.append(request.model_copy(deep=True))
+        return super().build(request)
 
 
 class StaticTransport:
@@ -164,6 +174,63 @@ def test_runtime_facade_executes_shadow_mode_and_captures_diagnostics():
     assert len(transport.calls) == 1
     assert facade.snapshot().shadow_execution_count == 1
     assert facade.snapshot().last_shadow_status == "SUCCEEDED"
+
+
+def test_runtime_facade_shadow_mode_uses_rendered_prompt_builder_output():
+    transport = StaticTransport(
+        {
+            "content": "Hidden LLM answer",
+            "finish_reason": "stop",
+            "model": "gpt-4.1-mini",
+        }
+    )
+    prompt_builder = RecordingPromptBuilder()
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=prompt_builder,
+            configuration_settings=_base_settings(shadow_mode=True),
+            transport_factory=StaticTransportFactory({"openai": transport}),
+        ),
+        shadow_execution_runner=InlineLLMShadowExecutionRunner(),
+    )
+
+    dispatch = facade.run_shadow_mode(
+        LLMShadowModeRequest(
+            correlation_id="conv-7-3",
+            user_message="Book an appointment with Dr. Smith tomorrow",
+            official_response_owner=AIExecutionOwner.DETERMINISTIC,
+            official_intent_name="UNKNOWN",
+            has_active_workflow=False,
+            conversation_state={
+                "conversation_id": "conv-7-3",
+                "context": {
+                    "conversation_id": "conv-7-3",
+                    "current_workflow": {
+                        "workflow_type": "BOOK_APPOINTMENT",
+                        "status": "INPUT_REQUIRED",
+                        "draft": {"doctor_name": "Dr. Smith"},
+                        "missing_fields": ["appointment_date", "patient_email"],
+                    },
+                },
+                "history": [
+                    {"role": "user", "text": "Book an appointment with Dr. Smith tomorrow"}
+                ],
+            },
+        ),
+        asynchronous=False,
+    )
+
+    assert dispatch.diagnostic is not None
+    assert dispatch.diagnostic.status is LLMShadowModeStatus.SUCCEEDED
+    assert len(prompt_builder.calls) == 1
+    assert prompt_builder.calls[0].user_message == "Book an appointment with Dr. Smith tomorrow"
+    assert len(transport.calls) == 1
+    prompt_payload = transport.calls[0]["messages"][0]["content"]
+    assert "[User Message]" in prompt_payload
+    assert "[Conversation State]" in prompt_payload
+    assert "[Workflow State]" in prompt_payload
+    assert '"workflow_status":"INPUT_REQUIRED"' in prompt_payload
+    assert '"missing_fields":["appointment_date","patient_email"]' in prompt_payload
 
 
 def test_runtime_facade_skips_shadow_execution_when_shadow_mode_is_disabled():

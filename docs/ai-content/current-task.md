@@ -3,6 +3,19 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 7.3 end-to-end Prompt Builder to LLM shadow pipeline integration
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Extended the deterministic Prompt Builder assembly pipeline so canonical workflow context is now rendered into the final prompt alongside user, conversation, and knowledge sections.
+- Kept the runtime integration narrow: shadow execution continues to run through the existing `LLMRuntimeFacade` and `LLMGenerationOrchestrator`, which already delegate prompt creation exclusively to `PromptBuilderService`.
+- Added focused tests proving shadow-mode execution invokes the Prompt Builder, sends the rendered prompt to the provider path, and includes workflow-state data when present, while preserving the existing deterministic user-visible response path.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the full Prompt Builder -> Renderer -> Orchestrator shadow path directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 7.2 shadow-mode integration through the runtime facade without changing user-visible chat behavior
 - Completed on: 2026-07-05
 

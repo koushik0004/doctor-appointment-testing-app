@@ -96,6 +96,14 @@ It is intentionally disconnected from:
 
 No production request path imports or invokes this package.
 
+Phase 7.2 and Phase 7.3 add a guarded runtime caller outside this package boundary through `backend/app/llm/facade.py`, but that caller preserves the same ownership rules:
+
+- the live user-visible response remains workflow, knowledge, or deterministic
+- shadow execution is optional and hidden
+- the provider path receives only the rendered output produced by `PromptBuilderService`
+- canonical workflow context is now included in that rendered prompt when present
+- all LLM output is still discarded after diagnostics
+
 ## Package Structure
 
 ```txt
