@@ -17,6 +17,10 @@ from app.llm.execution_policy import (
     AIExecutionPolicyEvaluator,
     AIExecutionPolicyService,
 )
+from app.llm.operations import (
+    LLMOperationalReadinessEvaluator,
+    LLMOperationalReadinessService,
+)
 from app.llm.orchestrator import LLMGenerationOrchestrator
 from app.llm.providers import (
     ConfigurableLLMProviderAdapter,
@@ -57,6 +61,8 @@ class LLMRuntimeComposition:
     activation_status: LLMRuntimeActivationStatus
     execution_policy: AIExecutionPolicyEvaluator
     execution_policy_service: AIExecutionPolicyService
+    operational_readiness: LLMOperationalReadinessEvaluator
+    operational_readiness_service: LLMOperationalReadinessService
     provider_registry: InMemoryLLMProviderRegistry
     default_provider_name: str | None
     llm_integration_service: LLMIntegrationService
@@ -77,6 +83,7 @@ class LLMRuntimeCompositionRoot:
         adapter_factory: LLMProviderAdapterFactory | None = None,
         activation_evaluator: LLMRuntimeActivationEvaluator | None = None,
         execution_policy: AIExecutionPolicyEvaluator | None = None,
+        operational_readiness: LLMOperationalReadinessEvaluator | None = None,
     ) -> None:
         self._prompt_builder = prompt_builder
         self._configuration_loader = (
@@ -100,6 +107,11 @@ class LLMRuntimeCompositionRoot:
         )
         self._execution_policy = (
             execution_policy if execution_policy is not None else AIExecutionPolicyEvaluator()
+        )
+        self._operational_readiness = (
+            operational_readiness
+            if operational_readiness is not None
+            else LLMOperationalReadinessEvaluator()
         )
         self._composition: LLMRuntimeComposition | None = None
 
@@ -135,6 +147,10 @@ class LLMRuntimeCompositionRoot:
             composition_root=self,
             evaluator=self._execution_policy,
         )
+        operational_readiness_service = LLMOperationalReadinessService(
+            composition_root=self,
+            evaluator=self._operational_readiness,
+        )
 
         self._composition = LLMRuntimeComposition(
             configuration=configuration,
@@ -143,6 +159,8 @@ class LLMRuntimeCompositionRoot:
             activation_status=activation_status,
             execution_policy=self._execution_policy,
             execution_policy_service=execution_policy_service,
+            operational_readiness=self._operational_readiness,
+            operational_readiness_service=operational_readiness_service,
             provider_registry=provider_registry,
             default_provider_name=default_provider_name,
             llm_integration_service=llm_integration_service,

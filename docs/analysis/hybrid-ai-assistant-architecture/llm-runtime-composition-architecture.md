@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the Phase 6.7 runtime composition layer for the inactive LLM subsystem, updated in Phase 6.8 to include deterministic activation-status assembly and in Phase 6.9 to assemble the execution-policy seam.
+This document defines the Phase 6.7 runtime composition layer for the inactive LLM subsystem, updated in Phase 6.8 to include deterministic activation-status assembly, in Phase 6.9 to assemble the execution-policy seam, and in Phase 6.10 to assemble the operational-readiness seam.
 
 The goal remains architectural only:
 
@@ -27,6 +27,7 @@ It owns:
 - creating `LLMGenerationOrchestrator`
 - evaluating runtime activation status from the resolved graph
 - assembling the execution-policy evaluator and service from the resolved graph
+- assembling the operational-readiness evaluator and service from the resolved graph
 
 It does not own:
 
@@ -49,6 +50,7 @@ The explicit construction order is:
 6. `LLMIntegrationService(...)`
 7. `LLMGenerationOrchestrator(...)`
 8. `AIExecutionPolicyService(...)`
+9. `LLMOperationalReadinessService(...)`
 
 All dependencies are passed by constructor injection. No environment-variable reads happen outside the configuration loader.
 
@@ -80,6 +82,7 @@ The subsystem remains inactive because:
 - `LLMIntegrationService` can resolve providers, but provider generation still fails at the adapter boundary when no transport exists
 - activation status can report readiness, but it does not activate routing or execute generation by itself
 - the composed execution policy can evaluate future routing decisions, but no live runtime currently calls it
+- the composed operational-readiness service can describe future production concerns, but no live runtime currently consumes it
 
 ## Testing Scope
 
@@ -91,5 +94,6 @@ Focused composition tests validate:
 - transport injection into adapters
 - activation-status assembly from the composed graph
 - execution-policy assembly from the composed graph
+- operational-readiness assembly from the composed graph
 - explicit service and orchestrator composition
 - continued inactive behavior without transports

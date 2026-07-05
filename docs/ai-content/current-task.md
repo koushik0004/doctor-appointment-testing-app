@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.10 inactive production-readiness and operational-excellence architecture for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/operations.py` with canonical observability, trace, token-accounting, cost-accounting, health, retry, timeout, audit, privacy, rollout, and performance models plus a deterministic evaluator and safe composition-backed readiness service.
+- Updated `backend/app/llm/composition.py` so each composed inactive graph now also assembles the operational-readiness seam alongside the existing activation, execution-policy, registry, service, and orchestrator seams.
+- Preserved deterministic chat as the production path by keeping the new operational models architecture-only and fully disconnected from `ConversationManager`, live routing, provider SDK execution, and rollout behavior.
+- Added focused backend tests covering observability models, token accounting, cost accounting, retry validation, timeout validation, audit models, rollout-policy validation, composed readiness evaluation, and deterministic serialization.
+- Updated the operational-readiness architecture reference, the integration/composition references, the Phase 6 report set, and the compact AI context files so later sessions can discover the new seam directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 6.9 inactive execution-policy and runtime-routing architecture for the LLM seam
 - Completed on: 2026-07-05
 

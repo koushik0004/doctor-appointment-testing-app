@@ -69,15 +69,17 @@
 - `backend/app/services/prompt_builder.py`
   - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; it does not do retrieval, routing, workflow execution, API calls, database access, or AI reasoning.
 - `backend/app/llm/__init__.py`
-  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime activation, execution-policy, composition seams, and disconnected integration facade.
+  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime activation, execution-policy, operational-readiness, composition seams, and disconnected integration facade.
 - `backend/app/llm/activation.py`
   - Inactive runtime activation seam that evaluates top-level feature flags plus provider readiness, emits canonical diagnostics, and safely reports invalid configuration or dependency-assembly failures without changing routing.
 - `backend/app/llm/execution_policy.py`
   - Inactive execution-policy seam that turns provider-neutral routing requests plus runtime activation status into canonical workflow, knowledge, deterministic, hybrid, LLM-only, shadow, and fallback decisions without calling the live chat runtime.
+- `backend/app/llm/operations.py`
+  - Inactive operational-readiness seam that defines provider-neutral observability, accounting, health, retry, timeout, audit, privacy, rollout, and performance models plus a safe composed readiness service.
 - `backend/app/llm/budget.py`
   - Inactive provider-neutral generation-budget seam for future adapters; defines canonical generation profiles, token/latency/quality/cost controls, deterministic profile resolution, and now frozen resolved budget models without runtime wiring.
 - `backend/app/llm/composition.py`
-  - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy seam.
+  - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams.
 - `backend/app/llm/config.py`
   - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical runtime-activation flags, provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, configuration-backed generation-budget profiles, and frozen resolved configuration models without runtime wiring.
 - `backend/app/llm/providers.py`
@@ -167,9 +169,11 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_llm_activation.py`
   - Covers the inactive runtime activation seam: feature-flag evaluation, deterministic readiness decisions, disabled providers, missing transports, invalid configuration, inactive mode, and successful activation state.
 - `backend/tests/test_llm_composition.py`
-  - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
+  - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, operational-readiness assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
 - `backend/tests/test_llm_execution_policy.py`
   - Covers the inactive execution-policy seam: workflow ownership, knowledge ownership, deterministic default routing, shadow-mode routing, fallback routing, serialization, composed-policy access, and deterministic decision behavior.
+- `backend/tests/test_llm_operations.py`
+  - Covers the inactive operational-readiness seam: observability records, token and cost accounting, retry and timeout validation, audit models, rollout validation, composed health evaluation, and safe failure behavior.
 - `backend/tests/test_llm_provider_adapters.py`
   - Covers the inactive concrete adapter layer: provider-private request translation, canonical response normalization, composition-compatible adapter creation, and inactive transport enforcement.
 
@@ -183,6 +187,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-runtime-composition-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-runtime-activation-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-execution-policy-architecture.md`
+- `docs/analysis/hybrid-ai-assistant-architecture/llm-operational-readiness-architecture.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-abstraction.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-canonical-llm-contract.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-generation-orchestration.md`
@@ -192,6 +197,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-runtime-composition-dependency-assembly.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-runtime-activation-feature-flags.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-execution-policy-runtime-routing.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-production-readiness-operational-excellence.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`
@@ -203,4 +209,4 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/reports/test-data-report.md`
   - Latest manual-test data execution report with row counts, inserted demo bookings, duplicate handling, and validation notes.
 - `.env.example`
-  - Documents app-level and inactive Phase 6.8 LLM environment variables, including provider selection, runtime activation flags, provider enablement, default models, API keys, base URLs, timeout/retry defaults, feature-flag env mapping, and canonical generation-budget profile overrides; Phase 6.9 consumes these through execution-policy decisions without adding new env vars.
+  - Documents app-level and inactive Phase 6.8 LLM environment variables, including provider selection, runtime activation flags, provider enablement, default models, API keys, base URLs, timeout/retry defaults, feature-flag env mapping, and canonical generation-budget profile overrides; Phases 6.9 and 6.10 consume these through execution-policy and operational-readiness decisions without adding new env vars.

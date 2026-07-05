@@ -102,6 +102,7 @@ def test_composition_root_registers_only_enabled_providers_and_preserves_default
     assert composition.provider_registry.get_provider("gemini") is None
     assert composition.llm_integration_service.get_status().default_provider_name == "openai"
     assert composition.execution_policy is not None
+    assert composition.operational_readiness is not None
 
 
 def test_composition_root_injects_transports_into_created_adapters():
@@ -171,6 +172,10 @@ def test_composition_root_composes_orchestrator_with_explicit_dependencies():
             AIExecutionPolicyRequest(preferred_mode=AIExecutionMode.DETERMINISTIC_ONLY)
         ).decision.execution_mode
         == AIExecutionMode.DETERMINISTIC_ONLY
+    )
+    assert (
+        composition.operational_readiness_service.evaluate().profile.health.overall_status
+        == "UNAVAILABLE"
     )
 
     try:

@@ -78,6 +78,13 @@ Phase 6.9 adds an inactive execution-policy and runtime-routing layer with:
 - activation-aware `LLM_ONLY`, `HYBRID`, and `SHADOW` decision support without enabling runtime usage
 - a composed policy service that can evaluate future runtime-routing decisions from assembled activation state
 
+Phase 6.10 adds an inactive production-readiness and operational-excellence layer with:
+
+- canonical observability, trace, token-accounting, and cost-accounting models
+- provider-neutral health reporting derived from activation status
+- canonical retry, timeout, audit, rollout, privacy, and performance models
+- a safe operational-readiness service that describes future runtime operations without enabling generation or rollout
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -102,6 +109,7 @@ backend/app/llm/
 ├── execution_policy.py
 ├── interfaces.py
 ├── models.py
+├── operations.py
 ├── orchestrator.py
 ├── providers.py
 ├── registry.py
@@ -170,6 +178,7 @@ This module assembles the full inactive dependency graph in one place:
 - compose `LLMGenerationOrchestrator`
 - compute a deterministic activation-status snapshot for the composed graph
 - assemble the execution-policy evaluator and service for future runtime callers
+- assemble the operational-readiness evaluator and service for future runtime callers
 
 ### `activation.py`
 
@@ -196,6 +205,23 @@ Inactive execution-policy seam:
 - `AIExecutionPolicyService`
 
 This module makes provider-neutral routing decisions for future runtime callers while preserving the existing ownership hierarchy: workflow first, deterministic knowledge second, deterministic chat default, and optional activation-aware LLM participation after those checks.
+
+### `operations.py`
+
+Inactive operational-readiness seam:
+
+- `LLMObservabilityRecord`
+- `LLMTokenAccounting`
+- `LLMCostBreakdown`
+- `LLMOperationalHealthReport`
+- `LLMRetryPolicy`
+- `LLMTimeoutPolicy`
+- `LLMAuditTrailRecord`
+- `LLMRolloutPolicy`
+- `LLMOperationalReadinessEvaluator`
+- `LLMOperationalReadinessService`
+
+This module defines the provider-neutral contracts needed for future production observability, accounting, health monitoring, retry/timeout policy, auditability, privacy controls, rollout strategy, and performance tracking while remaining fully outside the live chat runtime.
 
 ### `budget.py`
 

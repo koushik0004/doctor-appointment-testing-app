@@ -1,12 +1,12 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.9. It defines only
+This package is intentionally inactive in Phase 6.10. It defines only
 implementation-ready contracts for a future LLM adapter layer, provider-neutral
 configuration and generation-budget seams, explicit concrete provider adapters,
 an inactive runtime composition root, a runtime activation policy seam, an
-execution-policy and runtime-routing seam, and an inactive generation
-orchestrator. It is not wired into the current chat runtime, workflow engine,
-retrieval layer, or prompt builder.
+execution-policy and runtime-routing seam, a production-readiness operations
+seam, and an inactive generation orchestrator. It is not wired into the current
+chat runtime, workflow engine, retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -94,6 +94,34 @@ from app.llm.models import (
     LLMToolChoiceMode,
     LLMToolDefinition,
 )
+from app.llm.operations import (
+    LLMAuditTrailRecord,
+    LLMAuditVisibility,
+    LLMCostAggregationWindow,
+    LLMCostBreakdown,
+    LLMCostRollup,
+    LLMHealthDiagnostic,
+    LLMObservabilityPolicy,
+    LLMObservabilityRecord,
+    LLMOperationalHealthReport,
+    LLMOperationalHealthStatus,
+    LLMOperationalReadinessEvaluator,
+    LLMOperationalReadinessProfile,
+    LLMOperationalReadinessResult,
+    LLMOperationalReadinessService,
+    LLMPerformanceMetrics,
+    LLMProviderHealthReport,
+    LLMProviderRetryPolicy,
+    LLMRetryBackoffStrategy,
+    LLMRetryPolicy,
+    LLMRolloutPolicy,
+    LLMRolloutStage,
+    LLMSecurityPrivacyPolicy,
+    LLMTimingBreakdown,
+    LLMTimeoutPolicy,
+    LLMTokenAccounting,
+    LLMTraceContext,
+)
 from app.llm.orchestrator import (
     LLMGenerationOrchestrationRequest,
     LLMGenerationOrchestrationResult,
@@ -134,7 +162,12 @@ __all__ = [
     "LLMConfiguration",
     "LLMConfigurationLoader",
     "LLMConfigurationSettings",
+    "LLMAuditTrailRecord",
+    "LLMAuditVisibility",
     "LLMCitation",
+    "LLMCostAggregationWindow",
+    "LLMCostBreakdown",
+    "LLMCostRollup",
     "LLMFinishReason",
     "LLMGenerationBudget",
     "LLMGenerationBudgetCostPreference",
@@ -158,8 +191,19 @@ __all__ = [
     "LLMIntegrationStatus",
     "LLMMessage",
     "LLMMessageRole",
+    "LLMHealthDiagnostic",
+    "LLMObservabilityPolicy",
+    "LLMObservabilityRecord",
+    "LLMOperationalHealthReport",
+    "LLMOperationalHealthStatus",
+    "LLMOperationalReadinessEvaluator",
+    "LLMOperationalReadinessProfile",
+    "LLMOperationalReadinessResult",
+    "LLMOperationalReadinessService",
+    "LLMPerformanceMetrics",
     "LLMProvider",
     "LLMProviderAdapterFactory",
+    "LLMProviderHealthReport",
     "LLMProviderConfiguration",
     "LLMProviderActivationStatus",
     "LLMProviderCapabilities",
@@ -167,6 +211,7 @@ __all__ = [
     "LLMProviderEnvironmentSettings",
     "LLMProviderFeatureFlags",
     "LLMProviderName",
+    "LLMProviderRetryPolicy",
     "LLMProviderRegistry",
     "LLMProviderTransportFactory",
     "LLMProviderTransport",
@@ -175,6 +220,10 @@ __all__ = [
     "LLMReasoningResult",
     "LLMRequestTranslator",
     "LLMRequestedModality",
+    "LLMRetryBackoffStrategy",
+    "LLMRetryPolicy",
+    "LLMRolloutPolicy",
+    "LLMRolloutStage",
     "LLMResponseTranslator",
     "LLMRuntimeActivationEvaluator",
     "LLMRuntimeActivationResult",
@@ -183,11 +232,16 @@ __all__ = [
     "LLMRuntimeComposition",
     "LLMRuntimeCompositionRoot",
     "LLMRuntimeFeatureFlags",
+    "LLMSecurityPrivacyPolicy",
     "LLMStreamingMetadata",
     "LLMStreamingOptions",
     "LLMStructuredOutputMode",
     "LLMStructuredOutputSchema",
+    "LLMTimingBreakdown",
+    "LLMTimeoutPolicy",
+    "LLMTokenAccounting",
     "LLMTokenUsage",
+    "LLMTraceContext",
     "LLMToolCall",
     "LLMToolChoice",
     "LLMToolChoiceMode",
