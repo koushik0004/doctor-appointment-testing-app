@@ -1,11 +1,12 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.8. It defines only
+This package is intentionally inactive in Phase 6.9. It defines only
 implementation-ready contracts for a future LLM adapter layer, provider-neutral
 configuration and generation-budget seams, explicit concrete provider adapters,
-an inactive runtime composition root, a runtime activation policy seam, and an
-inactive generation orchestrator. It is not wired into the current chat
-runtime, workflow engine, retrieval layer, or prompt builder.
+an inactive runtime composition root, a runtime activation policy seam, an
+execution-policy and runtime-routing seam, and an inactive generation
+orchestrator. It is not wired into the current chat runtime, workflow engine,
+retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -49,6 +50,19 @@ from app.llm.config import (
     LLMProviderName,
     LLMRuntimeFeatureFlags,
     get_llm_configuration,
+)
+from app.llm.execution_policy import (
+    AIExecutionActivationSnapshot,
+    AIExecutionDecision,
+    AIExecutionDiagnostic,
+    AIExecutionDiagnosticSeverity,
+    AIExecutionFallbackStrategy,
+    AIExecutionMode,
+    AIExecutionOwner,
+    AIExecutionPolicyEvaluator,
+    AIExecutionPolicyRequest,
+    AIExecutionPolicyResult,
+    AIExecutionPolicyService,
 )
 from app.llm.interfaces import (
     LLMProvider,
@@ -99,6 +113,17 @@ from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
 
 __all__ = [
+    "AIExecutionActivationSnapshot",
+    "AIExecutionDecision",
+    "AIExecutionDiagnostic",
+    "AIExecutionDiagnosticSeverity",
+    "AIExecutionFallbackStrategy",
+    "AIExecutionMode",
+    "AIExecutionOwner",
+    "AIExecutionPolicyEvaluator",
+    "AIExecutionPolicyRequest",
+    "AIExecutionPolicyResult",
+    "AIExecutionPolicyService",
     "BaseLLMProviderAdapter",
     "ClaudeProviderAdapter",
     "ConfigurableLLMProviderAdapter",

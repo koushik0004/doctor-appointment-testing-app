@@ -71,6 +71,13 @@ Phase 6.8 adds an inactive runtime activation layer with:
 - canonical activation-status and diagnostic models for safe startup reporting
 - a safe activation service that converts invalid configuration or assembly failures into inactive status instead of startup crashes
 
+Phase 6.9 adds an inactive execution-policy and runtime-routing layer with:
+
+- canonical execution modes, execution owners, fallback strategies, and routing diagnostics
+- a provider-neutral execution-policy evaluator that preserves workflow and knowledge ownership rules
+- activation-aware `LLM_ONLY`, `HYBRID`, and `SHADOW` decision support without enabling runtime usage
+- a composed policy service that can evaluate future runtime-routing decisions from assembled activation state
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -92,6 +99,7 @@ backend/app/llm/
 ├── budget.py
 ├── composition.py
 ├── config.py
+├── execution_policy.py
 ├── interfaces.py
 ├── models.py
 ├── orchestrator.py
@@ -161,6 +169,7 @@ This module assembles the full inactive dependency graph in one place:
 - compose `LLMIntegrationService`
 - compose `LLMGenerationOrchestrator`
 - compute a deterministic activation-status snapshot for the composed graph
+- assemble the execution-policy evaluator and service for future runtime callers
 
 ### `activation.py`
 
@@ -173,6 +182,20 @@ Inactive runtime activation seam:
 - `LLMRuntimeActivationService`
 
 This module evaluates whether the subsystem is enabled and whether the selected provider is ready without executing generation or changing routing behavior.
+
+### `execution_policy.py`
+
+Inactive execution-policy seam:
+
+- `AIExecutionMode`
+- `AIExecutionOwner`
+- `AIExecutionFallbackStrategy`
+- `AIExecutionPolicyRequest`
+- `AIExecutionDecision`
+- `AIExecutionPolicyEvaluator`
+- `AIExecutionPolicyService`
+
+This module makes provider-neutral routing decisions for future runtime callers while preserving the existing ownership hierarchy: workflow first, deterministic knowledge second, deterministic chat default, and optional activation-aware LLM participation after those checks.
 
 ### `budget.py`
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the Phase 6.8 runtime activation layer for the inactive LLM subsystem.
+This document defines the Phase 6.8 runtime activation layer for the inactive LLM subsystem, extended in Phase 6.9 as the readiness source for execution-policy decisions.
 
 The goal remains architectural only:
 
@@ -34,6 +34,8 @@ It is not responsible for:
 - workflow execution
 - provider invocation
 - conversation-state mutation
+
+Phase 6.9 keeps that boundary intact. The new execution-policy seam consumes activation status, but activation itself still does not make routing decisions.
 
 ## Canonical Models
 

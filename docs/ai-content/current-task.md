@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.9 inactive execution-policy and runtime-routing architecture for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/execution_policy.py` with canonical execution modes, ownership and fallback models, activation snapshots, deterministic routing diagnostics, a policy evaluator, and a composition-backed policy service.
+- Updated `backend/app/llm/composition.py` so each composed inactive graph now also assembles the execution-policy seam alongside the existing activation, registry, service, and orchestrator seams.
+- Preserved the existing ownership hierarchy by encoding workflow-first, deterministic knowledge second, deterministic-chat default, and optional activation-aware `LLM_ONLY`, `HYBRID`, and `SHADOW` routing decisions without touching the live `ConversationManager`.
+- Added focused backend tests covering workflow ownership, knowledge ownership, deterministic default routing, activation-aware shadow routing, fallback routing, execution-decision serialization, composed-policy access, and deterministic decisions.
+- Updated the execution-policy architecture reference, the activation/integration/composition references, the Phase 6 report set, and the compact AI context files so later sessions can discover the routing seam directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 6.8 inactive runtime activation and feature-flag architecture for the LLM seam
 - Completed on: 2026-07-05
 

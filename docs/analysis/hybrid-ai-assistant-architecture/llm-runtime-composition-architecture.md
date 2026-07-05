@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the Phase 6.7 runtime composition layer for the inactive LLM subsystem, updated in Phase 6.8 to include deterministic activation-status assembly.
+This document defines the Phase 6.7 runtime composition layer for the inactive LLM subsystem, updated in Phase 6.8 to include deterministic activation-status assembly and in Phase 6.9 to assemble the execution-policy seam.
 
 The goal remains architectural only:
 
@@ -26,6 +26,7 @@ It owns:
 - creating `LLMIntegrationService`
 - creating `LLMGenerationOrchestrator`
 - evaluating runtime activation status from the resolved graph
+- assembling the execution-policy evaluator and service from the resolved graph
 
 It does not own:
 
@@ -47,6 +48,7 @@ The explicit construction order is:
 5. `InMemoryLLMProviderRegistry(...)`
 6. `LLMIntegrationService(...)`
 7. `LLMGenerationOrchestrator(...)`
+8. `AIExecutionPolicyService(...)`
 
 All dependencies are passed by constructor injection. No environment-variable reads happen outside the configuration loader.
 
@@ -77,6 +79,7 @@ The subsystem remains inactive because:
 - adapters still require explicit transport injection to invoke anything
 - `LLMIntegrationService` can resolve providers, but provider generation still fails at the adapter boundary when no transport exists
 - activation status can report readiness, but it does not activate routing or execute generation by itself
+- the composed execution policy can evaluate future routing decisions, but no live runtime currently calls it
 
 ## Testing Scope
 
@@ -87,5 +90,6 @@ Focused composition tests validate:
 - disabled-provider exclusion
 - transport injection into adapters
 - activation-status assembly from the composed graph
+- execution-policy assembly from the composed graph
 - explicit service and orchestrator composition
 - continued inactive behavior without transports

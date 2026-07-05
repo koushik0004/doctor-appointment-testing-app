@@ -13,6 +13,10 @@ from app.llm.config import (
     LLMConfigurationLoader,
     LLMConfigurationSettings,
 )
+from app.llm.execution_policy import (
+    AIExecutionPolicyEvaluator,
+    AIExecutionPolicyService,
+)
 from app.llm.orchestrator import LLMGenerationOrchestrator
 from app.llm.providers import (
     ConfigurableLLMProviderAdapter,
@@ -51,6 +55,8 @@ class LLMRuntimeComposition:
     transports: Mapping[str, LLMProviderTransport]
     adapters: Mapping[str, ConfigurableLLMProviderAdapter]
     activation_status: LLMRuntimeActivationStatus
+    execution_policy: AIExecutionPolicyEvaluator
+    execution_policy_service: AIExecutionPolicyService
     provider_registry: InMemoryLLMProviderRegistry
     default_provider_name: str | None
     llm_integration_service: LLMIntegrationService
@@ -70,6 +76,7 @@ class LLMRuntimeCompositionRoot:
         transport_factory: LLMProviderTransportFactory | None = None,
         adapter_factory: LLMProviderAdapterFactory | None = None,
         activation_evaluator: LLMRuntimeActivationEvaluator | None = None,
+        execution_policy: AIExecutionPolicyEvaluator | None = None,
     ) -> None:
         self._prompt_builder = prompt_builder
         self._configuration_loader = (
@@ -90,6 +97,9 @@ class LLMRuntimeCompositionRoot:
             activation_evaluator
             if activation_evaluator is not None
             else LLMRuntimeActivationEvaluator()
+        )
+        self._execution_policy = (
+            execution_policy if execution_policy is not None else AIExecutionPolicyEvaluator()
         )
         self._composition: LLMRuntimeComposition | None = None
 
@@ -121,12 +131,18 @@ class LLMRuntimeCompositionRoot:
             prompt_builder=self._prompt_builder,
             llm_integration_service=llm_integration_service,
         )
+        execution_policy_service = AIExecutionPolicyService(
+            composition_root=self,
+            evaluator=self._execution_policy,
+        )
 
         self._composition = LLMRuntimeComposition(
             configuration=configuration,
             transports=MappingProxyType(dict(transports)),
             adapters=MappingProxyType(dict(adapters)),
             activation_status=activation_status,
+            execution_policy=self._execution_policy,
+            execution_policy_service=execution_policy_service,
             provider_registry=provider_registry,
             default_provider_name=default_provider_name,
             llm_integration_service=llm_integration_service,

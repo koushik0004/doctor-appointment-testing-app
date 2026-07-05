@@ -1,6 +1,8 @@
 from copy import deepcopy
 
 from app.llm import (
+    AIExecutionMode,
+    AIExecutionPolicyRequest,
     InactiveLLMProviderTransportFactory,
     LLMConfiguration,
     LLMConfigurationLoader,
@@ -99,6 +101,7 @@ def test_composition_root_registers_only_enabled_providers_and_preserves_default
     ]
     assert composition.provider_registry.get_provider("gemini") is None
     assert composition.llm_integration_service.get_status().default_provider_name == "openai"
+    assert composition.execution_policy is not None
 
 
 def test_composition_root_injects_transports_into_created_adapters():
@@ -163,6 +166,12 @@ def test_composition_root_composes_orchestrator_with_explicit_dependencies():
     assert composition.orchestrator._prompt_builder is composition.prompt_builder
     assert composition.orchestrator._llm_integration_service is composition.llm_integration_service
     assert composition.llm_integration_service.get_status().connected_provider_names == []
+    assert (
+        composition.execution_policy_service.evaluate(
+            AIExecutionPolicyRequest(preferred_mode=AIExecutionMode.DETERMINISTIC_ONLY)
+        ).decision.execution_mode
+        == AIExecutionMode.DETERMINISTIC_ONLY
+    )
 
     try:
         composition.orchestrator.generate(
