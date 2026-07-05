@@ -101,6 +101,7 @@
   - `backend/app/services/conversation_manager.py`
   - `backend/app/services/workflow_engine.py`
   - `backend/app/services/prompt_builder.py`
+  - `backend/app/llm/`
   - `backend/app/services/chat_service.py`
   - `backend/app/services/chat_intent_detector.py`
   - `backend/app/services/chat_entity_extractor.py`
@@ -117,6 +118,7 @@
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
+  - Contains an inactive provider-neutral LLM seam with canonical models, generation-budget profiles, concrete provider adapters, a single runtime composition root that assembles configuration, transports, adapters, registry, integration service, orchestrator, execution-policy service, and operational-readiness service, plus a runtime activation layer that evaluates feature-flag and provider-readiness diagnostics while remaining fully disconnected from the live chat runtime.
   - Accepts direct booking-entry prompts that mention a doctor plus incremental follow-up fields, including explicit day-month-year dates and labeled patient details in structured messages.
   - Consults the knowledge retrieval service only when no workflow is active and uses the retrieved document before the legacy deterministic fallback for FAQ-style non-workflow turns.
   - Returns optional `knowledge_source` metadata on knowledge-backed replies so downstream UI mapping can show the retrieved document source.
@@ -125,12 +127,13 @@
   - Loads curated Markdown and JSON knowledge files into an in-memory backend repository for future prompt/context work.
   - Supports deterministic top-document retrieval over repository documents with weighted title, alias, keyword, synonym, category, and body-text matching while filtering broad tokens that would otherwise interfere with doctor-search, availability, fee, or unrelated fallback flows.
   - Exposes an inactive standalone Prompt Builder seam that now normalizes caller inputs into a canonical internal `PromptContext` model, uses internal Conversation, Workflow, and Knowledge Context Collectors plus a System Instruction Builder to normalize conversation state, workflow state, already-selected documents, and system instructions deterministically, validates that context, assembles ordered prompt sections through a dedicated Prompt Assembly Pipeline, and delegates final bounded prompt rendering and truncation to a dedicated PromptRenderer without changing live chat behavior.
+  - Exposes an additional inactive provider-neutral LLM Integration seam under `backend/app/llm/` that defines future message/request/response contracts plus provider translator, adapter, registry, generation-orchestration, provider-configuration, generation-budget, runtime-activation, execution-policy, and operational-readiness boundaries; the canonical contract now also supports provider-neutral structured-output, tool-calling, reasoning, streaming, citation, provider/model metadata, multimodal-intent fields, and optional reusable generation-budget profiles, while inactive configuration can represent provider selection, model, key, base URL, timeout, retry, feature-flag, and profile-override settings without integrating any SDK or changing runtime routing.
   - Resolves informational FAQ prompts such as online consultation, payment methods, appointment preparation, consultation hours, insurance, and parking through the knowledge layer before the legacy deterministic fallback when no workflow is active.
   - Includes a dedicated manual test checklist that covers positive, negative, edge, regression, workflow, and existing chatbot scenarios.
 - Limitation:
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
-  - Knowledge retrieval is still backend-only and deterministic; it is not used by prompt building, LLM calls, embeddings, or a vector database, and it remains inactive while a workflow is running.
+  - Knowledge retrieval is still backend-only and deterministic; it is not used by the inactive Prompt Builder seam, the inactive LLM Integration seam or its inactive provider registry, embeddings, or a vector database, and it remains inactive while a workflow is running.
 
 ## Platform / Cross-Cutting Features
 

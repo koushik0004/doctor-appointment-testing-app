@@ -3,6 +3,143 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.10 inactive production-readiness and operational-excellence architecture for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/operations.py` with canonical observability, trace, token-accounting, cost-accounting, health, retry, timeout, audit, privacy, rollout, and performance models plus a deterministic evaluator and safe composition-backed readiness service.
+- Updated `backend/app/llm/composition.py` so each composed inactive graph now also assembles the operational-readiness seam alongside the existing activation, execution-policy, registry, service, and orchestrator seams.
+- Preserved deterministic chat as the production path by keeping the new operational models architecture-only and fully disconnected from `ConversationManager`, live routing, provider SDK execution, and rollout behavior.
+- Added focused backend tests covering observability models, token accounting, cost accounting, retry validation, timeout validation, audit models, rollout-policy validation, composed readiness evaluation, and deterministic serialization.
+- Updated the operational-readiness architecture reference, the integration/composition references, the Phase 6 report set, and the compact AI context files so later sessions can discover the new seam directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.9 inactive execution-policy and runtime-routing architecture for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/execution_policy.py` with canonical execution modes, ownership and fallback models, activation snapshots, deterministic routing diagnostics, a policy evaluator, and a composition-backed policy service.
+- Updated `backend/app/llm/composition.py` so each composed inactive graph now also assembles the execution-policy seam alongside the existing activation, registry, service, and orchestrator seams.
+- Preserved the existing ownership hierarchy by encoding workflow-first, deterministic knowledge second, deterministic-chat default, and optional activation-aware `LLM_ONLY`, `HYBRID`, and `SHADOW` routing decisions without touching the live `ConversationManager`.
+- Added focused backend tests covering workflow ownership, knowledge ownership, deterministic default routing, activation-aware shadow routing, fallback routing, execution-decision serialization, composed-policy access, and deterministic decisions.
+- Updated the execution-policy architecture reference, the activation/integration/composition references, the Phase 6 report set, and the compact AI context files so later sessions can discover the routing seam directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.8 inactive runtime activation and feature-flag architecture for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/activation.py` with canonical runtime activation diagnostics, provider-readiness status, overall activation status, a deterministic evaluator, and a safe activation service.
+- Extended `backend/app/llm/config.py` with top-level runtime feature flags for `LLM_ENABLED`, `LLM_SHADOW_MODE`, `LLM_ALLOW_GENERATION`, `LLM_ALLOW_STREAMING`, `LLM_ALLOW_TOOL_CALLING`, and `LLM_ALLOW_REASONING` while keeping provider enablement in the existing provider-scoped settings.
+- Updated `backend/app/llm/composition.py` so each composed inactive graph now carries a deterministic activation-status snapshot derived from resolved configuration, adapters, and transports.
+- Added focused backend tests covering feature-flag evaluation, readiness evaluation, disabled providers, missing transports, invalid configuration, inactive mode, successful activation state, and deterministic activation decisions.
+- Updated the runtime activation architecture reference, the LLM integration and runtime composition references, the Phase 6 report set, `.env.example`, and the compact AI context files so later sessions can discover the activation seam directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.7 inactive runtime composition and dependency assembly for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/composition.py` with a single inactive `LLMRuntimeCompositionRoot` that loads canonical configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, and composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`.
+- Added a dedicated `LLMProviderTransportFactory` seam with an `InactiveLLMProviderTransportFactory` default so the assembled subsystem stays disconnected from any live provider runtime.
+- Tightened the inactive dependency rules by making `LLMIntegrationService` and `LLMGenerationOrchestrator` constructor-composed only and moving registry construction out of `LLMProviderAdapterFactory`.
+- Added focused backend tests covering deterministic composition-root caching, one-time configuration loading, enabled-provider-only registration, disabled-provider exclusion, transport injection, explicit orchestrator/service composition, and continued inactive behavior without transports.
+- Updated the LLM runtime composition architecture reference, LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the composed inactive dependency graph directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.5.5 inactive provider-neutral generation budget architecture for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added an inactive `backend/app/llm/budget.py` seam with canonical generation-budget enums, reusable default profiles, deterministic profile catalogs, override support, and an adapter-facing translation protocol for future provider-private budget mapping.
+- Extended the canonical `LLMGenerationRequest` contract with an optional provider-neutral `generation_budget` field while preserving full backward compatibility and keeping `LLMGenerationOrchestrator` unchanged.
+- Extended `backend/app/llm/config.py` plus `.env.example` so global and per-provider configuration can declare default generation profiles and canonical profile overrides without wiring any provider runtime.
+- Added focused backend tests covering budget validation, profile resolution, serialization, provider neutrality, config integration, and backward-compatible request defaults.
+- Updated the LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the new inactive generation-budget seam directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.5 inactive provider configuration architecture for the provider-neutral LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added an inactive `backend/app/llm/config.py` layer with canonical provider-neutral configuration models, provider enums, feature-flag models, explicit validation rules, and a deterministic loader over nested environment-backed settings.
+- Added root `.env.example` documentation for global and provider-specific LLM configuration variables covering OpenAI, Claude, Gemini, OpenRouter, and Ollama without wiring any SDK or runtime execution path.
+- Added focused backend tests covering deterministic config loading, missing optional keys, missing required keys, selected-provider validation, default propagation, nested environment mapping, and backward-compatible inactive defaults.
+- Updated the LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the new inactive configuration seam directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.4 inactive LLM generation orchestrator for the provider-neutral LLM seam
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added an inactive `LLMGenerationOrchestrator` under `backend/app/llm/` that only coordinates `PromptBuilderService`, canonical `LLMGenerationRequest` construction, `LLMIntegrationService` delegation, and normalized provider-neutral result shaping.
+- Introduced dedicated orchestration request/result models for already-collected generation input while preserving the existing Prompt Builder contract and the Phase 6.3 canonical LLM request/response models unchanged.
+- Added focused backend tests covering orchestration order, deterministic canonical transformation, delegation behavior, inactive-by-default runtime status, and no caller-input mutation.
+- Updated the Phase 6 architecture/report/context documentation so future sessions can discover the orchestration seam directly from the compact AI context files.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.3 canonical LLM request/response contract refinement for the inactive LLM integration seam
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Refined `backend/app/llm/models.py` so the canonical internal LLM contract can represent future provider-neutral model selection, structured output, tool definitions and tool calls, reasoning controls and metadata, streaming intent and streaming metadata, citations, provider/model metadata, and multimodal request intent without exposing any provider-specific payload shape.
+- Preserved full backward compatibility by keeping all new request and response fields optional and leaving the inactive adapter, registry, and integration-service boundaries unchanged.
+- Added focused backend model tests covering canonical validation, deterministic serialization, backward-compatible defaults, optional field handling, and future extensibility while keeping provider tests and runtime wiring out of scope.
+- Updated the Phase 6 architecture/report/context documentation so future sessions can discover the refined canonical contract directly from the compact AI context files.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.2 provider abstraction for the inactive LLM integration seam
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Refined the inactive `backend/app/llm/` seam with explicit request-translation and response-translation contracts so future provider adapters can keep provider-native payloads private.
+- Added a shared `BaseLLMProviderAdapter` pipeline that turns canonical `LLMGenerationRequest` input into provider-native payloads, invokes a future provider privately, and translates the result back into canonical `LLMGenerationResponse` output.
+- Added an inactive `InMemoryLLMProviderRegistry` implementation with deterministic listing, lookup, duplicate-name rejection, and optional default-provider resolution, and updated `LLMIntegrationService` to honor an explicit registry default when present.
+- Kept `ConversationManager`, `WorkflowEngine`, Vector-less RAG retrieval, Prompt Builder, frontend contracts, APIs, and the database unchanged and still fully disconnected from any provider runtime.
+- Expanded focused tests and architecture/context documentation so later phases can build concrete provider adapters without changing upstream canonical contracts.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 6.1 provider-neutral LLM integration architecture seam
+- Completed on: 2026-07-04
+
+## Outcome
+
+- Added a new inactive backend `app.llm` package that defines provider-neutral LLM integration contracts without wiring any part of the production runtime to an external model.
+- Introduced implementation-ready internal models for messages, generation requests/responses, constraints, token usage, finish reasons, provider capabilities, and provider descriptors.
+- Added protocol boundaries for future provider adapters and provider registries plus an inactive `LLMIntegrationService` facade that reports disconnected status by default and only delegates generation when an explicit registry is supplied.
+- Kept `ConversationManager`, `WorkflowEngine`, Vector-less RAG retrieval, Prompt Builder, frontend contracts, APIs, and the database unchanged.
+- Added focused backend tests plus Phase 6 architecture/report documentation and refreshed the compact AI context files so future sessions can discover the new seam directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 5.8 dedicated prompt renderer
 - Completed on: 2026-07-04
 
