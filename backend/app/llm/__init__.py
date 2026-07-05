@@ -5,9 +5,9 @@ implementation-ready contracts for a future LLM adapter layer, provider-neutral
 configuration and generation-budget seams, explicit concrete provider adapters,
 an inactive runtime composition root, a runtime activation policy seam, an
 execution-policy and runtime-routing seam, a production-readiness operations
-seam, an inactive runtime facade, and an inactive generation orchestrator. It
-is not wired into the current chat runtime, workflow engine, retrieval layer,
-or prompt builder.
+seam, an inactive runtime facade, a policy-gated controlled-generation branch,
+and an inactive generation orchestrator. It is not wired into the current chat
+runtime, workflow engine, retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -66,6 +66,9 @@ from app.llm.execution_policy import (
     AIExecutionPolicyService,
 )
 from app.llm.facade import (
+    LLMControlledGenerationRequest,
+    LLMControlledGenerationResult,
+    LLMControlledGenerationStatus,
     InlineLLMShadowExecutionRunner,
     LLMRuntimeFacade,
     LLMRuntimeFacadeSnapshot,
@@ -175,6 +178,9 @@ __all__ = [
     "LLMConfiguration",
     "LLMConfigurationLoader",
     "LLMConfigurationSettings",
+    "LLMControlledGenerationRequest",
+    "LLMControlledGenerationResult",
+    "LLMControlledGenerationStatus",
     "LLMAuditTrailRecord",
     "LLMAuditVisibility",
     "LLMCitation",

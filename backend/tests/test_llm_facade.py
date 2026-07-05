@@ -1,11 +1,16 @@
 from app.llm import (
     AIExecutionOwner,
+    AIExecutionMode,
+    AIExecutionPolicyRequest,
+    LLMControlledGenerationRequest,
+    LLMControlledGenerationStatus,
     InlineLLMShadowExecutionRunner,
     LLMConfigurationSettings,
     LLMProviderName,
     LLMRuntimeCompositionRoot,
     LLMRuntimeFacade,
     LLMRuntimeFacadeSnapshot,
+    LLMGenerationOrchestrationRequest,
     LLMShadowModeRequest,
     LLMShadowModeStatus,
 )
@@ -47,11 +52,15 @@ class StaticTransportFactory:
         return dict(self._provider_transports)
 
 
-def _base_settings(*, shadow_mode: bool = False) -> LLMConfigurationSettings:
+def _base_settings(
+    *,
+    shadow_mode: bool = False,
+    allow_generation: bool = True,
+) -> LLMConfigurationSettings:
     return LLMConfigurationSettings(
         provider=LLMProviderName.OPENAI,
         enabled=True,
-        allow_generation=True,
+        allow_generation=allow_generation,
         shadow_mode=shadow_mode,
         openai={
             "enabled": True,
@@ -122,6 +131,164 @@ def test_runtime_facade_snapshot_serializes_deterministically():
     second = facade.save_integration_boundary().model_dump(mode="json")
 
     assert first == second
+
+
+def test_runtime_facade_runs_controlled_generation_when_policy_and_activation_allow_it():
+    transport = StaticTransport(
+        {
+            "content": "Generated runtime answer",
+            "finish_reason": "stop",
+            "model": "gpt-4.1-mini",
+            "usage": {
+                "prompt_tokens": 12,
+                "completion_tokens": 7,
+                "total_tokens": 19,
+            },
+        }
+    )
+    prompt_builder = RecordingPromptBuilder()
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=prompt_builder,
+            configuration_settings=_base_settings(allow_generation=True),
+            transport_factory=StaticTransportFactory({"openai": transport}),
+        )
+    )
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.HYBRID,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="What payment methods do you accept?",
+                conversation_state={
+                    "conversation_id": "conv-control-1",
+                    "current_workflow": {
+                        "workflow_type": "BOOK_APPOINTMENT",
+                        "status": "INPUT_REQUIRED",
+                        "draft": {"doctor_name": "Dr. Smith"},
+                        "missing_fields": ["appointment_date"],
+                    },
+                },
+                documents=[],
+                active_intent="UNKNOWN",
+                provider_name="openai",
+                metadata={"request_id": "controlled-1"},
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.SUCCEEDED
+    assert result.generated_result is not None
+    assert result.generated_result.provider_name == "openai"
+    assert result.generated_result.prompt is not None
+    assert "[Workflow State]" in result.generated_result.prompt
+    assert len(prompt_builder.calls) == 1
+    assert len(transport.calls) == 1
+    prompt_payload = transport.calls[0]["messages"][0]["content"]
+    assert "[User Message]" in prompt_payload
+    assert "[Conversation State]" in prompt_payload
+    assert "[Workflow State]" in prompt_payload
+
+
+def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled():
+    transport = StaticTransport(
+        {
+            "content": "Generated runtime answer",
+            "finish_reason": "stop",
+            "model": "gpt-4.1-mini",
+        }
+    )
+    prompt_builder = RecordingPromptBuilder()
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=prompt_builder,
+            configuration_settings=_base_settings(allow_generation=False),
+            transport_factory=StaticTransportFactory({"openai": transport}),
+        )
+    )
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.HYBRID,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="What payment methods do you accept?",
+                conversation_state={"conversation_id": "conv-control-2"},
+                provider_name="openai",
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.SKIPPED
+    assert result.generated_result is None
+    assert result.fallback_reason is not None
+    assert len(prompt_builder.calls) == 0
+    assert len(transport.calls) == 0
+
+
+def test_runtime_facade_falls_back_when_controlled_generation_fails():
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=PromptBuilderService(),
+            configuration_settings=_base_settings(allow_generation=True),
+            transport_factory=StaticTransportFactory({"openai": FailingTransport()}),
+        )
+    )
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.LLM_ONLY,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="Generate a runtime answer.",
+                provider_name="openai",
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.FAILED
+    assert result.generated_result is None
+    assert result.error_message is not None
+    assert result.error_type == "RuntimeError"
+
+
+def test_runtime_facade_keeps_deterministic_compatibility_for_non_llm_policies():
+    transport = StaticTransport(
+        {
+            "content": "Generated runtime answer",
+            "finish_reason": "stop",
+            "model": "gpt-4.1-mini",
+        }
+    )
+    prompt_builder = RecordingPromptBuilder()
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=prompt_builder,
+            configuration_settings=_base_settings(allow_generation=True),
+            transport_factory=StaticTransportFactory({"openai": transport}),
+        )
+    )
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.DETERMINISTIC_ONLY,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="Keep this deterministic.",
+                provider_name="openai",
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.SKIPPED
+    assert result.generated_result is None
+    assert len(prompt_builder.calls) == 0
+    assert len(transport.calls) == 0
 
 
 def test_runtime_facade_executes_shadow_mode_and_captures_diagnostics():

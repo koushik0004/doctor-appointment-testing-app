@@ -28,6 +28,10 @@ from app.llm.operations import (
     LLMTimingBreakdown,
     LLMTraceContext,
 )
+from app.llm.orchestrator import (
+    LLMGenerationOrchestrationRequest,
+    LLMGenerationOrchestrationResult,
+)
 from app.llm.service import LLMIntegrationStatus
 
 
@@ -94,6 +98,37 @@ class LLMShadowModeDispatchResult(BaseModel):
     decision: AIExecutionDecision
     scheduled: bool = False
     diagnostic: LLMShadowModeDiagnostic | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class LLMControlledGenerationStatus(str, Enum):
+    SKIPPED = "SKIPPED"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
+class LLMControlledGenerationRequest(BaseModel):
+    request_id: str = Field(default_factory=lambda: str(uuid4()), min_length=1)
+    correlation_id: str | None = None
+    parent_execution_id: str | None = None
+    policy_request: AIExecutionPolicyRequest = Field(
+        default_factory=AIExecutionPolicyRequest
+    )
+    orchestration_request: LLMGenerationOrchestrationRequest
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class LLMControlledGenerationResult(BaseModel):
+    request_id: str
+    correlation_id: str | None = None
+    decision: AIExecutionDecision
+    status: LLMControlledGenerationStatus
+    generated_result: LLMGenerationOrchestrationResult | None = None
+    fallback_reason: str | None = None
+    error_message: str | None = None
+    error_type: str | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -196,6 +231,46 @@ class LLMRuntimeFacade:
             diagnostic=diagnostic,
         )
 
+    def run_controlled_generation(
+        self,
+        request: LLMControlledGenerationRequest,
+    ) -> LLMControlledGenerationResult:
+        decision = self._evaluate_controlled_generation_decision(request.policy_request)
+        if not self._can_execute_controlled_generation(decision):
+            return LLMControlledGenerationResult(
+                request_id=request.request_id,
+                correlation_id=request.correlation_id,
+                decision=decision,
+                status=LLMControlledGenerationStatus.SKIPPED,
+                fallback_reason=decision.fallback_reason or decision.routing_reason,
+            )
+
+        try:
+            generated_result = self.compose().orchestrator.generate(
+                request.orchestration_request
+            )
+        except Exception as exc:
+            return LLMControlledGenerationResult(
+                request_id=request.request_id,
+                correlation_id=request.correlation_id,
+                decision=decision,
+                status=LLMControlledGenerationStatus.FAILED,
+                fallback_reason=(
+                    "Controlled runtime generation failed safely and preserved the "
+                    "existing deterministic response."
+                ),
+                error_message=str(exc),
+                error_type=type(exc).__name__,
+            )
+
+        return LLMControlledGenerationResult(
+            request_id=request.request_id,
+            correlation_id=request.correlation_id,
+            decision=decision,
+            status=LLMControlledGenerationStatus.SUCCEEDED,
+            generated_result=generated_result,
+        )
+
     def list_shadow_diagnostics(self) -> list[LLMShadowModeDiagnostic]:
         with self._shadow_history_lock:
             return list(self._shadow_history)
@@ -220,6 +295,22 @@ class LLMRuntimeFacade:
                 knowledge_match_available=request.knowledge_match_available,
             )
         ).decision
+
+    def _evaluate_controlled_generation_decision(
+        self,
+        request: AIExecutionPolicyRequest,
+    ) -> AIExecutionDecision:
+        composition = self.compose()
+        return composition.execution_policy_service.evaluate(request).decision
+
+    def _can_execute_controlled_generation(
+        self,
+        decision: AIExecutionDecision,
+    ) -> bool:
+        return decision.should_execute_llm and decision.execution_mode in {
+            AIExecutionMode.LLM_ONLY,
+            AIExecutionMode.HYBRID,
+        }
 
     def _execute_shadow_mode(
         self,

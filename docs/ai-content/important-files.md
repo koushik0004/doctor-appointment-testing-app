@@ -69,7 +69,7 @@
 - `backend/app/services/prompt_builder.py`
   - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; Phase 7.3 now renders workflow context into the final prompt used by shadow LLM execution while keeping retrieval, routing, workflow execution, API calls, database access, and AI reasoning out of this module.
 - `backend/app/llm/__init__.py`
-  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime activation, execution-policy, operational-readiness, composition seams, and disconnected integration facade.
+  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime activation, execution-policy, operational-readiness, composition seams, and the facade entrypoints for shadow execution plus policy-gated controlled generation.
 - `backend/app/llm/activation.py`
   - Inactive runtime activation seam that evaluates top-level feature flags plus provider readiness, emits canonical diagnostics, and safely reports invalid configuration or dependency-assembly failures without changing routing.
 - `backend/app/llm/execution_policy.py`
@@ -81,7 +81,7 @@
 - `backend/app/llm/composition.py`
   - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams.
 - `backend/app/llm/facade.py`
-  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, and now owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output; Phase 7.3 continues to route shadow calls through the existing orchestrator so the provider path receives only Prompt Builder rendered prompts.
+  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes a policy-gated controlled-generation path that reuses the existing execution policy, Prompt Builder, and orchestrator without changing default deterministic behavior.
 - `backend/app/llm/config.py`
   - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical runtime-activation flags, provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, configuration-backed generation-budget profiles, and frozen resolved configuration models without runtime wiring.
 - `backend/app/llm/providers.py`
@@ -91,7 +91,7 @@
 - `backend/app/llm/models.py`
   - Internal LLM integration request/response, capabilities, and usage models; now also carries provider-neutral structured-output, tool-calling, reasoning, streaming, citation, and multimodal-intent metadata without wiring any SDK or API schema.
 - `backend/app/llm/orchestrator.py`
-  - Inactive thin coordinator that accepts already-collected generation input, invokes `PromptBuilderService`, converts `PromptBuildResult` into canonical `LLMGenerationRequest`, delegates to `LLMIntegrationService`, and normalizes the canonical response into a simple provider-neutral result; Phase 7.3 keeps it as the only path from runtime shadow inputs into the final rendered prompt and provider request.
+  - Inactive thin coordinator that accepts already-collected generation input, invokes `PromptBuilderService`, converts `PromptBuildResult` into canonical `LLMGenerationRequest`, delegates to `LLMIntegrationService`, and normalizes the canonical response into a simple provider-neutral result; Phase 7.3 and Phase 7.4 keep it as the only path from runtime shadow or controlled-generation inputs into the final rendered prompt and provider request.
 - `backend/app/llm/interfaces.py`
   - Provider translator, adapter, and provider-registry protocols for future adapter implementations.
 - `backend/app/llm/registry.py`
@@ -173,7 +173,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_llm_composition.py`
   - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, operational-readiness assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
 - `backend/tests/test_llm_facade.py`
-  - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, Prompt Builder backed shadow prompt delivery, and deterministic serialization of the facade view.
+  - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, Prompt Builder backed shadow prompt delivery, policy-gated controlled generation, deterministic fallback behavior, and deterministic serialization of the facade view.
 - `backend/tests/test_llm_execution_policy.py`
   - Covers the inactive execution-policy seam: workflow ownership, knowledge ownership, deterministic default routing, shadow-mode routing, fallback routing, serialization, composed-policy access, and deterministic decision behavior.
 - `backend/tests/test_llm_operations.py`
@@ -204,6 +204,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-production-readiness-operational-excellence.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-shadow-mode-integration.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-llm-e2e-pipeline.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-controlled-runtime-generation.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

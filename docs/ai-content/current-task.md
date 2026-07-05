@@ -3,15 +3,15 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 7.3 end-to-end Prompt Builder to LLM shadow pipeline integration
+- Task: implement Phase 7.4 controlled runtime generation
 - Completed on: 2026-07-05
 
 ## Outcome
 
-- Extended the deterministic Prompt Builder assembly pipeline so canonical workflow context is now rendered into the final prompt alongside user, conversation, and knowledge sections.
-- Kept the runtime integration narrow: shadow execution continues to run through the existing `LLMRuntimeFacade` and `LLMGenerationOrchestrator`, which already delegate prompt creation exclusively to `PromptBuilderService`.
-- Added focused tests proving shadow-mode execution invokes the Prompt Builder, sends the rendered prompt to the provider path, and includes workflow-state data when present, while preserving the existing deterministic user-visible response path.
-- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the full Prompt Builder -> Renderer -> Orchestrator shadow path directly.
+- Added a policy-gated controlled-generation path on `backend/app/llm/facade.py` that reuses the existing execution-policy service, prompt builder, and orchestrator without changing the default deterministic chat path.
+- Kept runtime behavior safe by returning the existing deterministic outcome whenever generation is not explicitly allowed or when controlled generation fails, while never surfacing provider errors.
+- Added focused backend tests covering enabled generation, disabled generation, failure fallback, and deterministic compatibility, alongside the existing shadow-mode regression coverage.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the controlled runtime generation seam directly.
 
 ## Prior Work
 

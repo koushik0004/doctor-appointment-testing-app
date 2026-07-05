@@ -104,6 +104,13 @@ Phase 7.2 and Phase 7.3 add a guarded runtime caller outside this package bounda
 - canonical workflow context is now included in that rendered prompt when present
 - all LLM output is still discarded after diagnostics
 
+Phase 7.4 extends that same facade with a policy-gated controlled-generation branch:
+
+- the facade still returns the existing deterministic outcome by default
+- generation only runs when activation and execution policy explicitly allow an LLM-capable mode
+- the same Prompt Builder and `LLMGenerationOrchestrator` path is reused for visible generation requests
+- generation failures are caught and fall back to the existing deterministic behavior without exposing provider errors
+
 ## Package Structure
 
 ```txt
