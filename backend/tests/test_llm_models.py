@@ -1,8 +1,12 @@
 from app.llm import (
     LLMCitation,
     LLMFinishReason,
+    LLMGenerationBudget,
+    LLMGenerationBudgetQualityPreference,
+    LLMGenerationBudgetReasoningEffort,
     LLMGenerationRequest,
     LLMGenerationResponse,
+    LLMGenerationProfileName,
     LLMMessage,
     LLMMessageRole,
     LLMProviderCapabilities,
@@ -58,6 +62,13 @@ def test_canonical_request_supports_future_provider_neutral_generation_controls(
             effort=LLMReasoningEffort.MEDIUM,
             include_summary=True,
         ),
+        generation_budget=LLMGenerationBudget(
+            profile=LLMGenerationProfileName.BALANCED,
+            reasoning_effort=LLMGenerationBudgetReasoningEffort.MEDIUM,
+            max_output_tokens=1024,
+            max_context_tokens=24000,
+            quality_preference=LLMGenerationBudgetQualityPreference.HIGH,
+        ),
         streaming=LLMStreamingOptions(enabled=True, include_usage=True),
     )
 
@@ -68,6 +79,7 @@ def test_canonical_request_supports_future_provider_neutral_generation_controls(
     assert dumped["tools"][0]["name"] == "lookup_doctor_profile"
     assert dumped["tool_choice"]["mode"] == "named"
     assert dumped["reasoning"]["effort"] == "medium"
+    assert dumped["generation_budget"]["profile"] == "balanced"
     assert dumped["streaming"]["enabled"] is True
 
 
@@ -125,6 +137,7 @@ def test_canonical_request_backward_compatibility_defaults_remain_minimal():
     assert request.tools == []
     assert request.tool_choice is None
     assert request.reasoning is None
+    assert request.generation_budget is None
     assert request.streaming.enabled is False
 
 

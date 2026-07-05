@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.llm.budget import LLMGenerationBudget
+
 
 class LLMMessageRole(str, Enum):
     SYSTEM = "system"
@@ -157,6 +159,7 @@ class LLMGenerationRequest(BaseModel):
     tools: list[LLMToolDefinition] = Field(default_factory=list)
     tool_choice: LLMToolChoice | None = None
     reasoning: LLMReasoningConfig | None = None
+    generation_budget: LLMGenerationBudget | None = None
     streaming: LLMStreamingOptions = Field(default_factory=LLMStreamingOptions)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

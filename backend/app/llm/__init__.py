@@ -1,16 +1,32 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.4. It defines only
-implementation-ready contracts for a future LLM adapter layer and an inactive
-generation orchestrator, and is not wired into the current chat runtime,
-workflow engine, retrieval layer, or prompt builder.
+This package is intentionally inactive in Phase 6.5.5. It defines only
+implementation-ready contracts for a future LLM adapter layer, provider-neutral
+configuration and generation-budget seams, and an inactive generation
+orchestrator. It is not wired into the current chat runtime, workflow engine,
+retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
+from app.llm.budget import (
+    LLMGenerationBudget,
+    LLMGenerationBudgetCostPreference,
+    LLMGenerationBudgetLatencyPreference,
+    LLMGenerationBudgetOverrides,
+    LLMGenerationBudgetProfile,
+    LLMGenerationBudgetProfileCatalog,
+    LLMGenerationBudgetQualityPreference,
+    LLMGenerationBudgetReasoningEffort,
+    LLMGenerationBudgetTranslator,
+    LLMGenerationProfileName,
+    build_default_generation_budget_profile_catalog,
+)
 from app.llm.config import (
     LLMConfiguration,
     LLMConfigurationLoader,
     LLMConfigurationSettings,
+    LLMGenerationBudgetEnvironmentOverride,
+    LLMGenerationBudgetEnvironmentSettings,
     LLMProviderConfiguration,
     LLMProviderEnvironmentSettings,
     LLMProviderFeatureFlags,
@@ -62,10 +78,22 @@ __all__ = [
     "LLMConfigurationSettings",
     "LLMCitation",
     "LLMFinishReason",
+    "LLMGenerationBudget",
+    "LLMGenerationBudgetCostPreference",
+    "LLMGenerationBudgetEnvironmentOverride",
+    "LLMGenerationBudgetEnvironmentSettings",
+    "LLMGenerationBudgetLatencyPreference",
+    "LLMGenerationBudgetOverrides",
+    "LLMGenerationBudgetProfile",
+    "LLMGenerationBudgetProfileCatalog",
+    "LLMGenerationBudgetQualityPreference",
+    "LLMGenerationBudgetReasoningEffort",
+    "LLMGenerationBudgetTranslator",
     "LLMGenerationConstraints",
     "LLMGenerationOrchestrationRequest",
     "LLMGenerationOrchestrationResult",
     "LLMGenerationOrchestrator",
+    "LLMGenerationProfileName",
     "LLMGenerationRequest",
     "LLMGenerationResponse",
     "LLMIntegrationService",
@@ -96,5 +124,6 @@ __all__ = [
     "LLMToolChoiceMode",
     "LLMToolDefinition",
     "InMemoryLLMProviderRegistry",
+    "build_default_generation_budget_profile_catalog",
     "get_llm_configuration",
 ]

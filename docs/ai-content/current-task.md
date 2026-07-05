@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.5.5 inactive provider-neutral generation budget architecture for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added an inactive `backend/app/llm/budget.py` seam with canonical generation-budget enums, reusable default profiles, deterministic profile catalogs, override support, and an adapter-facing translation protocol for future provider-private budget mapping.
+- Extended the canonical `LLMGenerationRequest` contract with an optional provider-neutral `generation_budget` field while preserving full backward compatibility and keeping `LLMGenerationOrchestrator` unchanged.
+- Extended `backend/app/llm/config.py` plus `.env.example` so global and per-provider configuration can declare default generation profiles and canonical profile overrides without wiring any provider runtime.
+- Added focused backend tests covering budget validation, profile resolution, serialization, provider neutrality, config integration, and backward-compatible request defaults.
+- Updated the LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the new inactive generation-budget seam directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 6.5 inactive provider configuration architecture for the provider-neutral LLM seam
 - Completed on: 2026-07-05
 

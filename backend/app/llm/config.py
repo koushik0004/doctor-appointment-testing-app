@@ -6,6 +6,18 @@ from functools import lru_cache
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.llm.budget import (
+    LLMGenerationBudgetCostPreference,
+    LLMGenerationBudgetLatencyPreference,
+    LLMGenerationBudgetOverrides,
+    LLMGenerationBudgetProfile,
+    LLMGenerationBudgetProfileCatalog,
+    LLMGenerationBudgetQualityPreference,
+    LLMGenerationBudgetReasoningEffort,
+    LLMGenerationProfileName,
+    build_default_generation_budget_profile_catalog,
+)
+
 
 class LLMProviderName(str, Enum):
     OPENAI = "openai"
@@ -23,6 +35,48 @@ class LLMProviderFeatureFlags(BaseModel):
     citations: bool = False
 
 
+class LLMGenerationBudgetEnvironmentOverride(BaseModel):
+    reasoning_effort: LLMGenerationBudgetReasoningEffort | None = None
+    max_output_tokens: int | None = Field(default=None, gt=0)
+    max_context_tokens: int | None = Field(default=None, gt=0)
+    latency_preference: LLMGenerationBudgetLatencyPreference | None = None
+    quality_preference: LLMGenerationBudgetQualityPreference | None = None
+    cost_preference: LLMGenerationBudgetCostPreference | None = None
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    def to_budget_overrides(self) -> LLMGenerationBudgetOverrides:
+        return LLMGenerationBudgetOverrides(
+            reasoning_effort=self.reasoning_effort,
+            max_output_tokens=self.max_output_tokens,
+            max_context_tokens=self.max_context_tokens,
+            latency_preference=self.latency_preference,
+            quality_preference=self.quality_preference,
+            cost_preference=self.cost_preference,
+            metadata=dict(self.metadata),
+        )
+
+
+class LLMGenerationBudgetEnvironmentSettings(BaseModel):
+    default_profile: LLMGenerationProfileName | None = None
+    fast: LLMGenerationBudgetEnvironmentOverride = Field(
+        default_factory=LLMGenerationBudgetEnvironmentOverride
+    )
+    balanced: LLMGenerationBudgetEnvironmentOverride = Field(
+        default_factory=LLMGenerationBudgetEnvironmentOverride
+    )
+    workflow: LLMGenerationBudgetEnvironmentOverride = Field(
+        default_factory=LLMGenerationBudgetEnvironmentOverride
+    )
+    quality: LLMGenerationBudgetEnvironmentOverride = Field(
+        default_factory=LLMGenerationBudgetEnvironmentOverride
+    )
+    maximum: LLMGenerationBudgetEnvironmentOverride = Field(
+        default_factory=LLMGenerationBudgetEnvironmentOverride
+    )
+
+
 class LLMProviderEnvironmentSettings(BaseModel):
     enabled: bool = False
     default_model_name: str | None = None
@@ -33,6 +87,9 @@ class LLMProviderEnvironmentSettings(BaseModel):
     retry_backoff_seconds: float | None = Field(default=None, ge=0)
     feature_flags: LLMProviderFeatureFlags = Field(
         default_factory=LLMProviderFeatureFlags
+    )
+    generation_budget: LLMGenerationBudgetEnvironmentSettings = Field(
+        default_factory=LLMGenerationBudgetEnvironmentSettings
     )
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -49,6 +106,9 @@ class LLMProviderConfiguration(BaseModel):
     retry_backoff_seconds: float = Field(default=0.5, ge=0)
     feature_flags: LLMProviderFeatureFlags = Field(
         default_factory=LLMProviderFeatureFlags
+    )
+    generation_budget_profiles: LLMGenerationBudgetProfileCatalog = Field(
+        default_factory=build_default_generation_budget_profile_catalog
     )
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -120,6 +180,9 @@ class LLMConfigurationSettings(BaseSettings):
     timeout_seconds: float = Field(default=30.0, gt=0)
     max_retries: int = Field(default=2, ge=0)
     retry_backoff_seconds: float = Field(default=0.5, ge=0)
+    generation_budget: LLMGenerationBudgetEnvironmentSettings = Field(
+        default_factory=LLMGenerationBudgetEnvironmentSettings
+    )
     openai: LLMProviderEnvironmentSettings = Field(
         default_factory=LLMProviderEnvironmentSettings
     )
@@ -163,6 +226,7 @@ class LLMConfigurationLoader:
                 global_timeout_seconds=resolved_settings.timeout_seconds,
                 global_max_retries=resolved_settings.max_retries,
                 global_retry_backoff_seconds=resolved_settings.retry_backoff_seconds,
+                global_budget_settings=resolved_settings.generation_budget,
             ),
             self._build_provider_config(
                 provider_name=LLMProviderName.CLAUDE,
@@ -170,6 +234,7 @@ class LLMConfigurationLoader:
                 global_timeout_seconds=resolved_settings.timeout_seconds,
                 global_max_retries=resolved_settings.max_retries,
                 global_retry_backoff_seconds=resolved_settings.retry_backoff_seconds,
+                global_budget_settings=resolved_settings.generation_budget,
             ),
             self._build_provider_config(
                 provider_name=LLMProviderName.GEMINI,
@@ -177,6 +242,7 @@ class LLMConfigurationLoader:
                 global_timeout_seconds=resolved_settings.timeout_seconds,
                 global_max_retries=resolved_settings.max_retries,
                 global_retry_backoff_seconds=resolved_settings.retry_backoff_seconds,
+                global_budget_settings=resolved_settings.generation_budget,
             ),
             self._build_provider_config(
                 provider_name=LLMProviderName.OPENROUTER,
@@ -184,6 +250,7 @@ class LLMConfigurationLoader:
                 global_timeout_seconds=resolved_settings.timeout_seconds,
                 global_max_retries=resolved_settings.max_retries,
                 global_retry_backoff_seconds=resolved_settings.retry_backoff_seconds,
+                global_budget_settings=resolved_settings.generation_budget,
             ),
             self._build_provider_config(
                 provider_name=LLMProviderName.OLLAMA,
@@ -191,6 +258,7 @@ class LLMConfigurationLoader:
                 global_timeout_seconds=resolved_settings.timeout_seconds,
                 global_max_retries=resolved_settings.max_retries,
                 global_retry_backoff_seconds=resolved_settings.retry_backoff_seconds,
+                global_budget_settings=resolved_settings.generation_budget,
             ),
         ]
 
@@ -207,6 +275,7 @@ class LLMConfigurationLoader:
         global_timeout_seconds: float,
         global_max_retries: int,
         global_retry_backoff_seconds: float,
+        global_budget_settings: LLMGenerationBudgetEnvironmentSettings,
     ) -> LLMProviderConfiguration:
         return LLMProviderConfiguration(
             provider_name=provider_name,
@@ -230,6 +299,60 @@ class LLMConfigurationLoader:
                 else global_retry_backoff_seconds
             ),
             feature_flags=settings.feature_flags.model_copy(deep=True),
+            generation_budget_profiles=self._build_generation_budget_profile_catalog(
+                global_settings=global_budget_settings,
+                provider_settings=settings.generation_budget,
+            ),
+        )
+
+    def _build_generation_budget_profile_catalog(
+        self,
+        *,
+        global_settings: LLMGenerationBudgetEnvironmentSettings,
+        provider_settings: LLMGenerationBudgetEnvironmentSettings,
+    ) -> LLMGenerationBudgetProfileCatalog:
+        global_catalog = self._apply_generation_budget_settings(
+            build_default_generation_budget_profile_catalog(),
+            global_settings,
+        )
+        return self._apply_generation_budget_settings(global_catalog, provider_settings)
+
+    def _apply_generation_budget_settings(
+        self,
+        base_catalog: LLMGenerationBudgetProfileCatalog,
+        settings: LLMGenerationBudgetEnvironmentSettings,
+    ) -> LLMGenerationBudgetProfileCatalog:
+        profiles: list[LLMGenerationBudgetProfile] = []
+
+        for profile_name in [
+            LLMGenerationProfileName.FAST,
+            LLMGenerationProfileName.BALANCED,
+            LLMGenerationProfileName.WORKFLOW,
+            LLMGenerationProfileName.QUALITY,
+            LLMGenerationProfileName.MAXIMUM,
+        ]:
+            base_profile = base_catalog.get_profile(profile_name)
+            if base_profile is None:
+                raise ValueError(
+                    f"Generation budget profile '{profile_name.value}' is not configured."
+                )
+
+            override_settings = getattr(settings, profile_name.value)
+            resolved_budget = override_settings.to_budget_overrides().apply_to(
+                base_profile.budget,
+                profile=profile_name,
+            )
+            profiles.append(
+                LLMGenerationBudgetProfile(
+                    name=profile_name,
+                    description=base_profile.description,
+                    budget=resolved_budget,
+                )
+            )
+
+        return LLMGenerationBudgetProfileCatalog(
+            default_profile=settings.default_profile or base_catalog.default_profile,
+            profiles=profiles,
         )
 
 

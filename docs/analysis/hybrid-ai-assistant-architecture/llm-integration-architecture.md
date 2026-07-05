@@ -42,6 +42,13 @@ Phase 6.5 adds an inactive configuration layer with:
 - explicit validation for provider selection, provider enablement, model requirements, and API-key requirements
 - `.env.example` documentation without any runtime instantiation or SDK wiring
 
+Phase 6.5.5 adds an inactive generation budget layer with:
+
+- canonical provider-neutral generation-budget profiles for reasoning effort, output budget, context budget, latency preference, quality preference, and cost preference
+- deterministic reusable default profiles plus override support through configuration
+- adapter-facing translation contracts that keep provider-native budget parameters private to future adapters
+- optional canonical request-level budget metadata without changing orchestration or runtime wiring
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -59,6 +66,7 @@ No production request path imports or invokes this package.
 backend/app/llm/
 ├── __init__.py
 ├── adapters.py
+├── budget.py
 ├── config.py
 ├── interfaces.py
 ├── models.py
@@ -91,6 +99,20 @@ Phase 6.3 keeps the contract provider-neutral while making room for future:
 - streaming request intent and streaming result metadata
 - multimodal intent metadata
 - citations plus separated provider/model metadata
+
+Phase 6.5.5 adds an optional canonical `generation_budget` field on `LLMGenerationRequest` so future callers can pass reusable provider-neutral budget intent into adapters without exposing provider-native token or reasoning parameters upstream.
+
+### `budget.py`
+
+Inactive provider-neutral generation-budget seam:
+
+- `LLMGenerationBudget`
+- `LLMGenerationBudgetOverrides`
+- `LLMGenerationBudgetProfile`
+- `LLMGenerationBudgetProfileCatalog`
+- `LLMGenerationBudgetTranslator`
+
+This module defines reusable canonical profiles such as `FAST`, `BALANCED`, `WORKFLOW`, `QUALITY`, and `MAXIMUM`, along with deterministic validation for token budgets and adapter-facing translation contracts that keep provider-private generation knobs out of upstream code.
 
 ### `interfaces.py`
 
@@ -130,6 +152,8 @@ Inactive provider-neutral configuration layer:
 - `LLMConfigurationLoader`
 
 This module keeps future provider selection, default-model selection, API keys, base URLs, timeout settings, retry settings, and descriptive feature flags inside a declarative configuration seam that remains disconnected from runtime execution in this phase.
+
+Phase 6.5.5 extends this module with canonical generation-budget settings so global and per-provider profile defaults and profile overrides can be declared declaratively, resolved deterministically, and remain inactive until a later runtime phase.
 
 ### `registry.py`
 
@@ -181,6 +205,7 @@ This layer must not:
 - import or initialize any external LLM SDK
 - instantiate provider clients from configuration in this phase
 - expose provider-native payload shapes to upstream callers
+- expose provider-native reasoning, latency, token, or quality parameter names outside adapters
 - encode OpenAI, Claude, Gemini, Bedrock, Vertex, Ollama, or other provider request/response schemas into canonical models
 - load prompt context directly from files or repositories
 - perform retrieval, ranking, workflow execution, booking, or domain validation
@@ -224,9 +249,10 @@ Later phases may connect this layer in a guarded way:
 3. Register them behind an explicit `LLMProviderRegistry`.
 4. Optionally declare a default provider through configuration-owned registry setup.
 5. Keep configuration loading separate from adapter instantiation until a later guarded runtime phase.
-6. Keep `LLMGenerationOrchestrator` as the narrow caller that passes already-collected generation input through `PromptBuilderService` and then into `LLMIntegrationService`.
-7. Keep deterministic post-processing and business validation outside the LLM layer.
-8. Preserve existing chat response contracts unless a later migration explicitly changes them.
+6. Keep generation-budget translation inside adapters by mapping canonical profile and budget intent into provider-private request parameters.
+7. Keep `LLMGenerationOrchestrator` as the narrow caller that passes already-collected generation input through `PromptBuilderService` and then into `LLMIntegrationService`.
+8. Keep deterministic post-processing and business validation outside the LLM layer.
+9. Preserve existing chat response contracts unless a later migration explicitly changes them.
 
 ## Provider Abstraction Rules
 
@@ -237,6 +263,7 @@ Future adapter implementations should:
 - translate provider-native payloads entirely inside the adapter
 - map future provider-native structured output, tool-calling, reasoning, streaming, citation, and multimodal fields back into canonical metadata models
 - keep SDK clients, auth, retry policy, and transport details inside the adapter
+- translate canonical generation budgets into provider-native reasoning, token, latency, or quality controls privately
 - avoid leaking provider-specific enums, IDs, tool-call payloads, or message formats outside `backend/app/llm/`
 - rely on deterministic domain validation outside the adapter after model output returns
 
@@ -254,10 +281,11 @@ Focused tests now validate:
 - orchestration order stays deterministic across Prompt Builder, canonical request mapping, LLM service delegation, and normalized result shaping
 - the default orchestrator remains inactive without explicit registry-backed LLM service setup
 - deterministic configuration loading, nested environment mapping, default propagation, provider validation, and backward-compatible inactive defaults
+- deterministic generation-budget profile validation, reusable default-profile resolution, configuration-driven overrides, serialization, and provider-neutral request compatibility
 
 ## Compatibility Guarantees
 
-Phase 6.5 preserves:
+Phase 6.5.5 preserves:
 
 - zero production behavior changes
 - zero API changes
