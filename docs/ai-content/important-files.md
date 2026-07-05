@@ -74,6 +74,8 @@
   - Inactive provider-neutral generation-budget seam for future adapters; defines canonical generation profiles, token/latency/quality/cost controls, deterministic profile resolution, and adapter-facing translation contracts without runtime wiring.
 - `backend/app/llm/config.py`
   - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, and configuration-backed generation-budget profiles without runtime wiring.
+- `backend/app/llm/providers.py`
+  - Inactive concrete provider adapters for OpenAI, Claude, Gemini, OpenRouter, and Ollama; keeps provider-private request/response and generation-budget translation inside adapter classes, requires explicit transport injection, and includes a config-backed adapter factory for future registry setup.
 - `backend/app/llm/adapters.py`
   - Shared inactive base adapter pipeline for future provider-specific request/response translation and private provider invocation.
 - `backend/app/llm/models.py`
@@ -156,6 +158,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the inactive LLM configuration seam: deterministic loading, nested environment mapping, provider validation, default propagation, configuration-backed generation-budget overrides, required-key enforcement for enabled providers, and backward-compatible inactive defaults.
 - `backend/tests/test_llm_budget.py`
   - Covers the inactive generation-budget seam: deterministic budget validation, reusable profile resolution, override behavior, serialization determinism, and provider neutrality.
+- `backend/tests/test_llm_provider_adapters.py`
+  - Covers the inactive concrete adapter layer: provider-private request translation, canonical response normalization, config-backed registry construction, and inactive transport enforcement.
 
 ## High-Value Docs
 
@@ -169,6 +173,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-generation-orchestration.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-configuration.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-generation-budget-architecture.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-concrete-provider-adapters.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

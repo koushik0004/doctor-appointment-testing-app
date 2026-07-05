@@ -1,10 +1,10 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.5.5. It defines only
+This package is intentionally inactive in Phase 6.6. It defines only
 implementation-ready contracts for a future LLM adapter layer, provider-neutral
-configuration and generation-budget seams, and an inactive generation
-orchestrator. It is not wired into the current chat runtime, workflow engine,
-retrieval layer, or prompt builder.
+configuration and generation-budget seams, explicit concrete provider adapters,
+and an inactive generation orchestrator. It is not wired into the current chat
+runtime, workflow engine, retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -68,11 +68,24 @@ from app.llm.orchestrator import (
     LLMGenerationOrchestrationResult,
     LLMGenerationOrchestrator,
 )
+from app.llm.providers import (
+    ClaudeProviderAdapter,
+    ConfigurableLLMProviderAdapter,
+    GeminiProviderAdapter,
+    LLMProviderAdapterFactory,
+    LLMProviderTransport,
+    OllamaProviderAdapter,
+    OpenAIProviderAdapter,
+    OpenRouterProviderAdapter,
+)
 from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
 
 __all__ = [
     "BaseLLMProviderAdapter",
+    "ClaudeProviderAdapter",
+    "ConfigurableLLMProviderAdapter",
+    "GeminiProviderAdapter",
     "LLMConfiguration",
     "LLMConfigurationLoader",
     "LLMConfigurationSettings",
@@ -101,6 +114,7 @@ __all__ = [
     "LLMMessage",
     "LLMMessageRole",
     "LLMProvider",
+    "LLMProviderAdapterFactory",
     "LLMProviderConfiguration",
     "LLMProviderCapabilities",
     "LLMProviderDescriptor",
@@ -108,6 +122,7 @@ __all__ = [
     "LLMProviderFeatureFlags",
     "LLMProviderName",
     "LLMProviderRegistry",
+    "LLMProviderTransport",
     "LLMReasoningConfig",
     "LLMReasoningEffort",
     "LLMReasoningResult",
@@ -124,6 +139,9 @@ __all__ = [
     "LLMToolChoiceMode",
     "LLMToolDefinition",
     "InMemoryLLMProviderRegistry",
+    "OllamaProviderAdapter",
+    "OpenAIProviderAdapter",
+    "OpenRouterProviderAdapter",
     "build_default_generation_budget_profile_catalog",
     "get_llm_configuration",
 ]

@@ -49,6 +49,13 @@ Phase 6.5.5 adds an inactive generation budget layer with:
 - adapter-facing translation contracts that keep provider-native budget parameters private to future adapters
 - optional canonical request-level budget metadata without changing orchestration or runtime wiring
 
+Phase 6.6 adds explicit inactive concrete provider adapters with:
+
+- config-backed adapter classes for OpenAI, Claude, Gemini, OpenRouter, and Ollama
+- provider-private request and response translation inside each adapter
+- explicit transport injection so adapters remain testable without any SDK or live API
+- an inactive adapter factory that builds concrete adapters and optional registries from canonical configuration
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -71,6 +78,7 @@ backend/app/llm/
 ├── interfaces.py
 ├── models.py
 ├── orchestrator.py
+├── providers.py
 ├── registry.py
 └── service.py
 ```
@@ -101,6 +109,19 @@ Phase 6.3 keeps the contract provider-neutral while making room for future:
 - citations plus separated provider/model metadata
 
 Phase 6.5.5 adds an optional canonical `generation_budget` field on `LLMGenerationRequest` so future callers can pass reusable provider-neutral budget intent into adapters without exposing provider-native token or reasoning parameters upstream.
+
+### `providers.py`
+
+Inactive concrete provider adapters:
+
+- `OpenAIProviderAdapter`
+- `ClaudeProviderAdapter`
+- `GeminiProviderAdapter`
+- `OpenRouterProviderAdapter`
+- `OllamaProviderAdapter`
+- `LLMProviderAdapterFactory`
+
+These adapters stay inside the inactive boundary. They accept canonical requests, translate them into provider-private payload dictionaries, require an explicit injected transport for invocation, and map provider-private responses back into canonical response models.
 
 ### `budget.py`
 
@@ -154,6 +175,8 @@ Inactive provider-neutral configuration layer:
 This module keeps future provider selection, default-model selection, API keys, base URLs, timeout settings, retry settings, and descriptive feature flags inside a declarative configuration seam that remains disconnected from runtime execution in this phase.
 
 Phase 6.5.5 extends this module with canonical generation-budget settings so global and per-provider profile defaults and profile overrides can be declared declaratively, resolved deterministically, and remain inactive until a later runtime phase.
+
+Phase 6.6 keeps configuration ownership here and lets the adapter factory consume canonical provider configuration without teaching `LLMIntegrationService` how to self-configure.
 
 ### `registry.py`
 
@@ -248,7 +271,7 @@ Later phases may connect this layer in a guarded way:
 2. Keep provider-native request and response payloads private to those adapters.
 3. Register them behind an explicit `LLMProviderRegistry`.
 4. Optionally declare a default provider through configuration-owned registry setup.
-5. Keep configuration loading separate from adapter instantiation until a later guarded runtime phase.
+5. Use explicit adapter-factory setup and explicit transport injection instead of hidden runtime auto-discovery.
 6. Keep generation-budget translation inside adapters by mapping canonical profile and budget intent into provider-private request parameters.
 7. Keep `LLMGenerationOrchestrator` as the narrow caller that passes already-collected generation input through `PromptBuilderService` and then into `LLMIntegrationService`.
 8. Keep deterministic post-processing and business validation outside the LLM layer.
@@ -266,6 +289,7 @@ Future adapter implementations should:
 - translate canonical generation budgets into provider-native reasoning, token, latency, or quality controls privately
 - avoid leaking provider-specific enums, IDs, tool-call payloads, or message formats outside `backend/app/llm/`
 - rely on deterministic domain validation outside the adapter after model output returns
+- require explicit transport injection or future provider clients rather than silently performing network setup
 
 ## Focused Validation
 
@@ -282,10 +306,11 @@ Focused tests now validate:
 - the default orchestrator remains inactive without explicit registry-backed LLM service setup
 - deterministic configuration loading, nested environment mapping, default propagation, provider validation, and backward-compatible inactive defaults
 - deterministic generation-budget profile validation, reusable default-profile resolution, configuration-driven overrides, serialization, and provider-neutral request compatibility
+- concrete provider-adapter request translation, response normalization, config-backed registry construction, and inactive transport enforcement
 
 ## Compatibility Guarantees
 
-Phase 6.5.5 preserves:
+Phase 6.6 preserves:
 
 - zero production behavior changes
 - zero API changes
@@ -305,9 +330,11 @@ Phase 6.5.5 preserves:
 - `backend/app/llm/models.py`
 - `backend/app/llm/interfaces.py`
 - `backend/app/llm/orchestrator.py`
+- `backend/app/llm/providers.py`
 - `backend/app/llm/registry.py`
 - `backend/app/llm/service.py`
 - `.env.example`
 - `backend/tests/test_llm_config.py`
 - `backend/tests/test_llm_integration.py`
 - `backend/tests/test_llm_orchestrator.py`
+- `backend/tests/test_llm_provider_adapters.py`

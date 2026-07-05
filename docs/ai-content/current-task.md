@@ -3,6 +3,20 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.6 inactive concrete provider adapters for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/providers.py` with explicit inactive concrete adapters for OpenAI, Claude, Gemini, OpenRouter, and Ollama that keep provider-private request/response translation inside the adapter boundary.
+- Added an explicit `LLMProviderTransport` seam plus `LLMProviderAdapterFactory` so canonical provider configuration can produce inactive concrete adapters and optional registries without SDK integration or hidden runtime setup.
+- Kept generation-budget translation private to each adapter while preserving the canonical upstream request/response contract and leaving `ConversationManager`, `WorkflowEngine`, `PromptBuilderService`, and `LLMGenerationOrchestrator` unchanged.
+- Added focused backend tests covering concrete adapter request translation, response normalization, config-backed registry construction, and inactive transport enforcement.
+- Updated the LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the new inactive concrete adapter seam directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 6.5.5 inactive provider-neutral generation budget architecture for the LLM seam
 - Completed on: 2026-07-05
 
