@@ -7,9 +7,9 @@ an inactive runtime composition root, a runtime activation policy seam, an
 execution-policy and runtime-routing seam, a production-readiness operations
 seam, an inactive runtime facade, a policy-gated controlled-generation branch,
 a provider-neutral runtime-response validator, a provider-neutral runtime-
-response eligibility gate, and an inactive generation orchestrator. It is not
-wired into the current chat runtime, workflow engine, retrieval layer, or
-prompt builder.
+response eligibility gate, a provider-neutral runtime-response composer, and
+an inactive generation orchestrator. It is not wired into the current chat
+runtime, workflow engine, retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -40,6 +40,14 @@ from app.llm.composition import (
     LLMProviderTransportFactory,
     LLMRuntimeComposition,
     LLMRuntimeCompositionRoot,
+)
+from app.llm.composer import (
+    LLMRuntimeResponse,
+    LLMRuntimeResponseComposer,
+    LLMRuntimeResponseComposerRequest,
+    LLMRuntimeResponseComposerResult,
+    LLMRuntimeResponseCompositionIssue,
+    LLMRuntimeResponseCompositionStatus,
 )
 from app.llm.config import (
     LLMConfiguration,
@@ -264,6 +272,12 @@ __all__ = [
     "LLMRuntimeActivationResult",
     "LLMRuntimeActivationService",
     "LLMRuntimeActivationStatus",
+    "LLMRuntimeResponse",
+    "LLMRuntimeResponseComposer",
+    "LLMRuntimeResponseComposerRequest",
+    "LLMRuntimeResponseComposerResult",
+    "LLMRuntimeResponseCompositionIssue",
+    "LLMRuntimeResponseCompositionStatus",
     "LLMRuntimeResponseEligibilityEvaluator",
     "LLMRuntimeResponseEligibilityIssue",
     "LLMRuntimeResponseEligibilityRequest",

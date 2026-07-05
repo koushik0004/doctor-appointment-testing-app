@@ -127,6 +127,14 @@ Phase 7.6 extends that same facade with a provider-neutral runtime-response elig
 - workflow-owned requests and other non-approved scenarios remain deterministic after validation
 - the eligibility gate remains outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
 
+Phase 7.7 extends that same facade with a provider-neutral runtime-response composition branch:
+
+- the facade now owns the final runtime response envelope for deterministic-only, LLM-only, and hybrid modes
+- canonical composition preserves deterministic business truth and can append validated, eligible LLM guidance without replacing the business response
+- hybrid composition remains provider-neutral and uses only canonical orchestration, validation, and eligibility data
+- business fields such as booking identifiers, appointment identifiers, dates, times, fees, and workflow decisions remain untouched
+- the composer stays outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
+
 ## Package Structure
 
 ```txt
@@ -136,6 +144,7 @@ backend/app/llm/
 ├── activation.py
 ├── budget.py
 ├── composition.py
+├── composer.py
 ├── config.py
 ├── execution_policy.py
 ├── interfaces.py
@@ -267,6 +276,18 @@ Inactive runtime response eligibility seam:
 
 This module determines whether a validated runtime response is safe to expose to the user by applying a deterministic low-risk allowlist over canonical execution-policy and orchestration metadata.
 
+### `composer.py`
+
+Inactive runtime response composer seam:
+
+- `LLMRuntimeResponse`
+- `LLMRuntimeResponseComposerRequest`
+- `LLMRuntimeResponseComposerResult`
+- `LLMRuntimeResponseCompositionStatus`
+- `LLMRuntimeResponseComposer`
+
+This module composes the final runtime response envelope after validation and eligibility. It supports deterministic-only, LLM-only, and hybrid modes while preserving deterministic business truth, appending optional LLM guidance only when safe, and emitting deterministic composition diagnostics and fallback metadata.
+
 ### `budget.py`
 
 Inactive provider-neutral generation-budget seam:
@@ -361,6 +382,7 @@ Inactive runtime facade:
 The facade owns the composed inactive graph as a single public boundary for later runtime callers.
 It can capture a deterministic, save-ready snapshot of the integration boundary without changing runtime wiring or exposing provider-private state.
 Phase 7.2 also lets the facade evaluate the existing execution policy, trigger best-effort shadow-mode orchestration through the existing Prompt Builder and generation orchestrator, record provider-neutral diagnostics, and discard all generated LLM output so the official chatbot response stays unchanged.
+Phase 7.7 adds a final-response composition branch on that same facade so deterministic-only, LLM-only, and hybrid runtime responses can preserve business truth while optionally appending validated and eligible LLM guidance.
 
 ### `orchestrator.py`
 

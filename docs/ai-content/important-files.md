@@ -69,7 +69,7 @@
 - `backend/app/services/prompt_builder.py`
   - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; Phase 7.3 now renders workflow context into the final prompt used by shadow LLM execution while keeping retrieval, routing, workflow execution, API calls, database access, and AI reasoning out of this module.
 - `backend/app/llm/__init__.py`
-  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime activation, execution-policy, operational-readiness, validation, eligibility, composition seams, and the facade entrypoints for shadow execution plus policy-gated controlled generation.
+  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime activation, execution-policy, operational-readiness, validation, eligibility, composition, response-composition, and facade entrypoints for shadow execution plus policy-gated controlled generation.
 - `backend/app/llm/activation.py`
   - Inactive runtime activation seam that evaluates top-level feature flags plus provider readiness, emits canonical diagnostics, and safely reports invalid configuration or dependency-assembly failures without changing routing.
 - `backend/app/llm/execution_policy.py`
@@ -81,7 +81,7 @@
 - `backend/app/llm/composition.py`
   - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams.
 - `backend/app/llm/facade.py`
-  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes a policy-gated controlled-generation path with provider-neutral runtime-response validation and eligibility gates that reuse the existing execution policy, Prompt Builder, and orchestrator without changing default deterministic behavior.
+  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, and final-response composition gates that reuse the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
 - `backend/app/llm/config.py`
   - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical runtime-activation flags, provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, configuration-backed generation-budget profiles, and frozen resolved configuration models without runtime wiring.
 - `backend/app/llm/providers.py`
@@ -96,6 +96,8 @@
   - Provider-neutral runtime-response validation seam that inspects canonical orchestration results for empty or whitespace content, malformed structured output, invalid finish reasons, and invalid canonical metadata before controlled generation can become visible.
 - `backend/app/llm/eligibility.py`
   - Provider-neutral runtime-response eligibility seam that allows only explicitly approved low-risk conversational responses to become user-visible after validation.
+- `backend/app/llm/composer.py`
+  - Provider-neutral runtime-response composer seam that combines deterministic business output with validated and eligible LLM guidance while preserving business truth and deterministic diagnostics.
 - `backend/app/llm/interfaces.py`
   - Provider translator, adapter, and provider-registry protocols for future adapter implementations.
 - `backend/app/llm/registry.py`
@@ -177,7 +179,9 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_llm_composition.py`
   - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, operational-readiness assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
 - `backend/tests/test_llm_facade.py`
-  - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, Prompt Builder backed shadow prompt delivery, policy-gated controlled generation, runtime-response validation fallback, runtime-response eligibility fallback, deterministic fallback behavior, and deterministic serialization of the facade view.
+  - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, Prompt Builder backed shadow prompt delivery, policy-gated controlled generation, runtime-response validation fallback, runtime-response eligibility fallback, deterministic-only composition, hybrid final-response composition, deterministic fallback behavior, and deterministic serialization of the facade view.
+- `backend/tests/test_llm_composer.py`
+  - Covers the provider-neutral runtime-response composer: deterministic-only composition, LLM-only composition, hybrid composition, business-field preservation, augmentation placement, validation and eligibility compatibility, deterministic fallback, and serialization determinism.
 - `backend/tests/test_llm_validation.py`
   - Covers the provider-neutral runtime-response validator: valid response acceptance, empty and whitespace rejection, malformed structured-output rejection, invalid finish reasons, metadata diagnostics, and deterministic validation results.
 - `backend/tests/test_llm_eligibility.py`
@@ -214,6 +218,8 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-llm-e2e-pipeline.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-controlled-runtime-generation.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-runtime-response-validation.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-controlled-user-visible-llm-responses.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-hybrid-response-strategy.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`

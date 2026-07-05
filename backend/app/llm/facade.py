@@ -15,6 +15,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.knowledge import KnowledgeDocument
 from app.llm.activation import LLMRuntimeActivationStatus
 from app.llm.composition import LLMRuntimeComposition, LLMRuntimeCompositionRoot
+from app.llm.composer import (
+    LLMRuntimeResponse,
+    LLMRuntimeResponseComposer,
+    LLMRuntimeResponseComposerRequest,
+    LLMRuntimeResponseComposerResult,
+)
 from app.llm.execution_policy import (
     AIExecutionDecision,
     AIExecutionMode,
@@ -125,6 +131,7 @@ class LLMControlledGenerationRequest(BaseModel):
     policy_request: AIExecutionPolicyRequest = Field(
         default_factory=AIExecutionPolicyRequest
     )
+    deterministic_response: LLMRuntimeResponse | None = None
     orchestration_request: LLMGenerationOrchestrationRequest
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -138,6 +145,8 @@ class LLMControlledGenerationResult(BaseModel):
     generated_result: LLMGenerationOrchestrationResult | None = None
     validation_result: LLMRuntimeResponseValidationResult | None = None
     eligibility_result: LLMRuntimeResponseEligibilityResult | None = None
+    composition_result: LLMRuntimeResponseComposerResult | None = None
+    final_response: LLMRuntimeResponse | None = None
     fallback_reason: str | None = None
     error_message: str | None = None
     error_type: str | None = None
@@ -175,6 +184,7 @@ class LLMRuntimeFacade:
         shadow_execution_runner: LLMShadowExecutionRunner | None = None,
         runtime_response_validator: LLMRuntimeResponseValidator | None = None,
         runtime_response_eligibility_evaluator: LLMRuntimeResponseEligibilityEvaluator | None = None,
+        runtime_response_composer: LLMRuntimeResponseComposer | None = None,
         shadow_history_limit: int = 100,
     ) -> None:
         self._composition_root = composition_root
@@ -192,6 +202,11 @@ class LLMRuntimeFacade:
             runtime_response_eligibility_evaluator
             if runtime_response_eligibility_evaluator is not None
             else LLMRuntimeResponseEligibilityEvaluator()
+        )
+        self._runtime_response_composer = (
+            runtime_response_composer
+            if runtime_response_composer is not None
+            else LLMRuntimeResponseComposer()
         )
         self._shadow_history: deque[LLMShadowModeDiagnostic] = deque(
             maxlen=shadow_history_limit
@@ -260,6 +275,40 @@ class LLMRuntimeFacade:
         request: LLMControlledGenerationRequest,
     ) -> LLMControlledGenerationResult:
         decision = self._evaluate_controlled_generation_decision(request.policy_request)
+        if decision.execution_mode is AIExecutionMode.DETERMINISTIC_ONLY:
+            if request.deterministic_response is None:
+                return LLMControlledGenerationResult(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    decision=decision,
+                    status=LLMControlledGenerationStatus.SKIPPED,
+                    fallback_reason=(
+                        "Deterministic-only controlled generation had no business "
+                        "response to preserve."
+                    ),
+                )
+
+            composition_result = self._runtime_response_composer.compose(
+                LLMRuntimeResponseComposerRequest(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    composition_mode=AIExecutionMode.DETERMINISTIC_ONLY,
+                    deterministic_response=request.deterministic_response,
+                    metadata={
+                        "parent_execution_id": request.parent_execution_id,
+                        **deepcopy(request.orchestration_request.metadata),
+                    },
+                )
+            )
+            return LLMControlledGenerationResult(
+                request_id=request.request_id,
+                correlation_id=request.correlation_id,
+                decision=decision,
+                status=LLMControlledGenerationStatus.SUCCEEDED,
+                composition_result=composition_result,
+                final_response=composition_result.final_response,
+            )
+
         if not self._can_execute_controlled_generation(decision):
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
@@ -312,6 +361,24 @@ class LLMRuntimeFacade:
                 )
             )
             if not eligibility_result.is_eligible:
+                composition_result = None
+                final_response = None
+                if request.deterministic_response is not None:
+                    composition_result = self._runtime_response_composer.compose(
+                        LLMRuntimeResponseComposerRequest(
+                            request_id=request.request_id,
+                            correlation_id=request.correlation_id,
+                            composition_mode=AIExecutionMode.DETERMINISTIC_ONLY,
+                            deterministic_response=request.deterministic_response,
+                            validation_result=validation_result,
+                            eligibility_result=eligibility_result,
+                            metadata={
+                                "parent_execution_id": request.parent_execution_id,
+                                **deepcopy(request.orchestration_request.metadata),
+                            },
+                        )
+                    )
+                    final_response = composition_result.final_response
                 return LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
@@ -319,8 +386,25 @@ class LLMRuntimeFacade:
                     status=LLMControlledGenerationStatus.SKIPPED,
                     validation_result=validation_result,
                     eligibility_result=eligibility_result,
+                    composition_result=composition_result,
+                    final_response=final_response,
                     fallback_reason=eligibility_result.fallback_reason,
                 )
+            composition_result = self._runtime_response_composer.compose(
+                LLMRuntimeResponseComposerRequest(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    composition_mode=decision.execution_mode,
+                    deterministic_response=request.deterministic_response,
+                    validation_result=validation_result,
+                    eligibility_result=eligibility_result,
+                    orchestration_result=generated_result,
+                    metadata={
+                        "parent_execution_id": request.parent_execution_id,
+                        **deepcopy(request.orchestration_request.metadata),
+                    },
+                )
+            )
         except Exception as exc:
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
@@ -343,6 +427,8 @@ class LLMRuntimeFacade:
             generated_result=generated_result,
             validation_result=validation_result,
             eligibility_result=eligibility_result,
+            composition_result=composition_result,
+            final_response=composition_result.final_response,
         )
 
     def list_shadow_diagnostics(self) -> list[LLMShadowModeDiagnostic]:

@@ -15,6 +15,7 @@ from app.llm import (
     LLMRuntimeCompositionRoot,
     LLMRuntimeFacade,
     LLMRuntimeFacadeSnapshot,
+    LLMRuntimeResponse,
     LLMGenerationOrchestrationRequest,
     LLMRuntimeResponseEligibilityStatus,
     LLMRuntimeResponseValidationStatus,
@@ -164,6 +165,17 @@ def test_runtime_facade_runs_controlled_generation_when_policy_and_activation_al
 
     result = facade.run_controlled_generation(
         LLMControlledGenerationRequest(
+            deterministic_response=LLMRuntimeResponse(
+                message="Your appointment is confirmed for July 10 at 9:30 AM.",
+                data={
+                    "booking_id": "BK-2001",
+                    "appointment_id": 101,
+                    "doctor_name": "Dr. Smith",
+                    "appointment_date": "2026-07-10",
+                    "start_time": "09:30",
+                },
+                metadata={"source": "workflow"},
+            ),
             policy_request=AIExecutionPolicyRequest(
                 preferred_mode=AIExecutionMode.HYBRID,
             ),
@@ -192,9 +204,18 @@ def test_runtime_facade_runs_controlled_generation_when_policy_and_activation_al
     assert result.validation_result.status is LLMRuntimeResponseValidationStatus.VALID
     assert result.eligibility_result is not None
     assert result.eligibility_result.status is LLMRuntimeResponseEligibilityStatus.ELIGIBLE
+    assert result.composition_result is not None
+    assert result.composition_result.augmentation_applied is True
+    assert result.final_response is not None
     assert result.generated_result.provider_name == "openai"
     assert result.generated_result.prompt is not None
     assert "[Workflow State]" in result.generated_result.prompt
+    assert result.final_response.message.startswith(
+        "Your appointment is confirmed for July 10 at 9:30 AM."
+    )
+    assert "Additional guidance:" in result.final_response.message
+    assert result.final_response.data["booking_id"] == "BK-2001"
+    assert result.final_response.data["appointment_id"] == 101
     assert len(prompt_builder.calls) == 1
     assert len(transport.calls) == 1
     prompt_payload = transport.calls[0]["messages"][0]["content"]
@@ -236,6 +257,7 @@ def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled(
     assert result.status is LLMControlledGenerationStatus.SKIPPED
     assert result.generated_result is None
     assert result.fallback_reason is not None
+    assert result.final_response is None
     assert len(prompt_builder.calls) == 0
     assert len(transport.calls) == 0
 
@@ -287,6 +309,7 @@ def test_runtime_facade_skips_controlled_generation_when_runtime_response_is_not
     assert result.eligibility_result is not None
     assert result.eligibility_result.is_eligible is False
     assert result.eligibility_result.status is LLMRuntimeResponseEligibilityStatus.INELIGIBLE
+    assert result.final_response is None
     assert any(
         issue.code == "non_eligible_intent"
         for issue in result.eligibility_result.issues
@@ -321,6 +344,7 @@ def test_runtime_facade_falls_back_when_controlled_generation_fails():
     assert result.generated_result is None
     assert result.error_message is not None
     assert result.error_type == "RuntimeError"
+    assert result.final_response is None
 
 
 def test_runtime_facade_falls_back_when_controlled_generation_validation_fails():
@@ -377,6 +401,7 @@ def test_runtime_facade_falls_back_when_controlled_generation_validation_fails()
         for issue in result.validation_result.issues
     )
     assert result.eligibility_result is None
+    assert result.final_response is None
     assert result.fallback_reason is not None
 
 
@@ -411,8 +436,46 @@ def test_runtime_facade_keeps_deterministic_compatibility_for_non_llm_policies()
 
     assert result.status is LLMControlledGenerationStatus.SKIPPED
     assert result.generated_result is None
+    assert result.final_response is None
     assert len(prompt_builder.calls) == 0
     assert len(transport.calls) == 0
+
+
+def test_runtime_facade_returns_deterministic_only_composition_when_policy_requires_it():
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=PromptBuilderService(),
+            configuration_settings=_base_settings(allow_generation=True),
+            transport_factory=StaticTransportFactory({"openai": StaticTransport({})}),
+        )
+    )
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            deterministic_response=LLMRuntimeResponse(
+                message="Your appointment is confirmed for July 11 at 10:00 AM.",
+                data={
+                    "booking_id": "BK-3001",
+                    "appointment_id": 202,
+                },
+            ),
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.DETERMINISTIC_ONLY,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="Keep this deterministic.",
+                provider_name="openai",
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.SUCCEEDED
+    assert result.generated_result is None
+    assert result.composition_result is not None
+    assert result.composition_result.augmentation_applied is False
+    assert result.final_response is not None
+    assert result.final_response.message == "Your appointment is confirmed for July 11 at 10:00 AM."
+    assert result.final_response.data["booking_id"] == "BK-3001"
 
 
 def test_runtime_facade_executes_shadow_mode_and_captures_diagnostics():
