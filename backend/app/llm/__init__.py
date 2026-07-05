@@ -65,7 +65,17 @@ from app.llm.execution_policy import (
     AIExecutionPolicyResult,
     AIExecutionPolicyService,
 )
-from app.llm.facade import LLMRuntimeFacade, LLMRuntimeFacadeSnapshot
+from app.llm.facade import (
+    InlineLLMShadowExecutionRunner,
+    LLMRuntimeFacade,
+    LLMRuntimeFacadeSnapshot,
+    LLMShadowExecutionRunner,
+    LLMShadowModeDiagnostic,
+    LLMShadowModeDispatchResult,
+    LLMShadowModeRequest,
+    LLMShadowModeStatus,
+    ThreadedLLMShadowExecutionRunner,
+)
 from app.llm.interfaces import (
     LLMProvider,
     LLMProviderRegistry,
@@ -159,6 +169,7 @@ __all__ = [
     "ConfigurableLLMProviderAdapter",
     "GeminiProviderAdapter",
     "InactiveLLMProviderTransportFactory",
+    "InlineLLMShadowExecutionRunner",
     "LLMActivationDiagnostic",
     "LLMActivationSeverity",
     "LLMConfiguration",
@@ -235,6 +246,11 @@ __all__ = [
     "LLMRuntimeCompositionRoot",
     "LLMRuntimeFacade",
     "LLMRuntimeFacadeSnapshot",
+    "LLMShadowExecutionRunner",
+    "LLMShadowModeDiagnostic",
+    "LLMShadowModeDispatchResult",
+    "LLMShadowModeRequest",
+    "LLMShadowModeStatus",
     "LLMRuntimeFeatureFlags",
     "LLMSecurityPrivacyPolicy",
     "LLMStreamingMetadata",
@@ -250,6 +266,7 @@ __all__ = [
     "LLMToolChoice",
     "LLMToolChoiceMode",
     "LLMToolDefinition",
+    "ThreadedLLMShadowExecutionRunner",
     "InMemoryLLMProviderRegistry",
     "OllamaProviderAdapter",
     "OpenAIProviderAdapter",

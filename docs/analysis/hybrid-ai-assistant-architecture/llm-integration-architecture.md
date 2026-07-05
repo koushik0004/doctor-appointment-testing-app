@@ -310,9 +310,13 @@ Inactive runtime facade:
 
 - `LLMRuntimeFacade`
 - `LLMRuntimeFacadeSnapshot`
+- `LLMShadowModeRequest`
+- `LLMShadowModeDiagnostic`
+- `LLMShadowModeDispatchResult`
 
 The facade owns the composed inactive graph as a single public boundary for later runtime callers.
 It can capture a deterministic, save-ready snapshot of the integration boundary without changing runtime wiring or exposing provider-private state.
+Phase 7.2 also lets the facade evaluate the existing execution policy, trigger best-effort shadow-mode orchestration through the existing Prompt Builder and generation orchestrator, record provider-neutral diagnostics, and discard all generated LLM output so the official chatbot response stays unchanged.
 
 ### `orchestrator.py`
 

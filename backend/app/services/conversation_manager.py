@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.knowledge import KnowledgeRetrievalMatch, KnowledgeRetrievalService
+from app.llm import AIExecutionOwner, LLMRuntimeFacade, LLMShadowModeRequest
 from app.schemas.chat import (
     ChatConversationContext,
     ChatConversationHistoryMessage,
@@ -232,10 +233,12 @@ class ConversationManager:
         *,
         deterministic_engine: DeterministicChatEngine,
         knowledge_retrieval_service: KnowledgeRetrievalService | None = None,
+        llm_runtime_facade: LLMRuntimeFacade | None = None,
     ) -> None:
         self._session = session
         self._deterministic_engine = deterministic_engine
         self._knowledge_retrieval_service = knowledge_retrieval_service
+        self._llm_runtime_facade = llm_runtime_facade
         self._workflow_engine = WorkflowEngine(session)
 
     def _resolve_route(self, response: ChatResponse) -> ChatRoutingTarget:
@@ -249,6 +252,60 @@ class ConversationManager:
         if self._knowledge_retrieval_service is None or _has_active_workflow(base_context.current_workflow):
             return None
         return self._knowledge_retrieval_service.retrieve_top_match(message)
+
+    def _run_shadow_mode(
+        self,
+        *,
+        request: ChatRequest,
+        response: ChatResponse,
+        resolved_filters: ChatSearchFilters | None,
+        intent_match: ChatIntentMatch,
+        knowledge_match: KnowledgeRetrievalMatch | None,
+    ) -> None:
+        if self._llm_runtime_facade is None or response.conversation is None:
+            return
+
+        conversation_history = (
+            [item.model_dump(mode="json") for item in request.conversation.history]
+            if request.conversation is not None
+            else []
+        )
+        conversation_state = {
+            "conversation_id": response.conversation.conversation_id,
+            "context": response.conversation.model_dump(mode="json"),
+            "history": conversation_history,
+        }
+        if resolved_filters is not None:
+            conversation_state["active_filters"] = resolved_filters.model_dump(mode="json")
+
+        try:
+            self._llm_runtime_facade.run_shadow_mode(
+                LLMShadowModeRequest(
+                    correlation_id=response.conversation.conversation_id,
+                    user_message=request.message,
+                    official_response_owner=(
+                        AIExecutionOwner.WORKFLOW
+                        if response.workflow is not None
+                        else (
+                            AIExecutionOwner.KNOWLEDGE
+                            if response.knowledge_source is not None
+                            else AIExecutionOwner.DETERMINISTIC
+                        )
+                    ),
+                    official_intent_name=response.intent.value,
+                    has_active_workflow=_has_active_workflow(response.conversation.current_workflow),
+                    knowledge_eligible=_should_use_knowledge_response(intent_match),
+                    knowledge_match_available=knowledge_match is not None,
+                    conversation_state=conversation_state,
+                    documents=[knowledge_match.document] if knowledge_match is not None else [],
+                    metadata={
+                        "routed_to": response.conversation.routed_to.value,
+                        "knowledge_used": response.knowledge_source is not None,
+                    },
+                )
+            )
+        except Exception:
+            return
 
     def handle(self, request: ChatRequest) -> ChatResponse:
         base_context = _build_context_from_request(request.conversation)
@@ -301,5 +358,12 @@ class ConversationManager:
             last_assistant_message=response.message,
             routed_to=routed_to,
             current_workflow=next_workflow,
+        )
+        self._run_shadow_mode(
+            request=request,
+            response=response,
+            resolved_filters=resolved_filters,
+            intent_match=intent_match,
+            knowledge_match=knowledge_match,
         )
         return response

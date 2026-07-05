@@ -118,6 +118,7 @@
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
+  - Triggers the inactive Phase 7.2 LLM runtime facade in hidden shadow mode after the official response is chosen, captures diagnostics only, and discards all LLM output without changing any frontend-visible chat behavior.
   - Contains an inactive provider-neutral LLM seam with canonical models, generation-budget profiles, concrete provider adapters, a single runtime composition root that assembles configuration, transports, adapters, registry, integration service, orchestrator, execution-policy service, and operational-readiness service, plus a runtime activation layer that evaluates feature-flag and provider-readiness diagnostics while remaining fully disconnected from the live chat runtime.
   - Adds an inactive runtime facade that wraps the composed LLM subsystem and captures a deterministic, save-ready integration snapshot without changing chat routing or provider execution.
   - Accepts direct booking-entry prompts that mention a doctor plus incremental follow-up fields, including explicit day-month-year dates and labeled patient details in structured messages.

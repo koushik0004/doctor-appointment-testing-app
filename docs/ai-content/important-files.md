@@ -63,7 +63,7 @@
 - `backend/app/api/chat.py`
   - Chat endpoints for `/api/chat` and `/api/v1/chat`; expected workflow/business errors should pass through while only unexpected chat failures become HTTP 500 responses.
 - `backend/app/services/conversation_manager.py`
-  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, and uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns.
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns, and now triggers best-effort hidden shadow execution through the runtime facade after the official response is finalized.
 - `backend/app/services/workflow_engine.py`
   - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file.
 - `backend/app/services/prompt_builder.py`
@@ -81,7 +81,7 @@
 - `backend/app/llm/composition.py`
   - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams.
 - `backend/app/llm/facade.py`
-  - Inactive runtime facade that wraps the composed LLM graph and exposes a deterministic save-ready snapshot of the integration boundary without changing runtime wiring.
+  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, and now owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output.
 - `backend/app/llm/config.py`
   - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical runtime-activation flags, provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, configuration-backed generation-budget profiles, and frozen resolved configuration models without runtime wiring.
 - `backend/app/llm/providers.py`
@@ -107,7 +107,7 @@
 - `backend/app/services/appointment_search_service.py`
   - Appointment search behavior across patient and doctor joins.
 - `backend/app/services/chat_service.py`
-  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching and the knowledge-backed fallback composer.
+  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching, the knowledge-backed fallback composer, and the cached runtime-facade wiring used by `ConversationManager`.
 - `backend/app/services/chat_intent_detector.py`
   - Intent classification entry point for chat behavior, including doctor-profile/detail query routing.
 - `backend/app/services/chat_entity_extractor.py`
@@ -153,7 +153,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_knowledge_repository.py`
   - Covers Markdown/JSON loading, repository caching, exact filters, metadata-aware deterministic retrieval matching, and bundled FAQ retrieval expectations.
 - `backend/tests/test_conversation_manager.py`
-  - Covers routing order guarantees: workflow-first, knowledge-before-deterministic fallback, and active-workflow exclusion from retrieval.
+  - Covers routing order guarantees, active-workflow exclusion from retrieval, and the guarantee that `ConversationManager` can trigger shadow mode without changing the visible chat response and safely ignore shadow failures.
 - `backend/tests/test_chat_entity_extractor.py`
   - Covers search-filter extraction regressions, including the payment-method wording that must not infer a doctor-gender filter.
 - `backend/tests/test_prompt_builder_service.py`
@@ -173,7 +173,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_llm_composition.py`
   - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, operational-readiness assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
 - `backend/tests/test_llm_facade.py`
-  - Covers the inactive runtime facade seam: composition caching, save-ready boundary snapshots, and deterministic serialization of the facade view.
+  - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, and deterministic serialization of the facade view.
 - `backend/tests/test_llm_execution_policy.py`
   - Covers the inactive execution-policy seam: workflow ownership, knowledge ownership, deterministic default routing, shadow-mode routing, fallback routing, serialization, composed-policy access, and deterministic decision behavior.
 - `backend/tests/test_llm_operations.py`
@@ -202,6 +202,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-runtime-activation-feature-flags.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-execution-policy-runtime-routing.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-production-readiness-operational-excellence.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-shadow-mode-integration.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`
