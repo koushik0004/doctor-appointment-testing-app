@@ -3,16 +3,15 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 6.10 inactive production-readiness and operational-excellence architecture for the LLM seam
+- Task: implement Phase 7 inactive runtime facade and save-ready integration boundary for the LLM seam
 - Completed on: 2026-07-05
 
 ## Outcome
 
-- Added `backend/app/llm/operations.py` with canonical observability, trace, token-accounting, cost-accounting, health, retry, timeout, audit, privacy, rollout, and performance models plus a deterministic evaluator and safe composition-backed readiness service.
-- Updated `backend/app/llm/composition.py` so each composed inactive graph now also assembles the operational-readiness seam alongside the existing activation, execution-policy, registry, service, and orchestrator seams.
-- Preserved deterministic chat as the production path by keeping the new operational models architecture-only and fully disconnected from `ConversationManager`, live routing, provider SDK execution, and rollout behavior.
-- Added focused backend tests covering observability models, token accounting, cost accounting, retry validation, timeout validation, audit models, rollout-policy validation, composed readiness evaluation, and deterministic serialization.
-- Updated the operational-readiness architecture reference, the integration/composition references, the Phase 6 report set, and the compact AI context files so later sessions can discover the new seam directly.
+- Added `backend/app/llm/facade.py` with an inactive runtime facade and deterministic save-ready snapshot model for the composed LLM boundary.
+- Kept the facade architecture-only by wrapping the existing `LLMRuntimeCompositionRoot` without changing chat routing, provider execution, prompt building, or runtime activation.
+- Added focused backend tests covering facade composition caching, boundary snapshot generation, and deterministic serialization of the save-ready facade view.
+- Updated the LLM integration architecture reference, `backend/app/llm/__init__.py`, and the compact AI context files so later sessions can discover the new runtime facade directly.
 
 ## Prior Work
 

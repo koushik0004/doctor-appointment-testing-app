@@ -304,6 +304,16 @@ The facade exposes three narrow responsibilities:
 
 Phase 6.7 keeps the service constructor-only: it does not self-configure, auto-discover providers, lazily create a registry, or attach itself to runtime execution.
 
+### `facade.py`
+
+Inactive runtime facade:
+
+- `LLMRuntimeFacade`
+- `LLMRuntimeFacadeSnapshot`
+
+The facade owns the composed inactive graph as a single public boundary for later runtime callers.
+It can capture a deterministic, save-ready snapshot of the integration boundary without changing runtime wiring or exposing provider-private state.
+
 ### `orchestrator.py`
 
 Inactive coordination layer:

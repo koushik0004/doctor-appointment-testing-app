@@ -1,12 +1,13 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.10. It defines only
+This package is intentionally inactive in Phase 7. It defines only
 implementation-ready contracts for a future LLM adapter layer, provider-neutral
 configuration and generation-budget seams, explicit concrete provider adapters,
 an inactive runtime composition root, a runtime activation policy seam, an
 execution-policy and runtime-routing seam, a production-readiness operations
-seam, and an inactive generation orchestrator. It is not wired into the current
-chat runtime, workflow engine, retrieval layer, or prompt builder.
+seam, an inactive runtime facade, and an inactive generation orchestrator. It
+is not wired into the current chat runtime, workflow engine, retrieval layer,
+or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -64,6 +65,7 @@ from app.llm.execution_policy import (
     AIExecutionPolicyResult,
     AIExecutionPolicyService,
 )
+from app.llm.facade import LLMRuntimeFacade, LLMRuntimeFacadeSnapshot
 from app.llm.interfaces import (
     LLMProvider,
     LLMProviderRegistry,
@@ -231,6 +233,8 @@ __all__ = [
     "LLMRuntimeActivationStatus",
     "LLMRuntimeComposition",
     "LLMRuntimeCompositionRoot",
+    "LLMRuntimeFacade",
+    "LLMRuntimeFacadeSnapshot",
     "LLMRuntimeFeatureFlags",
     "LLMSecurityPrivacyPolicy",
     "LLMStreamingMetadata",

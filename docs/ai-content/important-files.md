@@ -80,6 +80,8 @@
   - Inactive provider-neutral generation-budget seam for future adapters; defines canonical generation profiles, token/latency/quality/cost controls, deterministic profile resolution, and now frozen resolved budget models without runtime wiring.
 - `backend/app/llm/composition.py`
   - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams.
+- `backend/app/llm/facade.py`
+  - Inactive runtime facade that wraps the composed LLM graph and exposes a deterministic save-ready snapshot of the integration boundary without changing runtime wiring.
 - `backend/app/llm/config.py`
   - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical runtime-activation flags, provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, configuration-backed generation-budget profiles, and frozen resolved configuration models without runtime wiring.
 - `backend/app/llm/providers.py`
@@ -170,6 +172,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the inactive runtime activation seam: feature-flag evaluation, deterministic readiness decisions, disabled providers, missing transports, invalid configuration, inactive mode, and successful activation state.
 - `backend/tests/test_llm_composition.py`
   - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, operational-readiness assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
+- `backend/tests/test_llm_facade.py`
+  - Covers the inactive runtime facade seam: composition caching, save-ready boundary snapshots, and deterministic serialization of the facade view.
 - `backend/tests/test_llm_execution_policy.py`
   - Covers the inactive execution-policy seam: workflow ownership, knowledge ownership, deterministic default routing, shadow-mode routing, fallback routing, serialization, composed-policy access, and deterministic decision behavior.
 - `backend/tests/test_llm_operations.py`

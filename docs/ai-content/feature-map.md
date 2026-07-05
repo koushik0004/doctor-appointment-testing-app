@@ -119,6 +119,7 @@
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
   - Contains an inactive provider-neutral LLM seam with canonical models, generation-budget profiles, concrete provider adapters, a single runtime composition root that assembles configuration, transports, adapters, registry, integration service, orchestrator, execution-policy service, and operational-readiness service, plus a runtime activation layer that evaluates feature-flag and provider-readiness diagnostics while remaining fully disconnected from the live chat runtime.
+  - Adds an inactive runtime facade that wraps the composed LLM subsystem and captures a deterministic, save-ready integration snapshot without changing chat routing or provider execution.
   - Accepts direct booking-entry prompts that mention a doctor plus incremental follow-up fields, including explicit day-month-year dates and labeled patient details in structured messages.
   - Consults the knowledge retrieval service only when no workflow is active and uses the retrieved document before the legacy deterministic fallback for FAQ-style non-workflow turns.
   - Returns optional `knowledge_source` metadata on knowledge-backed replies so downstream UI mapping can show the retrieved document source.
@@ -134,6 +135,7 @@
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
   - Knowledge retrieval is still backend-only and deterministic; it is not used by the inactive Prompt Builder seam, the inactive LLM Integration seam or its inactive provider registry, embeddings, or a vector database, and it remains inactive while a workflow is running.
+  - The new runtime facade is still architecture-only; it does not persist state or alter assistant routing, and it only exposes a save-ready snapshot of the existing inactive LLM boundary.
 
 ## Platform / Cross-Cutting Features
 
