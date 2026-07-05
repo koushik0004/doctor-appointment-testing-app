@@ -7,6 +7,16 @@ workflow engine, retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
+from app.llm.config import (
+    LLMConfiguration,
+    LLMConfigurationLoader,
+    LLMConfigurationSettings,
+    LLMProviderConfiguration,
+    LLMProviderEnvironmentSettings,
+    LLMProviderFeatureFlags,
+    LLMProviderName,
+    get_llm_configuration,
+)
 from app.llm.interfaces import (
     LLMProvider,
     LLMProviderRegistry,
@@ -47,6 +57,9 @@ from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
 
 __all__ = [
     "BaseLLMProviderAdapter",
+    "LLMConfiguration",
+    "LLMConfigurationLoader",
+    "LLMConfigurationSettings",
     "LLMCitation",
     "LLMFinishReason",
     "LLMGenerationConstraints",
@@ -60,8 +73,12 @@ __all__ = [
     "LLMMessage",
     "LLMMessageRole",
     "LLMProvider",
+    "LLMProviderConfiguration",
     "LLMProviderCapabilities",
     "LLMProviderDescriptor",
+    "LLMProviderEnvironmentSettings",
+    "LLMProviderFeatureFlags",
+    "LLMProviderName",
     "LLMProviderRegistry",
     "LLMReasoningConfig",
     "LLMReasoningEffort",
@@ -79,4 +96,5 @@ __all__ = [
     "LLMToolChoiceMode",
     "LLMToolDefinition",
     "InMemoryLLMProviderRegistry",
+    "get_llm_configuration",
 ]

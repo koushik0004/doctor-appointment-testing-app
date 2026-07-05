@@ -35,6 +35,13 @@ Phase 6.4 adds an inactive orchestration layer with:
 - deterministic transformation from `PromptBuildResult` into `LLMGenerationRequest`
 - deterministic normalization from `LLMGenerationResponse` into a simple orchestration result
 
+Phase 6.5 adds an inactive configuration layer with:
+
+- canonical provider-neutral configuration models for OpenAI, Claude, Gemini, OpenRouter, Ollama, and future providers
+- deterministic nested environment mapping into canonical configuration
+- explicit validation for provider selection, provider enablement, model requirements, and API-key requirements
+- `.env.example` documentation without any runtime instantiation or SDK wiring
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -52,6 +59,7 @@ No production request path imports or invokes this package.
 backend/app/llm/
 ├── __init__.py
 ├── adapters.py
+├── config.py
 ├── interfaces.py
 ├── models.py
 ├── orchestrator.py
@@ -109,6 +117,20 @@ Future provider adapters can subclass this base to:
 
 This keeps provider-specific payload handling inside the adapter boundary instead of exposing it to callers.
 
+### `config.py`
+
+Inactive provider-neutral configuration layer:
+
+- `LLMProviderName`
+- `LLMProviderFeatureFlags`
+- `LLMProviderEnvironmentSettings`
+- `LLMProviderConfiguration`
+- `LLMConfiguration`
+- `LLMConfigurationSettings`
+- `LLMConfigurationLoader`
+
+This module keeps future provider selection, default-model selection, API keys, base URLs, timeout settings, retry settings, and descriptive feature flags inside a declarative configuration seam that remains disconnected from runtime execution in this phase.
+
 ### `registry.py`
 
 Inactive explicit registry implementation:
@@ -157,6 +179,7 @@ It does not:
 This layer must not:
 
 - import or initialize any external LLM SDK
+- instantiate provider clients from configuration in this phase
 - expose provider-native payload shapes to upstream callers
 - encode OpenAI, Claude, Gemini, Bedrock, Vertex, Ollama, or other provider request/response schemas into canonical models
 - load prompt context directly from files or repositories
@@ -200,9 +223,10 @@ Later phases may connect this layer in a guarded way:
 2. Keep provider-native request and response payloads private to those adapters.
 3. Register them behind an explicit `LLMProviderRegistry`.
 4. Optionally declare a default provider through configuration-owned registry setup.
-5. Keep `LLMGenerationOrchestrator` as the narrow caller that passes already-collected generation input through `PromptBuilderService` and then into `LLMIntegrationService`.
-6. Keep deterministic post-processing and business validation outside the LLM layer.
-7. Preserve existing chat response contracts unless a later migration explicitly changes them.
+5. Keep configuration loading separate from adapter instantiation until a later guarded runtime phase.
+6. Keep `LLMGenerationOrchestrator` as the narrow caller that passes already-collected generation input through `PromptBuilderService` and then into `LLMIntegrationService`.
+7. Keep deterministic post-processing and business validation outside the LLM layer.
+8. Preserve existing chat response contracts unless a later migration explicitly changes them.
 
 ## Provider Abstraction Rules
 
@@ -229,10 +253,11 @@ Focused tests now validate:
 - optional structured-output, tool, reasoning, streaming, citation, and modality fields remain provider-neutral and optional
 - orchestration order stays deterministic across Prompt Builder, canonical request mapping, LLM service delegation, and normalized result shaping
 - the default orchestrator remains inactive without explicit registry-backed LLM service setup
+- deterministic configuration loading, nested environment mapping, default propagation, provider validation, and backward-compatible inactive defaults
 
 ## Compatibility Guarantees
 
-Phase 6.4 preserves:
+Phase 6.5 preserves:
 
 - zero production behavior changes
 - zero API changes
@@ -242,15 +267,19 @@ Phase 6.4 preserves:
 - zero changes to workflow ownership
 - zero changes to prompt-builder behavior
 - zero runtime wiring of the new orchestrator
+- zero runtime wiring of the new configuration layer
 
 ## Reference Files
 
 - `backend/app/llm/__init__.py`
 - `backend/app/llm/adapters.py`
+- `backend/app/llm/config.py`
 - `backend/app/llm/models.py`
 - `backend/app/llm/interfaces.py`
 - `backend/app/llm/orchestrator.py`
 - `backend/app/llm/registry.py`
 - `backend/app/llm/service.py`
+- `.env.example`
+- `backend/tests/test_llm_config.py`
 - `backend/tests/test_llm_integration.py`
 - `backend/tests/test_llm_orchestrator.py`

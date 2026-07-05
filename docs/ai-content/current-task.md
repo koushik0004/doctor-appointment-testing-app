@@ -3,6 +3,19 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 6.5 inactive provider configuration architecture for the provider-neutral LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added an inactive `backend/app/llm/config.py` layer with canonical provider-neutral configuration models, provider enums, feature-flag models, explicit validation rules, and a deterministic loader over nested environment-backed settings.
+- Added root `.env.example` documentation for global and provider-specific LLM configuration variables covering OpenAI, Claude, Gemini, OpenRouter, and Ollama without wiring any SDK or runtime execution path.
+- Added focused backend tests covering deterministic config loading, missing optional keys, missing required keys, selected-provider validation, default propagation, nested environment mapping, and backward-compatible inactive defaults.
+- Updated the LLM integration architecture reference, Phase 6 report set, and compact AI context files so future sessions can discover the new inactive configuration seam directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 6.4 inactive LLM generation orchestrator for the provider-neutral LLM seam
 - Completed on: 2026-07-04
 

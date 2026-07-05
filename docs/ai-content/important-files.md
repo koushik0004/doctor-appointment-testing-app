@@ -70,6 +70,8 @@
   - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; it does not do retrieval, routing, workflow execution, API calls, database access, or AI reasoning.
 - `backend/app/llm/__init__.py`
   - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts and the disconnected integration facade.
+- `backend/app/llm/config.py`
+  - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical provider settings, nested environment-backed loading, validation rules, deterministic defaults, and feature-flag metadata without runtime wiring.
 - `backend/app/llm/adapters.py`
   - Shared inactive base adapter pipeline for future provider-specific request/response translation and private provider invocation.
 - `backend/app/llm/models.py`
@@ -148,6 +150,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the refined canonical LLM contract: model validation, backward-compatible defaults, deterministic serialization, optional future-capability fields, and provider-neutral extensibility.
 - `backend/tests/test_llm_orchestrator.py`
   - Covers the inactive LLM generation orchestrator: orchestration order, Prompt Builder delegation, canonical request transformation, normalized result shaping, deterministic behavior, inactive-by-default runtime status, and no caller-input mutation.
+- `backend/tests/test_llm_config.py`
+  - Covers the inactive LLM configuration seam: deterministic loading, nested environment mapping, provider validation, default propagation, required-key enforcement for enabled providers, and backward-compatible inactive defaults.
 
 ## High-Value Docs
 
@@ -159,6 +163,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-abstraction.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-canonical-llm-contract.md`
 - `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-generation-orchestration.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-06-provider-configuration.md`
 - `docs/project-context.md`
 - `docs/frontend-spec.md`
 - `docs/backend-spec.md`
@@ -169,3 +174,5 @@ These files define the persistence and API contracts. Any API change should be c
   - Manual QA checklist for the Vector-less RAG prototype, including positive, negative, edge, regression, workflow, and existing chatbot coverage.
 - `docs/reports/test-data-report.md`
   - Latest manual-test data execution report with row counts, inserted demo bookings, duplicate handling, and validation notes.
+- `.env.example`
+  - Documents app-level and inactive Phase 6.5 LLM configuration environment variables, including provider selection, provider enablement, default models, API keys, base URLs, timeout/retry defaults, and feature-flag env mapping.
