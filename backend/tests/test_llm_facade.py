@@ -18,6 +18,7 @@ from app.llm import (
     LLMRuntimeResponse,
     LLMGenerationOrchestrationRequest,
     LLMRuntimeResponseEligibilityStatus,
+    LLMRuntimeResponsePostProcessingStatus,
     LLMRuntimeResponseValidationStatus,
     LLMShadowModeRequest,
     LLMShadowModeStatus,
@@ -476,6 +477,57 @@ def test_runtime_facade_returns_deterministic_only_composition_when_policy_requi
     assert result.final_response is not None
     assert result.final_response.message == "Your appointment is confirmed for July 11 at 10:00 AM."
     assert result.final_response.data["booking_id"] == "BK-3001"
+
+
+def test_runtime_facade_post_processes_final_responses_before_returning_them():
+    facade = LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=PromptBuilderService(),
+            configuration_settings=_base_settings(allow_generation=True),
+            transport_factory=StaticTransportFactory({"openai": StaticTransport({})}),
+        )
+    )
+
+    result = facade.run_controlled_generation(
+        LLMControlledGenerationRequest(
+            deterministic_response=LLMRuntimeResponse(
+                message="  Confirmed.  \r\n\r\n##Heading",
+                data={
+                    "booking_id": "BK-3002",
+                    "appointment_id": 303,
+                    "doctor_name": "Dr. Mehta",
+                },
+                metadata={
+                    "source": "workflow",
+                    "presentation_metadata": {"ui": "card"},
+                },
+            ),
+            policy_request=AIExecutionPolicyRequest(
+                preferred_mode=AIExecutionMode.DETERMINISTIC_ONLY,
+            ),
+            orchestration_request=LLMGenerationOrchestrationRequest(
+                user_message="Keep this deterministic.",
+                provider_name="openai",
+            ),
+        )
+    )
+
+    assert result.status is LLMControlledGenerationStatus.SUCCEEDED
+    assert result.post_processing_result is not None
+    assert result.post_processing_result.status is (
+        LLMRuntimeResponsePostProcessingStatus.PROCESSED
+    )
+    assert result.final_response is not None
+    assert result.final_response.message == "Confirmed.\n\n## Heading"
+    assert result.final_response.data == {
+        "booking_id": "BK-3002",
+        "appointment_id": 303,
+        "doctor_name": "Dr. Mehta",
+    }
+    assert "presentation_metadata" not in result.final_response.metadata
+    assert result.final_response.metadata["runtime_response_post_processing"][
+        "composition_mode"
+    ] == "DETERMINISTIC_ONLY"
 
 
 def test_runtime_facade_executes_shadow_mode_and_captures_diagnostics():

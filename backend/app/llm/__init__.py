@@ -7,9 +7,10 @@ an inactive runtime composition root, a runtime activation policy seam, an
 execution-policy and runtime-routing seam, a production-readiness operations
 seam, an inactive runtime facade, a policy-gated controlled-generation branch,
 a provider-neutral runtime-response validator, a provider-neutral runtime-
-response eligibility gate, a provider-neutral runtime-response composer, and
-an inactive generation orchestrator. It is not wired into the current chat
-runtime, workflow engine, retrieval layer, or prompt builder.
+response eligibility gate, a provider-neutral runtime-response composer, a
+provider-neutral runtime-response post processor, and an inactive generation
+orchestrator. It is not wired into the current chat runtime, workflow engine,
+retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -95,6 +96,13 @@ from app.llm.facade import (
     LLMShadowModeRequest,
     LLMShadowModeStatus,
     ThreadedLLMShadowExecutionRunner,
+)
+from app.llm.post_processor import (
+    LLMRuntimeResponsePostProcessor,
+    LLMRuntimeResponsePostProcessingIssue,
+    LLMRuntimeResponsePostProcessingRequest,
+    LLMRuntimeResponsePostProcessingResult,
+    LLMRuntimeResponsePostProcessingStatus,
 )
 from app.llm.interfaces import (
     LLMProvider,
@@ -283,6 +291,11 @@ __all__ = [
     "LLMRuntimeResponseEligibilityRequest",
     "LLMRuntimeResponseEligibilityResult",
     "LLMRuntimeResponseEligibilityStatus",
+    "LLMRuntimeResponsePostProcessor",
+    "LLMRuntimeResponsePostProcessingIssue",
+    "LLMRuntimeResponsePostProcessingRequest",
+    "LLMRuntimeResponsePostProcessingResult",
+    "LLMRuntimeResponsePostProcessingStatus",
     "LLMRuntimeComposition",
     "LLMRuntimeCompositionRoot",
     "LLMRuntimeFacade",

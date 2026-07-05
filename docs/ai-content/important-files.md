@@ -82,6 +82,8 @@
   - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams.
 - `backend/app/llm/facade.py`
   - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, and final-response composition gates that reuse the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
+- `backend/app/llm/post_processor.py`
+  - Provider-neutral runtime-response post processor that normalizes presentation, sanitizes presentation-only metadata, and emits deterministic post-processing diagnostics before the final response is returned.
 - `backend/app/llm/config.py`
   - Inactive provider-neutral configuration seam for future LLM adapters and registries; defines canonical runtime-activation flags, provider settings, nested environment-backed loading, validation rules, deterministic defaults, feature-flag metadata, configuration-backed generation-budget profiles, and frozen resolved configuration models without runtime wiring.
 - `backend/app/llm/providers.py`
@@ -180,6 +182,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, operational-readiness assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
 - `backend/tests/test_llm_facade.py`
   - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, Prompt Builder backed shadow prompt delivery, policy-gated controlled generation, runtime-response validation fallback, runtime-response eligibility fallback, deterministic-only composition, hybrid final-response composition, deterministic fallback behavior, and deterministic serialization of the facade view.
+- `backend/tests/test_llm_post_processor.py`
+  - Covers the runtime-response post processor seam: whitespace normalization, duplicate newline removal, markdown normalization, metadata sanitization, deterministic business preservation, runtime-mode compatibility, and serialization determinism.
 - `backend/tests/test_llm_composer.py`
   - Covers the provider-neutral runtime-response composer: deterministic-only composition, LLM-only composition, hybrid composition, business-field preservation, augmentation placement, validation and eligibility compatibility, deterministic fallback, and serialization determinism.
 - `backend/tests/test_llm_validation.py`
@@ -198,6 +202,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `docs/architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
+- `docs/reports/feature-10/ai-impl-architecture-and-implementation/phase-07-runtime-response-post-processing.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-integration-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/llm-runtime-composition-architecture.md`

@@ -135,6 +135,14 @@ Phase 7.7 extends that same facade with a provider-neutral runtime-response comp
 - business fields such as booking identifiers, appointment identifiers, dates, times, fees, and workflow decisions remain untouched
 - the composer stays outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
 
+Phase 7.8 extends that same facade with a provider-neutral runtime-response post-processing branch:
+
+- the facade now applies a final presentation-only normalization pass before a runtime response becomes visible
+- canonical post-processing normalizes whitespace, line breaks, and supported markdown presentation while leaving business truth untouched
+- presentation-only metadata can be sanitized into separate post-processing diagnostics without altering workflow state, validation output, eligibility output, or orchestration metadata
+- deterministic business fields such as booking identifiers, appointment identifiers, doctor names, consultation fees, and workflow decisions remain untouched
+- the post processor stays outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, conversation orchestration, validation, and eligibility
+
 ## Package Structure
 
 ```txt
@@ -151,6 +159,7 @@ backend/app/llm/
 ├── models.py
 ├── operations.py
 ├── eligibility.py
+├── post_processor.py
 ├── orchestrator.py
 ├── providers.py
 ├── registry.py
@@ -288,6 +297,18 @@ Inactive runtime response composer seam:
 
 This module composes the final runtime response envelope after validation and eligibility. It supports deterministic-only, LLM-only, and hybrid modes while preserving deterministic business truth, appending optional LLM guidance only when safe, and emitting deterministic composition diagnostics and fallback metadata.
 
+### `post_processor.py`
+
+Inactive runtime response post-processing seam:
+
+- `LLMRuntimeResponsePostProcessingIssue`
+- `LLMRuntimeResponsePostProcessingRequest`
+- `LLMRuntimeResponsePostProcessingResult`
+- `LLMRuntimeResponsePostProcessingStatus`
+- `LLMRuntimeResponsePostProcessor`
+
+This module performs the final presentation-only cleanup pass after composition. It normalizes whitespace, line breaks, and supported markdown presentation, removes presentation-only metadata from the visible response envelope, and emits deterministic post-processing diagnostics without touching deterministic business data or upstream runtime decisions.
+
 ### `budget.py`
 
 Inactive provider-neutral generation-budget seam:
@@ -383,6 +404,7 @@ The facade owns the composed inactive graph as a single public boundary for late
 It can capture a deterministic, save-ready snapshot of the integration boundary without changing runtime wiring or exposing provider-private state.
 Phase 7.2 also lets the facade evaluate the existing execution policy, trigger best-effort shadow-mode orchestration through the existing Prompt Builder and generation orchestrator, record provider-neutral diagnostics, and discard all generated LLM output so the official chatbot response stays unchanged.
 Phase 7.7 adds a final-response composition branch on that same facade so deterministic-only, LLM-only, and hybrid runtime responses can preserve business truth while optionally appending validated and eligible LLM guidance.
+Phase 7.8 adds a final post-processing branch on that same facade so the composed runtime response is normalized for presentation while deterministic business truth and runtime diagnostics stay separate.
 
 ### `orchestrator.py`
 
@@ -418,6 +440,7 @@ This layer must not:
 - perform retrieval, ranking, workflow execution, booking, or domain validation
 - mutate conversation state
 - change chat API contracts
+- alter the authoritative workflow or response-composition ownership boundaries
 - bypass deterministic backend services for domain truth
 
 ## Relationship To Existing AI Layers

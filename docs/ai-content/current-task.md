@@ -3,15 +3,15 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 7.7 hybrid response strategy with a runtime response composer
+- Task: implement Phase 7.8 runtime response post processing with a presentation-normalization stage
 - Completed on: 2026-07-05
 
 ## Outcome
 
-- Added a provider-neutral runtime-response composer under `backend/app/llm/composer.py` and wired the `LLMRuntimeFacade` so deterministic-only, LLM-only, and hybrid runtime response modes now produce a composed final response envelope after validation and eligibility.
-- Kept business truth intact by preserving deterministic booking/appointment fields, appending only optional LLM enhancement text in hybrid mode, and falling back safely to deterministic-only output when validation, eligibility, or composition prerequisites are not met.
-- Added focused backend tests covering deterministic-only composition, LLM-only composition, hybrid composition, business-field preservation, augmentation placement, validation compatibility, eligibility compatibility, deterministic fallback, and serialization determinism.
-- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response composer seam and the final-response envelope directly.
+- Added a provider-neutral runtime-response post processor under `backend/app/llm/post_processor.py` and wired the `LLMRuntimeFacade` so every composed controlled-generation response is normalized before it is returned.
+- Kept business truth intact by preserving deterministic booking/appointment fields, sanitizing presentation-only metadata separately, and falling back safely to the preprocessed composed response when post-processing cannot complete.
+- Added focused backend tests covering whitespace normalization, duplicate newline removal, markdown normalization, metadata sanitization, deterministic business preservation, deterministic-only compatibility, LLM-only compatibility, hybrid compatibility, and serialization determinism.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response post-processing seam and the final presentation-normalized response envelope directly.
 
 ## Prior Work
 

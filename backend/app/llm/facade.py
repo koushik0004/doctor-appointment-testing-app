@@ -39,6 +39,12 @@ from app.llm.operations import (
     LLMTimingBreakdown,
     LLMTraceContext,
 )
+from app.llm.post_processor import (
+    LLMRuntimeResponsePostProcessor,
+    LLMRuntimeResponsePostProcessingRequest,
+    LLMRuntimeResponsePostProcessingResult,
+    LLMRuntimeResponsePostProcessingStatus,
+)
 from app.llm.orchestrator import (
     LLMGenerationOrchestrationRequest,
     LLMGenerationOrchestrationResult,
@@ -146,6 +152,7 @@ class LLMControlledGenerationResult(BaseModel):
     validation_result: LLMRuntimeResponseValidationResult | None = None
     eligibility_result: LLMRuntimeResponseEligibilityResult | None = None
     composition_result: LLMRuntimeResponseComposerResult | None = None
+    post_processing_result: LLMRuntimeResponsePostProcessingResult | None = None
     final_response: LLMRuntimeResponse | None = None
     fallback_reason: str | None = None
     error_message: str | None = None
@@ -185,6 +192,7 @@ class LLMRuntimeFacade:
         runtime_response_validator: LLMRuntimeResponseValidator | None = None,
         runtime_response_eligibility_evaluator: LLMRuntimeResponseEligibilityEvaluator | None = None,
         runtime_response_composer: LLMRuntimeResponseComposer | None = None,
+        runtime_response_post_processor: LLMRuntimeResponsePostProcessor | None = None,
         shadow_history_limit: int = 100,
     ) -> None:
         self._composition_root = composition_root
@@ -207,6 +215,11 @@ class LLMRuntimeFacade:
             runtime_response_composer
             if runtime_response_composer is not None
             else LLMRuntimeResponseComposer()
+        )
+        self._runtime_response_post_processor = (
+            runtime_response_post_processor
+            if runtime_response_post_processor is not None
+            else LLMRuntimeResponsePostProcessor()
         )
         self._shadow_history: deque[LLMShadowModeDiagnostic] = deque(
             maxlen=shadow_history_limit
@@ -300,13 +313,18 @@ class LLMRuntimeFacade:
                     },
                 )
             )
+            post_processing_result = self._post_process_runtime_response(
+                request=request,
+                composition_result=composition_result,
+            )
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
                 correlation_id=request.correlation_id,
                 decision=decision,
                 status=LLMControlledGenerationStatus.SUCCEEDED,
                 composition_result=composition_result,
-                final_response=composition_result.final_response,
+                post_processing_result=post_processing_result,
+                final_response=post_processing_result.final_response,
             )
 
         if not self._can_execute_controlled_generation(decision):
@@ -319,6 +337,7 @@ class LLMRuntimeFacade:
             )
 
         eligibility_result: LLMRuntimeResponseEligibilityResult | None = None
+        post_processing_result: LLMRuntimeResponsePostProcessingResult | None = None
         try:
             generated_result = self.compose().orchestrator.generate(
                 request.orchestration_request
@@ -378,7 +397,11 @@ class LLMRuntimeFacade:
                             },
                         )
                     )
-                    final_response = composition_result.final_response
+                    post_processing_result = self._post_process_runtime_response(
+                        request=request,
+                        composition_result=composition_result,
+                    )
+                    final_response = post_processing_result.final_response
                 return LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
@@ -387,6 +410,7 @@ class LLMRuntimeFacade:
                     validation_result=validation_result,
                     eligibility_result=eligibility_result,
                     composition_result=composition_result,
+                    post_processing_result=post_processing_result,
                     final_response=final_response,
                     fallback_reason=eligibility_result.fallback_reason,
                 )
@@ -404,6 +428,10 @@ class LLMRuntimeFacade:
                         **deepcopy(request.orchestration_request.metadata),
                     },
                 )
+            )
+            post_processing_result = self._post_process_runtime_response(
+                request=request,
+                composition_result=composition_result,
             )
         except Exception as exc:
             return LLMControlledGenerationResult(
@@ -428,7 +456,8 @@ class LLMRuntimeFacade:
             validation_result=validation_result,
             eligibility_result=eligibility_result,
             composition_result=composition_result,
-            final_response=composition_result.final_response,
+            post_processing_result=post_processing_result,
+            final_response=post_processing_result.final_response,
         )
 
     def list_shadow_diagnostics(self) -> list[LLMShadowModeDiagnostic]:
@@ -471,6 +500,44 @@ class LLMRuntimeFacade:
             AIExecutionMode.LLM_ONLY,
             AIExecutionMode.HYBRID,
         }
+
+    def _post_process_runtime_response(
+        self,
+        *,
+        request: LLMControlledGenerationRequest,
+        composition_result: LLMRuntimeResponseComposerResult,
+    ) -> LLMRuntimeResponsePostProcessingResult:
+        try:
+            return self._runtime_response_post_processor.process(
+                LLMRuntimeResponsePostProcessingRequest(
+                    request_id=request.request_id,
+                    correlation_id=request.correlation_id,
+                    final_response=composition_result.final_response,
+                    composition_result=composition_result,
+                    metadata={
+                        "parent_execution_id": request.parent_execution_id,
+                        **deepcopy(request.orchestration_request.metadata),
+                    },
+                )
+            )
+        except Exception as exc:
+            return LLMRuntimeResponsePostProcessingResult(
+                request_id=request.request_id,
+                correlation_id=request.correlation_id,
+                status=LLMRuntimeResponsePostProcessingStatus.FALLBACK,
+                final_response=composition_result.final_response,
+                original_response=composition_result.final_response,
+                message_changed=False,
+                metadata_changed=False,
+                removed_metadata_keys=[],
+                sanitized_presentation_metadata={},
+                issues=[],
+                diagnostics={
+                    "post_processing_failed": True,
+                    "error_message": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+            )
 
     def _execute_shadow_mode(
         self,
