@@ -37,6 +37,17 @@ class LLMProviderFeatureFlags(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class LLMRuntimeFeatureFlags(BaseModel):
+    enabled: bool = False
+    shadow_mode: bool = False
+    allow_generation: bool = False
+    allow_streaming: bool = False
+    allow_tool_calling: bool = False
+    allow_reasoning: bool = False
+
+    model_config = ConfigDict(frozen=True)
+
+
 class LLMGenerationBudgetEnvironmentOverride(BaseModel):
     reasoning_effort: LLMGenerationBudgetReasoningEffort | None = None
     max_output_tokens: int | None = Field(default=None, gt=0)
@@ -137,6 +148,9 @@ class LLMProviderConfiguration(BaseModel):
 
 class LLMConfiguration(BaseModel):
     selected_provider_name: LLMProviderName | None = None
+    runtime_flags: LLMRuntimeFeatureFlags = Field(
+        default_factory=LLMRuntimeFeatureFlags
+    )
     providers: list[LLMProviderConfiguration] = Field(default_factory=list)
 
     model_config = ConfigDict(frozen=True)
@@ -183,6 +197,12 @@ class LLMConfiguration(BaseModel):
 
 class LLMConfigurationSettings(BaseSettings):
     provider: LLMProviderName | None = None
+    enabled: bool = False
+    shadow_mode: bool = False
+    allow_generation: bool = False
+    allow_streaming: bool = False
+    allow_tool_calling: bool = False
+    allow_reasoning: bool = False
     timeout_seconds: float = Field(default=30.0, gt=0)
     max_retries: int = Field(default=2, ge=0)
     retry_backoff_seconds: float = Field(default=0.5, ge=0)
@@ -270,6 +290,14 @@ class LLMConfigurationLoader:
 
         return LLMConfiguration(
             selected_provider_name=resolved_settings.provider,
+            runtime_flags=LLMRuntimeFeatureFlags(
+                enabled=resolved_settings.enabled,
+                shadow_mode=resolved_settings.shadow_mode,
+                allow_generation=resolved_settings.allow_generation,
+                allow_streaming=resolved_settings.allow_streaming,
+                allow_tool_calling=resolved_settings.allow_tool_calling,
+                allow_reasoning=resolved_settings.allow_reasoning,
+            ),
             providers=providers,
         )
 

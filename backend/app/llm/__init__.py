@@ -1,14 +1,23 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.7. It defines only
+This package is intentionally inactive in Phase 6.8. It defines only
 implementation-ready contracts for a future LLM adapter layer, provider-neutral
 configuration and generation-budget seams, explicit concrete provider adapters,
-an inactive runtime composition root, and an inactive generation orchestrator.
-It is not wired into the current chat runtime, workflow engine, retrieval
-layer, or prompt builder.
+an inactive runtime composition root, a runtime activation policy seam, and an
+inactive generation orchestrator. It is not wired into the current chat
+runtime, workflow engine, retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
+from app.llm.activation import (
+    LLMActivationDiagnostic,
+    LLMActivationSeverity,
+    LLMProviderActivationStatus,
+    LLMRuntimeActivationEvaluator,
+    LLMRuntimeActivationResult,
+    LLMRuntimeActivationService,
+    LLMRuntimeActivationStatus,
+)
 from app.llm.budget import (
     LLMGenerationBudget,
     LLMGenerationBudgetCostPreference,
@@ -38,6 +47,7 @@ from app.llm.config import (
     LLMProviderEnvironmentSettings,
     LLMProviderFeatureFlags,
     LLMProviderName,
+    LLMRuntimeFeatureFlags,
     get_llm_configuration,
 )
 from app.llm.interfaces import (
@@ -94,6 +104,8 @@ __all__ = [
     "ConfigurableLLMProviderAdapter",
     "GeminiProviderAdapter",
     "InactiveLLMProviderTransportFactory",
+    "LLMActivationDiagnostic",
+    "LLMActivationSeverity",
     "LLMConfiguration",
     "LLMConfigurationLoader",
     "LLMConfigurationSettings",
@@ -124,6 +136,7 @@ __all__ = [
     "LLMProvider",
     "LLMProviderAdapterFactory",
     "LLMProviderConfiguration",
+    "LLMProviderActivationStatus",
     "LLMProviderCapabilities",
     "LLMProviderDescriptor",
     "LLMProviderEnvironmentSettings",
@@ -138,8 +151,13 @@ __all__ = [
     "LLMRequestTranslator",
     "LLMRequestedModality",
     "LLMResponseTranslator",
+    "LLMRuntimeActivationEvaluator",
+    "LLMRuntimeActivationResult",
+    "LLMRuntimeActivationService",
+    "LLMRuntimeActivationStatus",
     "LLMRuntimeComposition",
     "LLMRuntimeCompositionRoot",
+    "LLMRuntimeFeatureFlags",
     "LLMStreamingMetadata",
     "LLMStreamingOptions",
     "LLMStructuredOutputMode",

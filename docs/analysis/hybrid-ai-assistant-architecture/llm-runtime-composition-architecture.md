@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the Phase 6.7 runtime composition layer for the inactive LLM subsystem.
+This document defines the Phase 6.7 runtime composition layer for the inactive LLM subsystem, updated in Phase 6.8 to include deterministic activation-status assembly.
 
 The goal remains architectural only:
 
@@ -25,6 +25,7 @@ It owns:
 - resolving the configured default provider
 - creating `LLMIntegrationService`
 - creating `LLMGenerationOrchestrator`
+- evaluating runtime activation status from the resolved graph
 
 It does not own:
 
@@ -42,9 +43,10 @@ The explicit construction order is:
 1. `LLMConfigurationLoader.load()`
 2. `LLMProviderTransportFactory.create_transports()`
 3. `LLMProviderAdapterFactory.create_adapter()` for each enabled provider
-4. `InMemoryLLMProviderRegistry(...)`
-5. `LLMIntegrationService(...)`
-6. `LLMGenerationOrchestrator(...)`
+4. `LLMRuntimeActivationEvaluator.evaluate(...)`
+5. `InMemoryLLMProviderRegistry(...)`
+6. `LLMIntegrationService(...)`
+7. `LLMGenerationOrchestrator(...)`
 
 All dependencies are passed by constructor injection. No environment-variable reads happen outside the configuration loader.
 
@@ -74,6 +76,7 @@ The subsystem remains inactive because:
 - the default transport factory returns no live transports
 - adapters still require explicit transport injection to invoke anything
 - `LLMIntegrationService` can resolve providers, but provider generation still fails at the adapter boundary when no transport exists
+- activation status can report readiness, but it does not activate routing or execute generation by itself
 
 ## Testing Scope
 
@@ -83,5 +86,6 @@ Focused composition tests validate:
 - enabled-provider registration only
 - disabled-provider exclusion
 - transport injection into adapters
+- activation-status assembly from the composed graph
 - explicit service and orchestrator composition
 - continued inactive behavior without transports

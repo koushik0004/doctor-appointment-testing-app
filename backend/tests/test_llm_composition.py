@@ -51,6 +51,8 @@ class StaticTransportFactory:
 def _make_settings() -> LLMConfigurationSettings:
     return LLMConfigurationSettings(
         provider=LLMProviderName.OPENAI,
+        enabled=True,
+        allow_generation=True,
         openai={
             "enabled": True,
             "default_model_name": "gpt-4.1-mini",
@@ -90,6 +92,7 @@ def test_composition_root_registers_only_enabled_providers_and_preserves_default
 
     assert composition.default_provider_name == "openai"
     assert list(composition.adapters.keys()) == ["openai", "claude"]
+    assert composition.activation_status.selected_provider_name == "openai"
     assert [provider.provider_name for provider in composition.provider_registry.list_providers()] == [
         "openai",
         "claude",
@@ -127,6 +130,7 @@ def test_composition_root_injects_transports_into_created_adapters():
     assert transport_factory.calls == 1
     assert len(openai_transport.calls) == 1
     assert openai_transport.calls[0]["model"] == "gpt-4.1-mini"
+    assert composition.activation_status.generation_available is True
     assert response.provider_name == "openai"
     assert response.message.content == "Echo: hello"
 

@@ -88,6 +88,12 @@ def test_llm_configuration_loader_rejects_selected_disabled_provider():
 
 def test_llm_configuration_loader_applies_global_defaults_and_provider_overrides():
     settings = LLMConfigurationSettings(
+        enabled=True,
+        shadow_mode=True,
+        allow_generation=True,
+        allow_streaming=True,
+        allow_tool_calling=True,
+        allow_reasoning=False,
         timeout_seconds=60,
         max_retries=5,
         retry_backoff_seconds=2.0,
@@ -117,6 +123,12 @@ def test_llm_configuration_loader_applies_global_defaults_and_provider_overrides
     openrouter = config.get_provider(LLMProviderName.OPENROUTER)
     openai = config.get_provider(LLMProviderName.OPENAI)
 
+    assert config.runtime_flags.enabled is True
+    assert config.runtime_flags.shadow_mode is True
+    assert config.runtime_flags.allow_generation is True
+    assert config.runtime_flags.allow_streaming is True
+    assert config.runtime_flags.allow_tool_calling is True
+    assert config.runtime_flags.allow_reasoning is False
     assert openrouter is not None
     assert openrouter.timeout_seconds == 12
     assert openrouter.max_retries == 5
@@ -156,6 +168,12 @@ def test_llm_configuration_loader_applies_global_defaults_and_provider_overrides
 
 def test_llm_configuration_settings_maps_nested_environment_variables(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setenv("LLM_ENABLED", "true")
+    monkeypatch.setenv("LLM_SHADOW_MODE", "true")
+    monkeypatch.setenv("LLM_ALLOW_GENERATION", "true")
+    monkeypatch.setenv("LLM_ALLOW_STREAMING", "true")
+    monkeypatch.setenv("LLM_ALLOW_TOOL_CALLING", "false")
+    monkeypatch.setenv("LLM_ALLOW_REASONING", "false")
     monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "75")
     monkeypatch.setenv("LLM_GENERATION_BUDGET__DEFAULT_PROFILE", "quality")
     monkeypatch.setenv(
@@ -176,6 +194,12 @@ def test_llm_configuration_settings_maps_nested_environment_variables(monkeypatc
     ollama = config.get_provider(LLMProviderName.OLLAMA)
 
     assert config.selected_provider_name == LLMProviderName.OLLAMA
+    assert config.runtime_flags.enabled is True
+    assert config.runtime_flags.shadow_mode is True
+    assert config.runtime_flags.allow_generation is True
+    assert config.runtime_flags.allow_streaming is True
+    assert config.runtime_flags.allow_tool_calling is False
+    assert config.runtime_flags.allow_reasoning is False
     assert ollama is not None
     assert ollama.enabled is True
     assert ollama.default_model_name == "llama3.1"

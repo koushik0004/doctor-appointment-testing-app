@@ -64,6 +64,13 @@ Phase 6.7 adds an inactive runtime composition layer with:
 - constructor-only composition for `LLMIntegrationService` and `LLMGenerationOrchestrator`
 - immutable resolved configuration objects for provider and generation-budget settings
 
+Phase 6.8 adds an inactive runtime activation layer with:
+
+- top-level runtime feature flags for enablement, shadow mode, generation, streaming, tool calling, and reasoning
+- a provider-neutral activation evaluator that checks readiness from resolved configuration plus composed dependencies
+- canonical activation-status and diagnostic models for safe startup reporting
+- a safe activation service that converts invalid configuration or assembly failures into inactive status instead of startup crashes
+
 It is intentionally disconnected from:
 
 - `ConversationManager`
@@ -81,6 +88,7 @@ No production request path imports or invokes this package.
 backend/app/llm/
 ├── __init__.py
 ├── adapters.py
+├── activation.py
 ├── budget.py
 ├── composition.py
 ├── config.py
@@ -152,6 +160,19 @@ This module assembles the full inactive dependency graph in one place:
 - resolve the configured default provider
 - compose `LLMIntegrationService`
 - compose `LLMGenerationOrchestrator`
+- compute a deterministic activation-status snapshot for the composed graph
+
+### `activation.py`
+
+Inactive runtime activation seam:
+
+- `LLMActivationDiagnostic`
+- `LLMProviderActivationStatus`
+- `LLMRuntimeActivationStatus`
+- `LLMRuntimeActivationEvaluator`
+- `LLMRuntimeActivationService`
+
+This module evaluates whether the subsystem is enabled and whether the selected provider is ready without executing generation or changing routing behavior.
 
 ### `budget.py`
 
@@ -207,6 +228,8 @@ This module keeps future provider selection, default-model selection, API keys, 
 Phase 6.5.5 extends this module with canonical generation-budget settings so global and per-provider profile defaults and profile overrides can be declared declaratively, resolved deterministically, and remain inactive until a later runtime phase.
 
 Phase 6.6 keeps configuration ownership here and lets the adapter factory consume canonical provider configuration without teaching `LLMIntegrationService` how to self-configure.
+
+Phase 6.8 extends the resolved configuration with top-level runtime activation flags while keeping provider enablement in the existing provider-scoped settings.
 
 ### `registry.py`
 

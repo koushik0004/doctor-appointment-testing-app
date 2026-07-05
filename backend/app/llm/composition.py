@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping, Protocol
 
+from app.llm.activation import (
+    LLMRuntimeActivationEvaluator,
+    LLMRuntimeActivationStatus,
+)
 from app.llm.config import (
     LLMConfiguration,
     LLMConfigurationLoader,
@@ -46,6 +50,7 @@ class LLMRuntimeComposition:
     configuration: LLMConfiguration
     transports: Mapping[str, LLMProviderTransport]
     adapters: Mapping[str, ConfigurableLLMProviderAdapter]
+    activation_status: LLMRuntimeActivationStatus
     provider_registry: InMemoryLLMProviderRegistry
     default_provider_name: str | None
     llm_integration_service: LLMIntegrationService
@@ -64,6 +69,7 @@ class LLMRuntimeCompositionRoot:
         configuration_settings: LLMConfigurationSettings | None = None,
         transport_factory: LLMProviderTransportFactory | None = None,
         adapter_factory: LLMProviderAdapterFactory | None = None,
+        activation_evaluator: LLMRuntimeActivationEvaluator | None = None,
     ) -> None:
         self._prompt_builder = prompt_builder
         self._configuration_loader = (
@@ -80,6 +86,11 @@ class LLMRuntimeCompositionRoot:
         self._adapter_factory = (
             adapter_factory if adapter_factory is not None else LLMProviderAdapterFactory()
         )
+        self._activation_evaluator = (
+            activation_evaluator
+            if activation_evaluator is not None
+            else LLMRuntimeActivationEvaluator()
+        )
         self._composition: LLMRuntimeComposition | None = None
 
     def compose(self) -> LLMRuntimeComposition:
@@ -90,6 +101,11 @@ class LLMRuntimeCompositionRoot:
         transports = self._build_transports(configuration)
         adapters = self._build_adapters(
             configuration=configuration,
+            transports=transports,
+        )
+        activation_status = self._activation_evaluator.evaluate(
+            configuration=configuration,
+            adapters=adapters,
             transports=transports,
         )
         default_provider_name = self._resolve_default_provider_name(configuration)
@@ -110,6 +126,7 @@ class LLMRuntimeCompositionRoot:
             configuration=configuration,
             transports=MappingProxyType(dict(transports)),
             adapters=MappingProxyType(dict(adapters)),
+            activation_status=activation_status,
             provider_registry=provider_registry,
             default_provider_name=default_provider_name,
             llm_integration_service=llm_integration_service,
