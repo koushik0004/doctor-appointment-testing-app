@@ -125,7 +125,7 @@
   - Phase 7.6 adds a provider-neutral runtime-response eligibility gate on the facade so only explicitly approved low-risk conversational responses can be exposed to the user after validation while workflow-owned requests remain deterministic.
   - Phase 7.7 adds a provider-neutral runtime-response composer on the facade so deterministic-only, LLM-only, and hybrid final responses can preserve business truth while optionally appending validated and eligible LLM guidance.
   - Phase 7.8 adds a provider-neutral runtime-response post processor on the facade so composed responses are normalized for presentation and presentation-only metadata is sanitized before frontend visibility.
-  - Contains an inactive provider-neutral LLM seam with canonical models, generation-budget profiles, concrete provider adapters, a single runtime composition root that assembles configuration, transports, adapters, registry, integration service, orchestrator, execution-policy service, and operational-readiness service, plus a runtime activation layer that evaluates feature-flag and provider-readiness diagnostics while remaining fully disconnected from the live chat runtime.
+  - Contains a provider-neutral LLM seam with canonical models, generation-budget profiles, concrete provider adapters, a single runtime composition root that assembles configuration, transports, adapters, registry, integration service, orchestrator, execution-policy service, and operational-readiness service, plus a runtime activation layer that evaluates feature-flag and provider-readiness diagnostics; Phase 8 now gives Claude a real Anthropic-backed production transport while the rest of the live chat runtime remains deterministic by default.
   - Adds an inactive runtime facade that wraps the composed LLM subsystem and captures a deterministic, save-ready integration snapshot without changing chat routing or provider execution.
   - Accepts direct booking-entry prompts that mention a doctor plus incremental follow-up fields, including explicit day-month-year dates and labeled patient details in structured messages.
   - Consults the knowledge retrieval service only when no workflow is active and uses the retrieved document before the legacy deterministic fallback for FAQ-style non-workflow turns.
@@ -142,7 +142,7 @@
   - The frontend mounts a noop adapter, so chat responses are present but automation/navigation remains limited.
   - Conversation and workflow state are not persisted beyond the request metadata loop used by the current widget.
   - Knowledge retrieval is still backend-only and deterministic; it is not used by the inactive Prompt Builder seam, the inactive LLM Integration seam or its inactive provider registry, embeddings, or a vector database, and it remains inactive while a workflow is running.
-  - The new runtime facade is still architecture-only; it does not persist state or alter assistant routing, and it only exposes a save-ready snapshot of the existing inactive LLM boundary.
+  - The runtime facade still does not alter default assistant routing or persist state; Claude transport now exists behind the facade, but user-visible chat remains deterministic unless controlled generation is explicitly enabled and allowed.
 
 ## Platform / Cross-Cutting Features
 

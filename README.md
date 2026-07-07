@@ -44,14 +44,15 @@ make restart
 
 ### 1. Overview
 
-The current AI assistant stack is implementation-complete for configuration, prompt construction, provider abstraction, runtime routing, validation, eligibility, composition, and post-processing, but the default runtime is still transport-inactive.
+The current AI assistant stack is implementation-complete for configuration, prompt construction, provider abstraction, runtime routing, validation, eligibility, composition, post-processing, and the first production transport path for Claude.
 
 What that means in practice:
 
 - The backend can load AI configuration from `.env`.
 - The prompt pipeline can build canonical prompts from conversation, workflow, and knowledge context.
 - The LLM seam can build provider-neutral requests, validate responses, decide eligibility, compose final runtime output, and normalize presentation.
-- The live app does not ship a real provider transport factory yet, so a real API key alone does not make the current runtime call OpenAI, Claude, Gemini, OpenRouter, or Ollama.
+- The default production composition path now builds a real Anthropic-backed Claude transport when Claude is enabled and selected.
+- OpenAI, Gemini, OpenRouter, and Ollama still remain transport-inactive until their production transport implementations are added.
 - The current visible chat flow remains deterministic and knowledge-backed; hidden shadow execution is still best-effort and falls back safely when generation is unavailable.
 
 ### 2. Required Environment Variables
@@ -71,7 +72,7 @@ Settings are loaded from `backend/.env` because both backend config loaders read
 
 | Variable name | Required? | Description | Example value |
 |---|---:|---|---|
-| `LLM_PROVIDER` | Yes for runtime activation | Selected provider name. Must match one of the supported provider enums. | `openai` |
+| `LLM_PROVIDER` | Yes for runtime activation | Selected provider name. Must match one of the supported provider enums. | `claude` |
 | `LLM_ENABLED` | Yes for runtime activation | Top-level runtime activation flag. | `true` |
 | `LLM_ALLOW_GENERATION` | Yes for runtime activation | Allows generation-capable execution paths. | `true` |
 | `LLM_SHADOW_MODE` | No | Enables shadow-mode execution decisions when generation is otherwise available. | `true` |
@@ -101,8 +102,8 @@ The same nested pattern exists for each supported provider name:
 | Variable name | Required? | Description | Example value |
 |---|---:|---|---|
 | `LLM_<PROVIDER>__ENABLED` | Yes for that provider | Enables the provider in the configuration model and registry. | `true` |
-| `LLM_<PROVIDER>__DEFAULT_MODEL_NAME` | Yes for that provider if enabled | Canonical model name used when a request does not supply one. | `gpt-4.1-mini` |
-| `LLM_<PROVIDER>__API_KEY` | Yes for non-Ollama providers if enabled | Provider API key. | `sk-<provider-key>` |
+| `LLM_<PROVIDER>__DEFAULT_MODEL_NAME` | Yes for that provider if enabled | Canonical model name used when a request does not supply one. | `claude-sonnet-4-5` |
+| `LLM_<PROVIDER>__API_KEY` | Yes for non-Ollama providers if enabled | Provider API key. | `sk-ant-...` |
 | `LLM_OLLAMA__BASE_URL` | Yes for Ollama if enabled | Ollama base URL used as the required authentication/connection setting. | `http://localhost:11434` |
 | `LLM_<PROVIDER>__BASE_URL` | No for non-Ollama providers | Optional provider base URL override. | `https://api.openai.com/v1` |
 | `LLM_<PROVIDER>__TIMEOUT_SECONDS` | No | Provider-specific timeout override. | `45` |
@@ -165,8 +166,14 @@ How to change the model:
 
 Current runtime limitation:
 
-- The composed runtime still uses `InactiveLLMProviderTransportFactory` by default.
-- That means a valid API key changes configuration and activation snapshots, but it does not produce a live provider call unless you inject a real transport factory in a custom harness or test.
+- The composed runtime now uses `ProductionLLMProviderTransportFactory` by default.
+- Today only Claude has a production transport implementation, so OpenAI, Gemini, OpenRouter, and Ollama still require future transport work before a valid API key can produce a live provider call.
+
+Current production transport behavior:
+
+- `backend/app/llm/transport.py` owns Claude HTTP communication through the official Anthropic SDK.
+- `ClaudeTransport` normalizes retries, timeout handling, request-id extraction, response-id extraction, usage extraction, structured transport logging, and provider error mapping.
+- `backend/app/llm/composition.py` injects Claude transport only when Claude is enabled in configuration.
 
 ### 4. Backend Startup
 

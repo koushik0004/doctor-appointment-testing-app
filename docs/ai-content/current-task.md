@@ -3,6 +3,19 @@
 ## Active Work
 
 - Status: completed
+- Task: implement Phase 08 production transport framework with Anthropic-backed Claude transport
+- Completed on: 2026-07-07
+
+## Outcome
+
+- Added `backend/app/llm/transport.py` with a production `ClaudeTransport`, normalized `LLMTransportError`, and activation-ready transport diagnostics while keeping the provider-neutral adapter/orchestrator/facade architecture intact.
+- Switched the default `LLMRuntimeCompositionRoot` transport factory to `ProductionLLMProviderTransportFactory`, which now composes Claude transport only when Claude is enabled and leaves other providers inactive until their transport implementations exist.
+- Extended Claude response translation to preserve normalized citation data, added focused transport unit coverage plus an optional live Claude integration test, and verified the broader `backend/tests/test_llm_*.py` suite still passes.
+- Updated README/runtime documentation and compact AI context files so later sessions can discover the live Claude transport boundary, the new production factory default, and the remaining non-Claude transport gap directly.
+
+## Prior Work
+
+- Status: completed
 - Task: implement Phase 7.8 runtime response post processing with a presentation-normalization stage
 - Completed on: 2026-07-05
 
@@ -12,7 +25,6 @@
 - Kept business truth intact by preserving deterministic booking/appointment fields, sanitizing presentation-only metadata separately, and falling back safely to the preprocessed composed response when post-processing cannot complete.
 - Added focused backend tests covering whitespace normalization, duplicate newline removal, markdown normalization, metadata sanitization, deterministic business preservation, deterministic-only compatibility, LLM-only compatibility, hybrid compatibility, and serialization determinism.
 - Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response post-processing seam and the final presentation-normalized response envelope directly.
-
 ## Prior Work
 
 - Status: completed

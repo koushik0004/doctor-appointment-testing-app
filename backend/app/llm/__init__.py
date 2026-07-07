@@ -39,6 +39,7 @@ from app.llm.budget import (
 from app.llm.composition import (
     InactiveLLMProviderTransportFactory,
     LLMProviderTransportFactory,
+    ProductionLLMProviderTransportFactory,
     LLMRuntimeComposition,
     LLMRuntimeCompositionRoot,
 )
@@ -179,6 +180,11 @@ from app.llm.providers import (
 )
 from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
+from app.llm.transport import (
+    ClaudeTransport,
+    LLMTransportActivationSnapshot,
+    LLMTransportError,
+)
 from app.llm.validation import (
     LLMRuntimeResponseValidationIssue,
     LLMRuntimeResponseValidationRequest,
@@ -266,6 +272,8 @@ __all__ = [
     "LLMProviderRegistry",
     "LLMProviderTransportFactory",
     "LLMProviderTransport",
+    "LLMTransportActivationSnapshot",
+    "LLMTransportError",
     "LLMReasoningConfig",
     "LLMReasoningEffort",
     "LLMReasoningResult",
@@ -330,6 +338,8 @@ __all__ = [
     "OllamaProviderAdapter",
     "OpenAIProviderAdapter",
     "OpenRouterProviderAdapter",
+    "ProductionLLMProviderTransportFactory",
+    "ClaudeTransport",
     "build_default_generation_budget_profile_catalog",
     "get_llm_configuration",
 ]

@@ -9,6 +9,7 @@ description = "FastAPI backend for the doctor appointment app"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
+  "anthropic",
   "fastapi",
   "uvicorn[standard]",
   "sqlalchemy",
@@ -43,3 +44,6 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+  "integration: optional live-provider integration tests",
+]

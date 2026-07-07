@@ -226,6 +226,9 @@ class LLMRuntimeActivationEvaluator:
         provider_enabled = provider_configuration.enabled
         adapter_available = adapter is not None
         transport_available = transport is not None
+        transport_snapshot = self._describe_transport(transport)
+        if transport_snapshot is not None:
+            transport_available = transport_available and transport_snapshot.available
         authentication_configured = self._is_authentication_configured(
             provider_configuration
         )
@@ -267,7 +270,21 @@ class LLMRuntimeActivationEvaluator:
                     severity=LLMActivationSeverity.WARNING,
                     blocking=True,
                     provider_name=provider_name,
+                    metadata=(
+                        dict(transport_snapshot.metadata)
+                        if transport_snapshot is not None and transport_snapshot.metadata is not None
+                        else {}
+                    ),
                 )
+            )
+        if transport_snapshot is not None:
+            diagnostics.extend(
+                self._map_transport_diagnostic(
+                    provider_name=provider_name,
+                    diagnostic=diagnostic,
+                    metadata=transport_snapshot.metadata,
+                )
+                for diagnostic in transport_snapshot.diagnostics
             )
 
         if not authentication_configured:
@@ -349,6 +366,34 @@ class LLMRuntimeActivationEvaluator:
             )
             return False
         return True
+
+    def _describe_transport(
+        self,
+        transport: LLMProviderTransport | None,
+    ) -> Any | None:
+        if transport is None or not hasattr(transport, "get_activation_snapshot"):
+            return None
+        return transport.get_activation_snapshot()
+
+    def _map_transport_diagnostic(
+        self,
+        *,
+        provider_name: str,
+        diagnostic: Mapping[str, Any],
+        metadata: Mapping[str, Any] | None,
+    ) -> LLMActivationDiagnostic:
+        combined_metadata = dict(metadata or {})
+        diagnostic_metadata = diagnostic.get("metadata")
+        if isinstance(diagnostic_metadata, Mapping):
+            combined_metadata.update(diagnostic_metadata)
+        return LLMActivationDiagnostic(
+            code=str(diagnostic.get("code") or "transport_diagnostic"),
+            message=str(diagnostic.get("message") or "Transport diagnostic reported."),
+            severity=LLMActivationSeverity(str(diagnostic.get("severity") or "warning")),
+            provider_name=provider_name,
+            blocking=bool(diagnostic.get("blocking", True)),
+            metadata=combined_metadata,
+        )
 
     def _is_authentication_configured(
         self,

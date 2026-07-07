@@ -79,7 +79,9 @@
 - `backend/app/llm/budget.py`
   - Inactive provider-neutral generation-budget seam for future adapters; defines canonical generation profiles, token/latency/quality/cost controls, deterministic profile resolution, and now frozen resolved budget models without runtime wiring.
 - `backend/app/llm/composition.py`
-  - Inactive runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams.
+  - Runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams; Phase 8 now defaults it to `ProductionLLMProviderTransportFactory`, which composes Claude transport when Claude is enabled.
+- `backend/app/llm/transport.py`
+  - Production transport layer for provider SDK/network execution; currently owns the Anthropic-backed `ClaudeTransport`, normalized transport errors, transport activation diagnostics, request-id/response-id extraction, usage extraction, and structured transport logging.
 - `backend/app/llm/facade.py`
   - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, and final-response composition gates that reuse the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
 - `backend/app/llm/post_processor.py`
@@ -196,6 +198,8 @@ These files define the persistence and API contracts. Any API change should be c
   - Covers the inactive operational-readiness seam: observability records, token and cost accounting, retry and timeout validation, audit models, rollout validation, composed health evaluation, and safe failure behavior.
 - `backend/tests/test_llm_provider_adapters.py`
   - Covers the inactive concrete adapter layer: provider-private request translation, canonical response normalization, composition-compatible adapter creation, and inactive transport enforcement.
+- `backend/tests/test_llm_transport.py`
+  - Covers the production transport layer: mocked Anthropic invocation, normalized response/error mapping, generation-budget token fallback, activation diagnostics, production-factory behavior, default Claude composition, and the optional live Claude integration probe.
 
 ## High-Value Docs
 
