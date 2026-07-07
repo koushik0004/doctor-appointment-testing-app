@@ -13,6 +13,7 @@ from app.knowledge import KnowledgeDocument
 class PromptContextBlockKind(str, Enum):
     USER_MESSAGE = "user_message"
     CONVERSATION_STATE = "conversation_state"
+    WORKFLOW_STATE = "workflow_state"
     KNOWLEDGE_DOCUMENT = "knowledge_document"
 
 
@@ -20,6 +21,7 @@ class PromptAssemblySectionKind(str, Enum):
     SYSTEM_INSTRUCTIONS = "system_instructions"
     USER_MESSAGE = "user_message"
     CONVERSATION_STATE = "conversation_state"
+    WORKFLOW_STATE = "workflow_state"
     KNOWLEDGE_DOCUMENT = "knowledge_document"
 
 
@@ -518,6 +520,19 @@ class PromptContextAssemblyPipeline:
                 ),
             )
 
+        if context.workflow_context is not None and self._has_workflow_context_content(
+            context.workflow_context
+        ):
+            self._append_section(
+                sections,
+                kind=PromptAssemblySectionKind.WORKFLOW_STATE,
+                label="Workflow State",
+                content=self._serialize_json(
+                    self._serialize_workflow_context(context.workflow_context),
+                    context.rendering_options,
+                ),
+            )
+
         if context.knowledge_context is None:
             return sections
 
@@ -666,6 +681,41 @@ class PromptContextAssemblyPipeline:
             "role": turn.role,
             "message": turn.message,
             "metadata": deepcopy(turn.metadata),
+        }
+
+    def _has_workflow_context_content(
+        self,
+        workflow_context: PromptContextWorkflowContext,
+    ) -> bool:
+        return bool(
+            workflow_context.active_intent
+            or workflow_context.workflow_status
+            or workflow_context.collected_fields
+            or workflow_context.missing_fields
+            or workflow_context.metadata
+            or workflow_context.state
+        )
+
+    def _serialize_workflow_context(
+        self,
+        workflow_context: PromptContextWorkflowContext,
+    ) -> dict[str, Any]:
+        if (
+            workflow_context.active_intent is None
+            and workflow_context.workflow_status is None
+            and not workflow_context.collected_fields
+            and not workflow_context.missing_fields
+            and not workflow_context.metadata
+        ):
+            return deepcopy(workflow_context.state)
+
+        return {
+            "active_intent": workflow_context.active_intent,
+            "workflow_status": workflow_context.workflow_status,
+            "collected_fields": deepcopy(workflow_context.collected_fields),
+            "missing_fields": list(workflow_context.missing_fields),
+            "metadata": deepcopy(workflow_context.metadata),
+            "state": deepcopy(workflow_context.state),
         }
 
 
@@ -1125,6 +1175,7 @@ class PromptBuilderService:
         section_kind_to_block_kind = {
             PromptAssemblySectionKind.USER_MESSAGE: PromptContextBlockKind.USER_MESSAGE,
             PromptAssemblySectionKind.CONVERSATION_STATE: PromptContextBlockKind.CONVERSATION_STATE,
+            PromptAssemblySectionKind.WORKFLOW_STATE: PromptContextBlockKind.WORKFLOW_STATE,
             PromptAssemblySectionKind.KNOWLEDGE_DOCUMENT: PromptContextBlockKind.KNOWLEDGE_DOCUMENT,
         }
         blocks: list[PromptContextBlock] = []

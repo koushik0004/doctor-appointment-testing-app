@@ -1,12 +1,16 @@
 """Provider-neutral LLM integration boundary.
 
-This package is intentionally inactive in Phase 6.10. It defines only
+This package is intentionally inactive in Phase 7. It defines only
 implementation-ready contracts for a future LLM adapter layer, provider-neutral
 configuration and generation-budget seams, explicit concrete provider adapters,
 an inactive runtime composition root, a runtime activation policy seam, an
 execution-policy and runtime-routing seam, a production-readiness operations
-seam, and an inactive generation orchestrator. It is not wired into the current
-chat runtime, workflow engine, retrieval layer, or prompt builder.
+seam, an inactive runtime facade, a policy-gated controlled-generation branch,
+a provider-neutral runtime-response validator, a provider-neutral runtime-
+response eligibility gate, a provider-neutral runtime-response composer, a
+provider-neutral runtime-response post processor, and an inactive generation
+orchestrator. It is not wired into the current chat runtime, workflow engine,
+retrieval layer, or prompt builder.
 """
 
 from app.llm.adapters import BaseLLMProviderAdapter
@@ -38,6 +42,14 @@ from app.llm.composition import (
     LLMRuntimeComposition,
     LLMRuntimeCompositionRoot,
 )
+from app.llm.composer import (
+    LLMRuntimeResponse,
+    LLMRuntimeResponseComposer,
+    LLMRuntimeResponseComposerRequest,
+    LLMRuntimeResponseComposerResult,
+    LLMRuntimeResponseCompositionIssue,
+    LLMRuntimeResponseCompositionStatus,
+)
 from app.llm.config import (
     LLMConfiguration,
     LLMConfigurationLoader,
@@ -63,6 +75,34 @@ from app.llm.execution_policy import (
     AIExecutionPolicyRequest,
     AIExecutionPolicyResult,
     AIExecutionPolicyService,
+)
+from app.llm.eligibility import (
+    LLMRuntimeResponseEligibilityEvaluator,
+    LLMRuntimeResponseEligibilityIssue,
+    LLMRuntimeResponseEligibilityRequest,
+    LLMRuntimeResponseEligibilityResult,
+    LLMRuntimeResponseEligibilityStatus,
+)
+from app.llm.facade import (
+    LLMControlledGenerationRequest,
+    LLMControlledGenerationResult,
+    LLMControlledGenerationStatus,
+    InlineLLMShadowExecutionRunner,
+    LLMRuntimeFacade,
+    LLMRuntimeFacadeSnapshot,
+    LLMShadowExecutionRunner,
+    LLMShadowModeDiagnostic,
+    LLMShadowModeDispatchResult,
+    LLMShadowModeRequest,
+    LLMShadowModeStatus,
+    ThreadedLLMShadowExecutionRunner,
+)
+from app.llm.post_processor import (
+    LLMRuntimeResponsePostProcessor,
+    LLMRuntimeResponsePostProcessingIssue,
+    LLMRuntimeResponsePostProcessingRequest,
+    LLMRuntimeResponsePostProcessingResult,
+    LLMRuntimeResponsePostProcessingStatus,
 )
 from app.llm.interfaces import (
     LLMProvider,
@@ -139,6 +179,13 @@ from app.llm.providers import (
 )
 from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService, LLMIntegrationStatus
+from app.llm.validation import (
+    LLMRuntimeResponseValidationIssue,
+    LLMRuntimeResponseValidationRequest,
+    LLMRuntimeResponseValidationResult,
+    LLMRuntimeResponseValidationStatus,
+    LLMRuntimeResponseValidator,
+)
 
 __all__ = [
     "AIExecutionActivationSnapshot",
@@ -157,11 +204,15 @@ __all__ = [
     "ConfigurableLLMProviderAdapter",
     "GeminiProviderAdapter",
     "InactiveLLMProviderTransportFactory",
+    "InlineLLMShadowExecutionRunner",
     "LLMActivationDiagnostic",
     "LLMActivationSeverity",
     "LLMConfiguration",
     "LLMConfigurationLoader",
     "LLMConfigurationSettings",
+    "LLMControlledGenerationRequest",
+    "LLMControlledGenerationResult",
+    "LLMControlledGenerationStatus",
     "LLMAuditTrailRecord",
     "LLMAuditVisibility",
     "LLMCitation",
@@ -229,8 +280,36 @@ __all__ = [
     "LLMRuntimeActivationResult",
     "LLMRuntimeActivationService",
     "LLMRuntimeActivationStatus",
+    "LLMRuntimeResponse",
+    "LLMRuntimeResponseComposer",
+    "LLMRuntimeResponseComposerRequest",
+    "LLMRuntimeResponseComposerResult",
+    "LLMRuntimeResponseCompositionIssue",
+    "LLMRuntimeResponseCompositionStatus",
+    "LLMRuntimeResponseEligibilityEvaluator",
+    "LLMRuntimeResponseEligibilityIssue",
+    "LLMRuntimeResponseEligibilityRequest",
+    "LLMRuntimeResponseEligibilityResult",
+    "LLMRuntimeResponseEligibilityStatus",
+    "LLMRuntimeResponsePostProcessor",
+    "LLMRuntimeResponsePostProcessingIssue",
+    "LLMRuntimeResponsePostProcessingRequest",
+    "LLMRuntimeResponsePostProcessingResult",
+    "LLMRuntimeResponsePostProcessingStatus",
     "LLMRuntimeComposition",
     "LLMRuntimeCompositionRoot",
+    "LLMRuntimeFacade",
+    "LLMRuntimeFacadeSnapshot",
+    "LLMRuntimeResponseValidationIssue",
+    "LLMRuntimeResponseValidationRequest",
+    "LLMRuntimeResponseValidationResult",
+    "LLMRuntimeResponseValidationStatus",
+    "LLMRuntimeResponseValidator",
+    "LLMShadowExecutionRunner",
+    "LLMShadowModeDiagnostic",
+    "LLMShadowModeDispatchResult",
+    "LLMShadowModeRequest",
+    "LLMShadowModeStatus",
     "LLMRuntimeFeatureFlags",
     "LLMSecurityPrivacyPolicy",
     "LLMStreamingMetadata",
@@ -246,6 +325,7 @@ __all__ = [
     "LLMToolChoice",
     "LLMToolChoiceMode",
     "LLMToolDefinition",
+    "ThreadedLLMShadowExecutionRunner",
     "InMemoryLLMProviderRegistry",
     "OllamaProviderAdapter",
     "OpenAIProviderAdapter",

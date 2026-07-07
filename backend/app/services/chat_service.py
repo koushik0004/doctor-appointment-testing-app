@@ -15,6 +15,7 @@ from app.knowledge import (
     KnowledgeRetrievalMatch,
     KnowledgeRetrievalService,
 )
+from app.llm import LLMRuntimeCompositionRoot, LLMRuntimeFacade
 from app.schemas.chat import (
     ChatAvailabilityCard,
     ChatConversationContext,
@@ -29,6 +30,7 @@ from app.schemas.doctor import DoctorResponse
 from app.services.availability_service import get_available_slots
 from app.services.chat_entity_extractor import extract_chat_search_filters, normalize_text
 from app.services.chat_intent_detector import ChatIntentMatch, detect_chat_intent
+from app.services.prompt_builder import PromptBuilderService
 from app.services.doctor_service import list_doctors
 
 GREETING_KEYWORDS = ("hello", "hi", "hey")
@@ -650,6 +652,15 @@ def _knowledge_retrieval_service() -> KnowledgeRetrievalService:
     return KnowledgeRetrievalService(repository)
 
 
+@lru_cache(maxsize=1)
+def _llm_runtime_facade() -> LLMRuntimeFacade:
+    return LLMRuntimeFacade(
+        composition_root=LLMRuntimeCompositionRoot(
+            prompt_builder=PromptBuilderService(),
+        )
+    )
+
+
 def create_chat_response(
     session: Session,
     request: ChatRequest,
@@ -662,5 +673,6 @@ def create_chat_response(
         session,
         deterministic_engine=chat_responder,
         knowledge_retrieval_service=_knowledge_retrieval_service(),
+        llm_runtime_facade=_llm_runtime_facade(),
     )
     return manager.handle(request)

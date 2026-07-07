@@ -3,16 +3,67 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 6.10 inactive production-readiness and operational-excellence architecture for the LLM seam
+- Task: implement Phase 7.8 runtime response post processing with a presentation-normalization stage
 - Completed on: 2026-07-05
 
 ## Outcome
 
-- Added `backend/app/llm/operations.py` with canonical observability, trace, token-accounting, cost-accounting, health, retry, timeout, audit, privacy, rollout, and performance models plus a deterministic evaluator and safe composition-backed readiness service.
-- Updated `backend/app/llm/composition.py` so each composed inactive graph now also assembles the operational-readiness seam alongside the existing activation, execution-policy, registry, service, and orchestrator seams.
-- Preserved deterministic chat as the production path by keeping the new operational models architecture-only and fully disconnected from `ConversationManager`, live routing, provider SDK execution, and rollout behavior.
-- Added focused backend tests covering observability models, token accounting, cost accounting, retry validation, timeout validation, audit models, rollout-policy validation, composed readiness evaluation, and deterministic serialization.
-- Updated the operational-readiness architecture reference, the integration/composition references, the Phase 6 report set, and the compact AI context files so later sessions can discover the new seam directly.
+- Added a provider-neutral runtime-response post processor under `backend/app/llm/post_processor.py` and wired the `LLMRuntimeFacade` so every composed controlled-generation response is normalized before it is returned.
+- Kept business truth intact by preserving deterministic booking/appointment fields, sanitizing presentation-only metadata separately, and falling back safely to the preprocessed composed response when post-processing cannot complete.
+- Added focused backend tests covering whitespace normalization, duplicate newline removal, markdown normalization, metadata sanitization, deterministic business preservation, deterministic-only compatibility, LLM-only compatibility, hybrid compatibility, and serialization determinism.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response post-processing seam and the final presentation-normalized response envelope directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 7.6 controlled user-visible LLM responses with runtime response eligibility
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added a provider-neutral runtime-response eligibility seam under `backend/app/llm/eligibility.py` and wired the `LLMRuntimeFacade` to expose validated LLM output only for explicitly low-risk conversational scenarios.
+- Kept user-visible runtime behavior safe by rejecting workflow-owned and non-approved requests after successful validation, preserving deterministic fallback without exposing provider, validator, or eligibility internals.
+- Added focused backend tests covering eligible conversational responses, booking and cancellation rejection, validation-plus-eligibility interaction, deterministic fallback, and serialization determinism.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response eligibility seam and user-visible response flow directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 7.5 provider-neutral runtime response validation
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added a provider-neutral runtime-response validation seam under `backend/app/llm/validation.py` and wired the `LLMRuntimeFacade` to validate controlled generation results before exposing any generated runtime output.
+- Kept runtime behavior safe by rejecting empty, whitespace-only, malformed-structured-output, invalid-finish-reason, and invalid-metadata cases through deterministic fallback without exposing provider or validation internals.
+- Added focused backend tests covering valid runtime responses, empty and whitespace rejection, malformed structured-output rejection, invalid finish reasons, diagnostics, and deterministic fallback after validation failure.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can find the runtime-response validation seam directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 7.2 shadow-mode integration through the runtime facade without changing user-visible chat behavior
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Extended `backend/app/llm/facade.py` so the runtime facade can evaluate the existing shadow execution policy, run the existing prompt-builder and orchestrator pipeline in the background, capture provider-neutral diagnostics, and discard all LLM output.
+- Wired `ConversationManager` to trigger the facade after the normal chat response is finalized, while preserving workflow, knowledge, and deterministic ownership exactly as before and swallowing any shadow-mode failure.
+- Added focused backend tests covering successful shadow execution, skipped shadow execution, failure capture, facade-trigger integration from `ConversationManager`, and the guarantee that visible responses remain unchanged.
+- Updated the Phase 7 architecture/report documentation plus the compact AI context files so future sessions can discover the shadow-mode boundary and diagnostics trail directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 7 inactive runtime facade and save-ready integration boundary for the LLM seam
+- Completed on: 2026-07-05
+
+## Outcome
+
+- Added `backend/app/llm/facade.py` with an inactive runtime facade and deterministic save-ready snapshot model for the composed LLM boundary.
+- Kept the facade architecture-only by wrapping the existing `LLMRuntimeCompositionRoot` without changing chat routing, provider execution, prompt building, or runtime activation.
+- Added focused backend tests covering facade composition caching, boundary snapshot generation, and deterministic serialization of the save-ready facade view.
+- Updated the LLM integration architecture reference, `backend/app/llm/__init__.py`, and the compact AI context files so later sessions can discover the new runtime facade directly.
 
 ## Prior Work
 

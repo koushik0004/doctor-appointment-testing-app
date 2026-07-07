@@ -10,6 +10,7 @@ from app.knowledge.documents import (
     KnowledgeDocumentStatus,
 )
 from app.knowledge.retrieval import KnowledgeRetrievalMatch
+from app.llm import LLMShadowModeDispatchResult
 from app.schemas.chat import (
     ChatConversationRequest,
     ChatConversationContext,
@@ -53,6 +54,39 @@ class StubKnowledgeService:
     def retrieve_top_match(self, query: str) -> KnowledgeRetrievalMatch | None:
         self.calls.append(query)
         return self.match
+
+
+class StubRuntimeFacade:
+    def __init__(self, *, should_raise: bool = False) -> None:
+        self.should_raise = should_raise
+        self.calls: list[object] = []
+
+    def run_shadow_mode(self, request) -> LLMShadowModeDispatchResult:
+        self.calls.append(request)
+        if self.should_raise:
+            raise RuntimeError("shadow execution failed")
+        return LLMShadowModeDispatchResult(
+            decision={
+                "requested_mode": "SHADOW",
+                "execution_mode": "SHADOW",
+                "primary_owner": "DETERMINISTIC",
+                "official_response_owner": "DETERMINISTIC",
+                "activation": {
+                    "llm_enabled": True,
+                    "shadow_mode": True,
+                    "generation_allowed": True,
+                    "generation_available": True,
+                    "provider_readiness": True,
+                    "selected_provider_name": "openai",
+                    "selected_provider_enabled": True,
+                    "selected_provider_healthy": True,
+                    "status_reason": "shadow enabled",
+                },
+                "routing_reason": "test",
+                "should_execute_shadow": True,
+                "should_execute_llm": True,
+            }
+        )
 
 
 def _knowledge_match() -> KnowledgeRetrievalMatch:
@@ -192,3 +226,43 @@ def test_conversation_manager_skips_knowledge_lookup_for_active_workflows():
     assert deterministic.calls == ["My name is Ava Thompson"]
     assert response.conversation is not None
     assert response.conversation.routed_to == ChatRoutingTarget.DETERMINISTIC_ENGINE
+
+
+def test_conversation_manager_triggers_shadow_mode_without_changing_response():
+    deterministic = StubDeterministicEngine(
+        ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
+    )
+    facade = StubRuntimeFacade()
+    manager = ConversationManager(
+        session=None,
+        deterministic_engine=deterministic,
+        knowledge_retrieval_service=StubKnowledgeService(match=None, calls=[]),
+        llm_runtime_facade=facade,
+    )
+    manager._workflow_engine = StubWorkflowEngine(response=None)
+
+    response = manager.handle(ChatRequest(message="Do you support pharmacy refills?"))
+
+    assert response.message == "fallback"
+    assert len(facade.calls) == 1
+    shadow_request = facade.calls[0]
+    assert shadow_request.user_message == "Do you support pharmacy refills?"
+    assert shadow_request.official_response_owner.value == "DETERMINISTIC"
+    assert shadow_request.correlation_id == response.conversation.conversation_id
+
+
+def test_conversation_manager_ignores_shadow_mode_failures():
+    deterministic = StubDeterministicEngine(
+        ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
+    )
+    manager = ConversationManager(
+        session=None,
+        deterministic_engine=deterministic,
+        knowledge_retrieval_service=StubKnowledgeService(match=None, calls=[]),
+        llm_runtime_facade=StubRuntimeFacade(should_raise=True),
+    )
+    manager._workflow_engine = StubWorkflowEngine(response=None)
+
+    response = manager.handle(ChatRequest(message="Hello"))
+
+    assert response.message == "fallback"

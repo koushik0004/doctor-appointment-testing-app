@@ -96,6 +96,53 @@ It is intentionally disconnected from:
 
 No production request path imports or invokes this package.
 
+Phase 7.2 and Phase 7.3 add a guarded runtime caller outside this package boundary through `backend/app/llm/facade.py`, but that caller preserves the same ownership rules:
+
+- the live user-visible response remains workflow, knowledge, or deterministic
+- shadow execution is optional and hidden
+- the provider path receives only the rendered output produced by `PromptBuilderService`
+- canonical workflow context is now included in that rendered prompt when present
+- all LLM output is still discarded after diagnostics
+
+Phase 7.4 extends that same facade with a policy-gated controlled-generation branch:
+
+- the facade still returns the existing deterministic outcome by default
+- generation only runs when activation and execution policy explicitly allow an LLM-capable mode
+- the same Prompt Builder and `LLMGenerationOrchestrator` path is reused for visible generation requests
+- generation failures are caught and fall back to the existing deterministic behavior without exposing provider errors
+
+Phase 7.5 extends that same facade with a provider-neutral runtime-response validation branch:
+
+- the facade still owns the final quality gate before any visible LLM output
+- canonical validation runs only on `LLMGenerationOrchestrationResult` data and never inspects provider-native payloads
+- validation covers empty responses, whitespace-only responses, malformed structured output, invalid finish reasons, and canonical metadata issues
+- validation failures return deterministic fallback behavior without exposing validation exceptions or provider internals
+- the validator remains outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
+
+Phase 7.6 extends that same facade with a provider-neutral runtime-response eligibility branch:
+
+- the facade now decides whether a validated response may be exposed to the user
+- canonical eligibility uses only execution policy, validation output, and canonical orchestration metadata
+- only explicitly approved low-risk conversational scenarios can become visible LLM replies
+- workflow-owned requests and other non-approved scenarios remain deterministic after validation
+- the eligibility gate remains outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
+
+Phase 7.7 extends that same facade with a provider-neutral runtime-response composition branch:
+
+- the facade now owns the final runtime response envelope for deterministic-only, LLM-only, and hybrid modes
+- canonical composition preserves deterministic business truth and can append validated, eligible LLM guidance without replacing the business response
+- hybrid composition remains provider-neutral and uses only canonical orchestration, validation, and eligibility data
+- business fields such as booking identifiers, appointment identifiers, dates, times, fees, and workflow decisions remain untouched
+- the composer stays outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, and conversation orchestration
+
+Phase 7.8 extends that same facade with a provider-neutral runtime-response post-processing branch:
+
+- the facade now applies a final presentation-only normalization pass before a runtime response becomes visible
+- canonical post-processing normalizes whitespace, line breaks, and supported markdown presentation while leaving business truth untouched
+- presentation-only metadata can be sanitized into separate post-processing diagnostics without altering workflow state, validation output, eligibility output, or orchestration metadata
+- deterministic business fields such as booking identifiers, appointment identifiers, doctor names, consultation fees, and workflow decisions remain untouched
+- the post processor stays outside Prompt Builder, Prompt Renderer, Orchestrator, provider adapters, workflow handling, conversation orchestration, validation, and eligibility
+
 ## Package Structure
 
 ```txt
@@ -105,11 +152,14 @@ backend/app/llm/
 ├── activation.py
 ├── budget.py
 ├── composition.py
+├── composer.py
 ├── config.py
 ├── execution_policy.py
 ├── interfaces.py
 ├── models.py
 ├── operations.py
+├── eligibility.py
+├── post_processor.py
 ├── orchestrator.py
 ├── providers.py
 ├── registry.py
@@ -223,6 +273,42 @@ Inactive operational-readiness seam:
 
 This module defines the provider-neutral contracts needed for future production observability, accounting, health monitoring, retry/timeout policy, auditability, privacy controls, rollout strategy, and performance tracking while remaining fully outside the live chat runtime.
 
+### `eligibility.py`
+
+Inactive runtime response eligibility seam:
+
+- `LLMRuntimeResponseEligibilityIssue`
+- `LLMRuntimeResponseEligibilityRequest`
+- `LLMRuntimeResponseEligibilityResult`
+- `LLMRuntimeResponseEligibilityStatus`
+- `LLMRuntimeResponseEligibilityEvaluator`
+
+This module determines whether a validated runtime response is safe to expose to the user by applying a deterministic low-risk allowlist over canonical execution-policy and orchestration metadata.
+
+### `composer.py`
+
+Inactive runtime response composer seam:
+
+- `LLMRuntimeResponse`
+- `LLMRuntimeResponseComposerRequest`
+- `LLMRuntimeResponseComposerResult`
+- `LLMRuntimeResponseCompositionStatus`
+- `LLMRuntimeResponseComposer`
+
+This module composes the final runtime response envelope after validation and eligibility. It supports deterministic-only, LLM-only, and hybrid modes while preserving deterministic business truth, appending optional LLM guidance only when safe, and emitting deterministic composition diagnostics and fallback metadata.
+
+### `post_processor.py`
+
+Inactive runtime response post-processing seam:
+
+- `LLMRuntimeResponsePostProcessingIssue`
+- `LLMRuntimeResponsePostProcessingRequest`
+- `LLMRuntimeResponsePostProcessingResult`
+- `LLMRuntimeResponsePostProcessingStatus`
+- `LLMRuntimeResponsePostProcessor`
+
+This module performs the final presentation-only cleanup pass after composition. It normalizes whitespace, line breaks, and supported markdown presentation, removes presentation-only metadata from the visible response envelope, and emits deterministic post-processing diagnostics without touching deterministic business data or upstream runtime decisions.
+
 ### `budget.py`
 
 Inactive provider-neutral generation-budget seam:
@@ -304,6 +390,22 @@ The facade exposes three narrow responsibilities:
 
 Phase 6.7 keeps the service constructor-only: it does not self-configure, auto-discover providers, lazily create a registry, or attach itself to runtime execution.
 
+### `facade.py`
+
+Inactive runtime facade:
+
+- `LLMRuntimeFacade`
+- `LLMRuntimeFacadeSnapshot`
+- `LLMShadowModeRequest`
+- `LLMShadowModeDiagnostic`
+- `LLMShadowModeDispatchResult`
+
+The facade owns the composed inactive graph as a single public boundary for later runtime callers.
+It can capture a deterministic, save-ready snapshot of the integration boundary without changing runtime wiring or exposing provider-private state.
+Phase 7.2 also lets the facade evaluate the existing execution policy, trigger best-effort shadow-mode orchestration through the existing Prompt Builder and generation orchestrator, record provider-neutral diagnostics, and discard all generated LLM output so the official chatbot response stays unchanged.
+Phase 7.7 adds a final-response composition branch on that same facade so deterministic-only, LLM-only, and hybrid runtime responses can preserve business truth while optionally appending validated and eligible LLM guidance.
+Phase 7.8 adds a final post-processing branch on that same facade so the composed runtime response is normalized for presentation while deterministic business truth and runtime diagnostics stay separate.
+
 ### `orchestrator.py`
 
 Inactive coordination layer:
@@ -338,6 +440,7 @@ This layer must not:
 - perform retrieval, ranking, workflow execution, booking, or domain validation
 - mutate conversation state
 - change chat API contracts
+- alter the authoritative workflow or response-composition ownership boundaries
 - bypass deterministic backend services for domain truth
 
 ## Relationship To Existing AI Layers
