@@ -296,10 +296,58 @@ class LLMRuntimeFacade:
     def run_controlled_generation(
         self,
         request: LLMControlledGenerationRequest,
+        *,
+        runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> LLMControlledGenerationResult:
         decision = self._evaluate_controlled_generation_decision(request.policy_request)
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "controlled_generation",
+                {
+                    "entered": True,
+                    "execution_mode": decision.execution_mode.value,
+                    "execution_owner": decision.official_response_owner.value,
+                    "shadow_mode": False,
+                    "reason": decision.fallback_reason or decision.routing_reason,
+                },
+            )
+            runtime_trace.update_stage(
+                "runtime_facade",
+                {
+                    "entered": True,
+                    "mode": "CONTROLLED_GENERATION",
+                    "execution_mode": decision.execution_mode.value,
+                    "execution_owner": decision.official_response_owner.value,
+                    "reason": decision.fallback_reason or decision.routing_reason,
+                },
+            )
+            runtime_trace.update_stage(
+                "execution_policy",
+                {
+                    "llm_enabled": decision.activation.llm_enabled,
+                    "selected_provider": decision.selected_provider_name,
+                    "provider_healthy": decision.activation.selected_provider_healthy,
+                    "generation_allowed": decision.activation.generation_allowed,
+                    "generation_available": decision.activation.generation_available,
+                    "execution_owner": decision.official_response_owner.value,
+                    "decision": decision.execution_mode.value,
+                    "reason": decision.fallback_reason or decision.routing_reason,
+                },
+            )
         if decision.execution_mode is AIExecutionMode.DETERMINISTIC_ONLY:
             if request.deterministic_response is None:
+                if runtime_trace is not None:
+                    runtime_trace.update_stage(
+                        "controlled_generation",
+                        {
+                            "entered": True,
+                            "status": LLMControlledGenerationStatus.SKIPPED.value,
+                            "reason": (
+                                "Deterministic-only controlled generation had no business "
+                                "response to preserve."
+                            ),
+                        },
+                    )
                 return LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
@@ -327,6 +375,38 @@ class LLMRuntimeFacade:
                 request=request,
                 composition_result=composition_result,
             )
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "runtime_validator",
+                    {"executed": False, "reason": "Deterministic-only controlled generation bypassed validation."},
+                )
+                runtime_trace.update_stage(
+                    "eligibility",
+                    {"executed": False, "reason": "Deterministic-only controlled generation bypassed eligibility."},
+                )
+                runtime_trace.update_stage(
+                    "composer",
+                    {
+                        "executed": True,
+                        "composition_mode": AIExecutionMode.DETERMINISTIC_ONLY.value,
+                        "reason": "Deterministic-only controlled generation preserved the business response.",
+                    },
+                )
+                runtime_trace.update_stage(
+                    "post_processor",
+                    {
+                        "executed": True,
+                        "status": post_processing_result.status.value,
+                    },
+                )
+                runtime_trace.update_stage(
+                    "controlled_generation",
+                    {
+                        "entered": True,
+                        "status": LLMControlledGenerationStatus.SUCCEEDED.value,
+                        "reason": "Deterministic-only controlled generation preserved the business response.",
+                    },
+                )
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
                 correlation_id=request.correlation_id,
@@ -338,6 +418,15 @@ class LLMRuntimeFacade:
             )
 
         if not self._can_execute_controlled_generation(decision):
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "controlled_generation",
+                    {
+                        "entered": True,
+                        "status": LLMControlledGenerationStatus.SKIPPED.value,
+                        "reason": decision.fallback_reason or decision.routing_reason,
+                    },
+                )
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
                 correlation_id=request.correlation_id,
@@ -350,7 +439,8 @@ class LLMRuntimeFacade:
         post_processing_result: LLMRuntimeResponsePostProcessingResult | None = None
         try:
             generated_result = self.compose().orchestrator.generate(
-                request.orchestration_request
+                request.orchestration_request,
+                runtime_trace=runtime_trace,
             )
             validation_result = self._runtime_response_validator.validate(
                 LLMRuntimeResponseValidationRequest(
@@ -364,7 +454,49 @@ class LLMRuntimeFacade:
                     },
                 )
             )
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "runtime_validator",
+                    {
+                        "executed": True,
+                        "passed": validation_result.is_valid,
+                        "issue_count": len(validation_result.issues),
+                    },
+                )
             if not validation_result.is_valid:
+                if runtime_trace is not None:
+                    runtime_trace.update_stage(
+                        "eligibility",
+                        {
+                            "executed": False,
+                            "reason": "Validation failed before eligibility evaluation.",
+                        },
+                    )
+                    runtime_trace.update_stage(
+                        "composer",
+                        {
+                            "executed": False,
+                            "reason": "Validation failed before response composition.",
+                        },
+                    )
+                    runtime_trace.update_stage(
+                        "post_processor",
+                        {
+                            "executed": False,
+                            "reason": "Validation failed before response post processing.",
+                        },
+                    )
+                    runtime_trace.update_stage(
+                        "controlled_generation",
+                        {
+                            "entered": True,
+                            "status": LLMControlledGenerationStatus.FAILED.value,
+                            "reason": (
+                                "Controlled runtime generation failed validation and "
+                                "preserved the existing deterministic response."
+                            ),
+                        },
+                    )
                 return LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
@@ -389,6 +521,15 @@ class LLMRuntimeFacade:
                     },
                 )
             )
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "eligibility",
+                    {
+                        "executed": True,
+                        "passed": eligibility_result.is_eligible,
+                        "issue_count": len(eligibility_result.issues),
+                    },
+                )
             if not eligibility_result.is_eligible:
                 composition_result = None
                 final_response = None
@@ -412,6 +553,22 @@ class LLMRuntimeFacade:
                         composition_result=composition_result,
                     )
                     final_response = post_processing_result.final_response
+                    if runtime_trace is not None:
+                        runtime_trace.update_stage(
+                            "composer",
+                            {
+                                "executed": True,
+                                "composition_mode": AIExecutionMode.DETERMINISTIC_ONLY.value,
+                                "reason": eligibility_result.fallback_reason,
+                            },
+                        )
+                        runtime_trace.update_stage(
+                            "post_processor",
+                            {
+                                "executed": True,
+                                "status": post_processing_result.status.value,
+                            },
+                        )
                 return LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
@@ -439,11 +596,41 @@ class LLMRuntimeFacade:
                     },
                 )
             )
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "composer",
+                    {
+                        "executed": True,
+                        "composition_mode": decision.execution_mode.value,
+                        "augmentation_applied": composition_result.augmentation_applied,
+                    },
+                )
             post_processing_result = self._post_process_runtime_response(
                 request=request,
                 composition_result=composition_result,
             )
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "post_processor",
+                    {
+                        "executed": True,
+                        "status": post_processing_result.status.value,
+                    },
+                )
         except Exception as exc:
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "controlled_generation",
+                    {
+                        "entered": True,
+                        "status": LLMControlledGenerationStatus.FAILED.value,
+                        "reason": (
+                            "Controlled runtime generation failed safely and preserved the "
+                            "existing deterministic response."
+                        ),
+                        "error_type": type(exc).__name__,
+                    },
+                )
             return LLMControlledGenerationResult(
                 request_id=request.request_id,
                 correlation_id=request.correlation_id,
@@ -457,6 +644,15 @@ class LLMRuntimeFacade:
                 error_type=type(exc).__name__,
             )
 
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "controlled_generation",
+                {
+                    "entered": True,
+                    "status": LLMControlledGenerationStatus.SUCCEEDED.value,
+                    "reason": "Controlled runtime generation completed successfully.",
+                },
+            )
         return LLMControlledGenerationResult(
             request_id=request.request_id,
             correlation_id=request.correlation_id,

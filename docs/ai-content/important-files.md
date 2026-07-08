@@ -63,7 +63,7 @@
 - `backend/app/api/chat.py`
   - Chat endpoints for `/api/chat` and `/api/v1/chat`; expected workflow/business errors should pass through while only unexpected chat failures become HTTP 500 responses.
 - `backend/app/services/conversation_manager.py`
-  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns, and now triggers best-effort hidden shadow execution through the runtime facade after the official response is finalized.
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns, and now routes eligible low-risk requests through controlled generation while keeping workflow, doctor search, and availability ownership deterministic.
 - `backend/app/services/workflow_engine.py`
   - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file.
 - `backend/app/services/prompt_builder.py`
@@ -83,9 +83,9 @@
 - `backend/app/llm/transport.py`
   - Production transport layer for provider SDK/network execution; currently owns the Anthropic-backed `ClaudeTransport`, normalized transport errors, transport activation diagnostics, request-id/response-id extraction, usage extraction, structured transport logging, and AI runtime trace capture for transport selection, HTTP start/finish, latency, and token usage.
 - `backend/app/llm/runtime_trace.py`
-  - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, and records explicit `llm_not_invoked` stop components/reasons whenever execution halts before provider transport.
+  - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, and records explicit `llm_not_invoked` stop components/reasons whenever execution halts before provider transport or controlled generation is skipped.
 - `backend/app/llm/facade.py`
-  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, and final-response composition gates that reuse the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
+  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, composition, and post-processing gates that reuse the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
 - `backend/app/llm/post_processor.py`
   - Provider-neutral runtime-response post processor that normalizes presentation, sanitizes presentation-only metadata, and emits deterministic post-processing diagnostics before the final response is returned.
 - `backend/app/llm/config.py`

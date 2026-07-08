@@ -378,7 +378,7 @@ def test_runtime_facade_falls_back_when_controlled_generation_validation_fails()
         model_metadata={},
         metadata={},
     )
-    composition.orchestrator.generate = lambda request: invalid_result  # type: ignore[assignment]
+    composition.orchestrator.generate = lambda request, runtime_trace=None: invalid_result  # type: ignore[assignment]
     facade.compose = lambda: composition  # type: ignore[assignment]
 
     result = facade.run_controlled_generation(

@@ -3,15 +3,15 @@
 ## Active Work
 
 - Status: completed
-- Task: implement production-safe AI runtime trace mode for end-to-end LLM call debugging
+- Task: wire controlled generation into live chat routing and runtime trace
 - Completed on: 2026-07-08
 
 ## Outcome
 
-- Added `backend/app/llm/runtime_trace.py` plus `AI_RUNTIME_TRACE` loading in `backend/app/core/config.py` so chat requests can emit a structured backend-only runtime trace with negligible disabled-path overhead.
-- Wired `ConversationManager`, `LLMRuntimeFacade`, `LLMGenerationOrchestrator`, `LLMIntegrationService`, the shared adapter pipeline, and `ClaudeTransport` to record routing, prompt, provider, transport, and stop-point diagnostics without changing business logic or visible chat routing.
-- Ensured the trace redacts common patient PII patterns, never logs secrets, and explicitly emits `llm_not_invoked` with the exact stop component and reason whenever execution stops before the transport layer.
-- Added focused tests for trace emission and provider-transport trace capture, and updated README plus the compact AI context files so later sessions can use the new debugging seam directly.
+- Updated `ConversationManager` so eligible low-risk requests now route through `LLMRuntimeFacade.run_controlled_generation()` instead of the old shadow-only live-chat trigger.
+- Preserved workflow ownership, doctor search, availability, and other business-owned paths as deterministic while allowing knowledge-backed low-risk questions to use hybrid composition and knowledge-free low-risk questions to use LLM-only generation.
+- Extended `LLMRuntimeFacade.run_controlled_generation()` with runtime-trace hooks for controlled generation, execution policy, prompt builder, integration, validation, eligibility, composition, and post-processing stages.
+- Added focused backend tests covering knowledge-backed hybrid routing, low-risk LLM-only routing, workflow blocking, active-workflow blocking, runtime-trace emission, and facade validation fallback.
 
 ## Prior Work
 

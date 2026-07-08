@@ -6,7 +6,16 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from app.knowledge import KnowledgeRetrievalMatch, KnowledgeRetrievalService
-from app.llm import AIExecutionOwner, LLMRuntimeFacade, LLMShadowModeRequest
+from app.llm import (
+    AIExecutionMode,
+    AIExecutionOwner,
+    AIExecutionPolicyRequest,
+    LLMControlledGenerationRequest,
+    LLMGenerationOrchestrationRequest,
+    LLMRuntimeFacade,
+    LLMRuntimeResponse,
+    LLMShadowModeRequest,
+)
 from app.llm.runtime_trace import AIRuntimeTraceRegistry, AIRuntimeTraceSession
 from app.schemas.chat import (
     ChatConversationContext,
@@ -227,6 +236,21 @@ def _should_use_knowledge_response(intent_match: ChatIntentMatch) -> bool:
     return intent_match.intent in {ChatIntent.UNKNOWN, ChatIntent.APPOINTMENT_HELP}
 
 
+def _should_use_controlled_generation(
+    intent_match: ChatIntentMatch,
+    response: ChatResponse,
+    *,
+    has_active_workflow: bool,
+) -> bool:
+    if response.workflow is not None or has_active_workflow:
+        return False
+    return intent_match.intent in {
+        ChatIntent.UNKNOWN,
+        ChatIntent.APPOINTMENT_HELP,
+        ChatIntent.CANCEL_APPOINTMENT_HELP,
+    }
+
+
 class ConversationManager:
     def __init__(
         self,
@@ -250,6 +274,11 @@ class ConversationManager:
         if response.knowledge_source is not None:
             return ChatRoutingTarget.FUTURE_AI_LAYER
         return ChatRoutingTarget.DETERMINISTIC_ENGINE
+
+    def _resolve_controlled_route(self, response: ChatResponse) -> ChatRoutingTarget:
+        if response.workflow is not None:
+            return ChatRoutingTarget.WORKFLOW_ENGINE
+        return ChatRoutingTarget.FUTURE_AI_LAYER
 
     def _retrieve_knowledge_match(self, message: str, base_context: ChatConversationContext) -> KnowledgeRetrievalMatch | None:
         if self._knowledge_retrieval_service is None or _has_active_workflow(base_context.current_workflow):
@@ -350,6 +379,154 @@ class ConversationManager:
             runtime_trace.mark_llm_not_invoked("runtime_facade", "Shadow mode raised an exception.")
             return
 
+    def _run_controlled_generation(
+        self,
+        *,
+        request: ChatRequest,
+        base_context: ChatConversationContext,
+        response: ChatResponse,
+        resolved_filters: ChatSearchFilters | None,
+        intent_match: ChatIntentMatch,
+        knowledge_match: KnowledgeRetrievalMatch | None,
+        runtime_trace: AIRuntimeTraceSession,
+    ) -> tuple[ChatResponse, bool]:
+        if self._llm_runtime_facade is None:
+            runtime_trace.update_stage(
+                "controlled_generation",
+                {
+                    "entered": False,
+                    "skipped": True,
+                    "reason": "LLM runtime facade is unavailable.",
+                },
+            )
+            runtime_trace.mark_llm_not_invoked(
+                "runtime_facade",
+                "LLM runtime facade is unavailable.",
+            )
+            return response, False
+
+        if not _should_use_controlled_generation(
+            intent_match,
+            response,
+            has_active_workflow=_has_active_workflow(base_context.current_workflow),
+        ):
+            runtime_trace.update_stage(
+                "controlled_generation",
+                {
+                    "entered": False,
+                    "skipped": True,
+                    "reason": "Execution policy kept this request on the deterministic path.",
+                },
+            )
+            runtime_trace.mark_llm_not_invoked(
+                "execution_policy",
+                "Execution policy kept this request on the deterministic path.",
+            )
+            return response, False
+
+        conversation_history = (
+            [item.model_dump(mode="json") for item in request.conversation.history]
+            if request.conversation is not None
+            else []
+        )
+        conversation_state = {
+            "conversation_id": base_context.conversation_id,
+            "context": base_context.model_dump(mode="json"),
+            "history": conversation_history,
+        }
+        if resolved_filters is not None:
+            conversation_state["active_filters"] = resolved_filters.model_dump(mode="json")
+
+        knowledge_route = _should_use_knowledge_response(intent_match) and knowledge_match is not None
+        baseline_route = (
+            ChatRoutingTarget.WORKFLOW_ENGINE
+            if response.workflow is not None
+            else ChatRoutingTarget.FUTURE_AI_LAYER
+            if response.knowledge_source is not None
+            else ChatRoutingTarget.DETERMINISTIC_ENGINE
+        )
+        deterministic_response = LLMRuntimeResponse(
+            message=response.message,
+            data={},
+            metadata={
+                "response_owner": baseline_route.value,
+                "knowledge_source": (
+                    response.knowledge_source.model_dump(mode="json")
+                    if response.knowledge_source is not None
+                    else None
+                ),
+            },
+        )
+        policy_request = AIExecutionPolicyRequest(
+            preferred_mode=AIExecutionMode.HYBRID if knowledge_route else AIExecutionMode.LLM_ONLY,
+            intent_name=intent_match.intent.value,
+            has_active_workflow=False,
+            knowledge_eligible=knowledge_route,
+            knowledge_match_available=knowledge_match is not None,
+        )
+        provider_name = self._llm_runtime_facade.compose().activation_status.selected_provider_name
+        try:
+            result = self._llm_runtime_facade.run_controlled_generation(
+                LLMControlledGenerationRequest(
+                    correlation_id=base_context.conversation_id,
+                    policy_request=policy_request,
+                    deterministic_response=deterministic_response,
+                    orchestration_request=LLMGenerationOrchestrationRequest(
+                        user_message=request.message,
+                        conversation_state=conversation_state,
+                        documents=[knowledge_match.document] if knowledge_match is not None else [],
+                        active_intent=intent_match.intent.value,
+                        provider_name=provider_name,
+                        metadata={
+                            "routed_to": baseline_route.value,
+                            "knowledge_used": response.knowledge_source is not None,
+                            "ai_runtime_trace_id": runtime_trace.trace_id,
+                        },
+                    ),
+                ),
+                runtime_trace=runtime_trace,
+            )
+        except Exception:
+            runtime_trace.update_stage(
+                "controlled_generation",
+                {
+                    "entered": True,
+                    "skipped": True,
+                    "reason": "Controlled generation raised an exception.",
+                },
+            )
+            runtime_trace.mark_llm_not_invoked(
+                "runtime_facade",
+                "Controlled generation raised an exception.",
+            )
+            return response, False
+
+        runtime_trace.update_stage(
+            "controlled_generation",
+            {
+                "entered": True,
+                "execution_mode": result.decision.execution_mode.value,
+                "execution_owner": result.decision.official_response_owner.value,
+                "status": result.status.value,
+                "reason": result.fallback_reason or result.decision.routing_reason,
+            },
+        )
+
+        if result.final_response is None or result.status.value != "SUCCEEDED":
+            return response, False
+
+        return (
+            ChatResponse(
+                intent=ChatIntent.UNKNOWN,
+                message=result.final_response.message,
+                data=[],
+                search_filters=resolved_filters,
+                help_steps=[],
+                knowledge_source=response.knowledge_source,
+            ),
+            True,
+        )
+
     def handle(self, request: ChatRequest) -> ChatResponse:
         base_context = _build_context_from_request(request.conversation)
         runtime_trace = AIRuntimeTraceSession(
@@ -436,7 +613,20 @@ class ConversationManager:
                         selected_doctor_name=base_context.selected_doctor_name,
                         conversation_context=base_context,
                     )
-            routed_to = self._resolve_route(response)
+            response, controlled_generation_used = self._run_controlled_generation(
+                request=request,
+                base_context=base_context,
+                response=response,
+                resolved_filters=resolved_filters,
+                intent_match=intent_match,
+                knowledge_match=knowledge_match,
+                runtime_trace=runtime_trace,
+            )
+            routed_to = (
+                self._resolve_controlled_route(response)
+                if controlled_generation_used
+                else self._resolve_route(response)
+            )
             selected_doctor_id, selected_doctor_name = _resolve_selected_doctor(
                 response,
                 base_context.selected_doctor_id,
@@ -459,32 +649,48 @@ class ConversationManager:
                 routed_to=routed_to,
                 current_workflow=next_workflow,
             )
-            self._run_shadow_mode(
-                request=request,
-                response=response,
-                resolved_filters=resolved_filters,
-                intent_match=intent_match,
-                knowledge_match=knowledge_match,
-                runtime_trace=runtime_trace,
-            )
-            runtime_trace.update_stage(
-                "runtime_validator",
-                {"pass": None, "reason": "Skipped for shadow-mode diagnostic execution."},
-            )
-            runtime_trace.update_stage(
-                "eligibility",
-                {"pass": None, "reason": "Skipped for shadow-mode diagnostic execution."},
-            )
-            runtime_trace.update_stage(
-                "composer",
-                {
-                    "deterministic": response.knowledge_source is None and response.workflow is None,
-                    "llm": False,
-                    "hybrid": False,
-                    "reason": "Visible response was finalized before shadow-mode diagnostics.",
-                },
-            )
-            runtime_trace.update_stage("post_processor", {"executed": False})
+            if not controlled_generation_used:
+                runtime_trace.update_stage(
+                    "runtime_validator",
+                    {"pass": None, "reason": "Skipped for visible conversation handling."},
+                )
+                runtime_trace.update_stage(
+                    "eligibility",
+                    {"pass": None, "reason": "Skipped for visible conversation handling."},
+                )
+                runtime_trace.update_stage(
+                    "composer",
+                    {
+                        "deterministic": response.knowledge_source is None and response.workflow is None,
+                        "llm": False,
+                        "hybrid": False,
+                        "reason": "Visible response was finalized before controlled-generation diagnostics.",
+                    },
+                )
+                runtime_trace.update_stage(
+                    "post_processor",
+                    {
+                        "executed": False,
+                        "reason": "Post-processing is reserved for controlled generation.",
+                    },
+                )
+            else:
+                runtime_trace.update_stage(
+                    "composer",
+                    {
+                        "deterministic": response.knowledge_source is None and response.workflow is None and not controlled_generation_used,
+                        "llm": controlled_generation_used and response.knowledge_source is None,
+                        "hybrid": controlled_generation_used and response.knowledge_source is not None,
+                        "reason": "Visible response was finalized through controlled generation.",
+                    },
+                )
+                runtime_trace.update_stage(
+                    "post_processor",
+                    {
+                        "executed": True,
+                        "reason": "Controlled generation response was already post-processed.",
+                    },
+                )
             runtime_trace.update_stage(
                 "final_response",
                 {
@@ -492,6 +698,8 @@ class ConversationManager:
                     "response_owner": (
                         "WORKFLOW"
                         if response.workflow is not None
+                        else "LLM"
+                        if controlled_generation_used
                         else "KNOWLEDGE"
                         if response.knowledge_source is not None
                         else "DETERMINISTIC"
@@ -499,6 +707,8 @@ class ConversationManager:
                     "response_source": (
                         "workflow_engine"
                         if response.workflow is not None
+                        else "controlled_generation"
+                        if controlled_generation_used
                         else "vectorless_rag"
                         if response.knowledge_source is not None
                         else "deterministic_engine"

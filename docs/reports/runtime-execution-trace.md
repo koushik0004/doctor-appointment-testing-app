@@ -1,95 +1,119 @@
 # Runtime Execution Trace
 
-## Request
+## Purpose
+
+This report captures the routing change that makes controlled generation reachable from the live chat path.
+
+It is both an implementation report and a runtime trace summary for the same request class:
 
 `"My wife has been suffering from migraine for 3 weeks. Which specialist should we consult first?"`
 
-## Execution Context Used
+## Files Modified
 
-- Trace performed against the current repository code without modifying code.
-- Direct service invocation confirmed the returned `ChatResponse`.
-- Important environment note: `backend/app/llm/config.py` loads `.env` relative to process working directory (`backend/app/llm/config.py:228-235`). In the current repo-root execution context, the composed LLM activation status resolved to `llm_enabled=False`, `shadow_mode=False`, and `generation_available=False`.
+- `backend/app/llm/facade.py`
+- `backend/app/services/conversation_manager.py`
+- `backend/tests/test_llm_facade.py`
+- `backend/tests/test_conversation_manager.py`
 
-## Final Outcome
+## What Changed
 
-- HTTP response is returned successfully.
-- Visible response owner is Vector-less RAG knowledge fallback, not workflow or Claude.
-- The request stops before Claude transport in `backend/app/llm/facade.py`, class `LLMRuntimeFacade`, method `run_shadow_mode`, line `263`, because execution policy returns `should_execute_shadow=False`.
-- The policy reason comes from `backend/app/llm/execution_policy.py`, class `AIExecutionPolicyEvaluator`, method `evaluate`, lines `197-215`: shadow execution falls back because shadow mode or runtime generation availability is not enabled.
+Before this change, `ConversationManager` always finished the visible response and then attempted hidden shadow execution. That shadow path stopped early in `LLMRuntimeFacade.run_shadow_mode()` whenever `should_execute_shadow` was false, so Prompt Builder, Orchestrator, Provider Registry, Claude Adapter, Claude Transport, Validator, Eligibility, Composer, and Post Processor were never reached.
 
-## Returned Response
+After this change, `ConversationManager` routes eligible low-risk chat requests into `LLMRuntimeFacade.run_controlled_generation()` instead of shadow mode. Workflow-owned requests still stay deterministic, doctor search and availability remain deterministic, and active workflows still block LLM participation. The visible response is replaced only when controlled generation succeeds.
 
-Observed returned payload summary:
+## Routing Changes
 
-- `intent`: `UNKNOWN`
-- `message`: knowledge fallback from `Appointment Preparation Guide`
-- `knowledge_source.document_id`: `faq.preparation.general`
-- `knowledge_source.matched_terms`: `["should"]`
-- `conversation.routed_to`: `FUTURE_AI_LAYER`
-- `workflow`: `null`
+- Workflow requests still win first.
+- Active workflows still block controlled generation.
+- Booking, cancellation, confirmation, doctor search, availability lookup, and doctor-detail routes remain deterministic.
+- Low-risk conversational requests now enter controlled generation when the intent is `UNKNOWN`, `APPOINTMENT_HELP`, or `CANCEL_APPOINTMENT_HELP`.
+- Knowledge-backed low-risk requests use `HYBRID` mode so the deterministic knowledge document and Claude guidance can be composed together.
+- Knowledge-free low-risk requests use `LLM_ONLY` mode.
 
-## Call Trace
+## Before / After
 
-| Component | Entered? | Exit Point | Returned Value | Continued? | Notes |
-|---|---|---|---|---|---|
-| Chat API endpoint | Yes | `backend/app/api/chat.py`, `_handle_chat`, line `14` | Returns `create_chat_response(session, request)` result | Yes | HTTP entrypoint is `create_chat_reply()` at `backend/app/api/chat.py:24-29` or `create_chat_reply_v1()` at `:32-37`; both delegate to `_handle_chat()`. |
-| Conversation Manager | Yes | `backend/app/services/conversation_manager.py`, `ConversationManager.handle`, line `509` | Final `ChatResponse` with knowledge fallback and conversation metadata | Yes | Builds base context, extracts filters, detects intent, runs knowledge lookup, asks workflow engine, then finalizes visible response. |
-| Workflow Engine | Yes | `backend/app/services/workflow_engine.py`, `WorkflowEngine.handle`, line `504` | `None` | Yes | `_resolve_workflow_type()` does not produce a workflow for this message, so workflow processing stops immediately. |
-| Execution Policy | Yes | `backend/app/llm/execution_policy.py`, `AIExecutionPolicyEvaluator.evaluate`, lines `204-215` | `AIExecutionDecision` with baseline knowledge mode and `should_execute_shadow=False` | No for LLM path | Shadow request is rejected here. Baseline owner is knowledge because `knowledge_eligible=True` and `knowledge_match_available=True` (`backend/app/llm/execution_policy.py:231-233`). |
-| Vector-less RAG | Yes | `backend/app/knowledge/retrieval.py`, `KnowledgeRetrievalService.retrieve_top_match`, line `98` | `KnowledgeRetrievalMatch(document_id="faq.preparation.general", title="Appointment Preparation Guide", score=5, matched_terms=("should",))` | Yes | The message is weakly matched to the preparation FAQ on the token `should`. |
-| Runtime Facade | Yes | `backend/app/llm/facade.py`, `LLMRuntimeFacade.run_shadow_mode`, lines `263-270` | `LLMShadowModeDispatchResult(scheduled=False, diagnostic=SKIPPED)` | No for LLM path | This is the concrete stop before prompt building and Claude transport. |
-| Prompt Builder | No | Not reached | None | No | `LLMRuntimeFacade._execute_shadow_mode()` is never called, so `composition.orchestrator.generate()` is never reached (`backend/app/llm/facade.py:285-289`, `:581-589`). |
-| LLM Orchestrator | No | Not reached | None | No | Blocked upstream by `run_shadow_mode()` early return at `backend/app/llm/facade.py:263-270`. |
-| LLM Integration Service | No | Not reached | None | No | `LLMIntegrationService.generate()` at `backend/app/llm/service.py:54-88` is never called. |
-| Provider Registry | No | Not reached | None | No | No request-time registry lookup occurs because `LLMIntegrationService.generate()` is not entered. |
-| Claude Adapter | No | Not reached | None | No | Adapter `generate()` path in `backend/app/llm/adapters.py:14-43` is never called. |
-| Claude Transport | No | Not reached | None | No | `ClaudeTransport.invoke()` in `backend/app/llm/transport.py:70-163` is never called. |
-| Runtime Validator | No | Not reached | None | No | Validation exists only in controlled generation via `run_controlled_generation()` (`backend/app/llm/facade.py:355-378`), not this shadow-skipped path. |
-| Runtime Eligibility | No | Not reached | None | No | Eligibility exists only in controlled generation via `run_controlled_generation()` (`backend/app/llm/facade.py:379-425`). |
-| Runtime Composer | No | Not reached | None | No | Composer exists only in controlled generation or deterministic-only facade composition, not in this shadow-skipped chat path. |
-| Runtime Post Processor | No | Not reached | None | No | Post-processing exists only after facade composition in controlled generation (`backend/app/llm/facade.py:514-550`). |
+| Area | Before | After |
+|---|---|---|
+| Visible chat owner | Deterministic or Vector-less RAG only | Deterministic, Vector-less RAG, or controlled generation |
+| General AI questions | Fell back to deterministic text | Reach Prompt Builder, Claude, and post-processing |
+| Knowledge-backed low-risk questions | Knowledge reply only | Hybrid controlled generation with knowledge context |
+| Workflow requests | Deterministic workflow only | Deterministic workflow only |
+| Shadow mode | Only diagnostic, and often skipped early | Still available as a facade capability, but no longer the live chat trigger |
 
-## Detailed Step-by-Step Path
+## Why Controlled Generation Was Previously Unreachable
 
-1. The request enters `POST /chat` or `POST /v1/chat` and is passed to `_handle_chat()` in `backend/app/api/chat.py:12-21`.
-2. `_handle_chat()` calls `create_chat_response(session, request)` at `backend/app/api/chat.py:14`.
-3. `create_chat_response()` constructs `ConversationManager(...)` and calls `manager.handle(request)` at `backend/app/services/chat_service.py:666-681`.
-4. `ConversationManager.handle()` builds request-scoped conversation state at `backend/app/services/conversation_manager.py:353-374`.
-5. It extracts search filters at `:375-376`. For this message, all filters are `None`.
-6. It detects intent at `:377`. `detect_chat_intent()` returns `APPOINTMENT_HELP` because the normalized message contains the booking keyword `consult` (`backend/app/services/chat_intent_detector.py:15-24`, `:104-115`).
-7. It runs Vector-less RAG at `backend/app/services/conversation_manager.py:388`. `retrieve_top_match()` returns the `Appointment Preparation Guide` document on a weak token match `("should",)` (`backend/app/knowledge/retrieval.py:81-98`, `:149-177`).
-8. It calls `WorkflowEngine.handle()` at `backend/app/services/conversation_manager.py:400-404`.
-9. `WorkflowEngine.handle()` resolves workflow type at `backend/app/services/workflow_engine.py:498-503`. `_resolve_workflow_type()` returns `None` because the message is not an actionable booking/cancellation/confirmation workflow and there is no selected doctor or workflow follow-up context (`backend/app/services/workflow_engine.py:246-275`).
-10. Control returns to `ConversationManager.handle()`. Since workflow returned `None` and knowledge exists and knowledge is allowed for `APPOINTMENT_HELP`, the visible response is created from the knowledge document at `backend/app/services/conversation_manager.py:421-430`.
-11. `ConversationManager` sets `response.conversation.routed_to = FUTURE_AI_LAYER` at `backend/app/services/conversation_manager.py:449-461`.
-12. `ConversationManager._run_shadow_mode()` is called at `backend/app/services/conversation_manager.py:462-469`.
-13. `_run_shadow_mode()` calls `LLMRuntimeFacade.run_shadow_mode(...)` at `backend/app/services/conversation_manager.py:290-318`.
-14. `LLMRuntimeFacade.run_shadow_mode()` evaluates shadow policy at `backend/app/llm/facade.py:262`.
-15. `AIExecutionPolicyEvaluator.evaluate()` receives a shadow request and enters the shadow branch at `backend/app/llm/execution_policy.py:197`.
-16. Because `activation.shadow_mode` and `activation.generation_available` are not both true, policy returns the fallback decision at `backend/app/llm/execution_policy.py:204-215`.
-17. `LLMRuntimeFacade.run_shadow_mode()` sees `decision.should_execute_shadow == False` and returns immediately at `backend/app/llm/facade.py:263-270`.
-18. Since that early return happens, `_execute_shadow_mode()` is never called, so the entire downstream path is skipped: Prompt Builder, Orchestrator, Integration Service, Registry lookup, Claude Adapter, Claude Transport, Validator, Eligibility, Composer, Post Processor.
-19. `ConversationManager.handle()` emits the final response and returns at `backend/app/services/conversation_manager.py:488-509`.
-20. `_handle_chat()` returns that `ChatResponse` to FastAPI at `backend/app/api/chat.py:14`.
+The controlled-generation pipeline already existed in `LLMRuntimeFacade.run_controlled_generation()`, but `ConversationManager.handle()` never called it. The chat path always invoked `_run_shadow_mode()`, which asked the execution policy for `SHADOW` mode and returned as soon as `should_execute_shadow` was false.
 
-## Exact Stop Before Claude Transport
+That meant the live request never reached:
 
-Primary stop location for this execution:
+- Prompt Builder
+- LLM Orchestrator
+- LLM Integration Service
+- Provider Registry
+- Claude Adapter
+- Claude Transport
+- Runtime Validator
+- Runtime Eligibility
+- Runtime Composer
+- Runtime Post Processor
 
-- File: `backend/app/llm/facade.py`
-- Class: `LLMRuntimeFacade`
-- Method: `run_shadow_mode`
-- Line: `263`
-- Condition: `if not decision.should_execute_shadow:`
+## How It Is Activated Now
 
-Why it stopped:
+`ConversationManager` now evaluates the request after the workflow and knowledge layers:
 
-- The decision was produced in `backend/app/llm/execution_policy.py`, class `AIExecutionPolicyEvaluator`, method `evaluate`, lines `197-215`.
-- Shadow execution was rejected because runtime activation did not satisfy the shadow-execution gate.
-- In the current repo-root execution context, the composed activation snapshot resolved to `llm_enabled=False`, `shadow_mode=False`, and `generation_available=False`, so the shadow request cannot proceed.
+1. Workflow ownership still short-circuits the request.
+2. If no workflow owns the request and the intent is low risk, the manager builds a controlled-generation request.
+3. If a knowledge document was found, the request is sent in `HYBRID` mode with the document included in the orchestration input.
+4. If no knowledge document exists, the request is sent in `LLM_ONLY` mode.
+5. The facade then runs the existing validated path:
+   - Prompt Builder
+   - Orchestrator
+   - Integration Service
+   - Provider Adapter
+   - Claude Transport
+   - Runtime Validator
+   - Runtime Eligibility
+   - Runtime Composer
+   - Runtime Post Processor
+
+## Runtime Trace Coverage
+
+The trace now records:
+
+- `controlled_generation`
+- `runtime_facade`
+- `execution_policy`
+- `prompt_builder`
+- `llm_integration`
+- `provider_adapter`
+- `provider_transport`
+- `runtime_validator`
+- `eligibility`
+- `composer`
+- `post_processor`
+- `final_response`
+
+The visible trace still emits `llm_not_invoked` when the facade is missing, policy blocks the request, or controlled generation fails safely before provider execution.
+
+## Manual Validation
+
+Validated with targeted backend tests:
+
+```bash
+./backend/.venv/bin/python -m pytest backend/tests/test_conversation_manager.py backend/tests/test_llm_facade.py -q
+```
+
+Result:
+
+- `21 passed`
+
+Additional direct verification covered the two intended behavior classes:
+
+- general low-risk text now reaches controlled generation
+- workflow-owned requests stay deterministic and do not call the facade
 
 ## Practical Interpretation
 
-- The user-facing answer for this request is currently not a specialist recommendation.
-- The request is misrouted into the knowledge FAQ path because `consult` is treated as a booking/help keyword by the intent detector, and the knowledge retriever accepts a weak match on `should`.
-- The Claude path is not reached at all for this execution because shadow execution is blocked before prompt generation begins.
+- General AI questions such as `What is quantization?` and `What is diabetes?` can now reach Claude through the controlled-generation path.
+- Knowledge-backed low-risk questions can combine Vector-less RAG and Claude guidance through the existing composer.
+- Booking and other business-owned flows remain on deterministic APIs and do not lose ownership to the LLM path.
