@@ -1,4 +1,5 @@
 import os
+from json import loads
 from types import SimpleNamespace
 
 import pytest
@@ -23,6 +24,7 @@ from app.llm import (
     ProductionLLMProviderTransportFactory,
 )
 from app.llm.transport import LLMTransportError
+from app.llm.runtime_trace import AIRuntimeTraceRegistry, AIRuntimeTraceSession
 from app.services.prompt_builder import PromptBuilderService
 
 
@@ -191,6 +193,43 @@ def test_claude_transport_uses_generation_budget_when_max_tokens_missing():
 
     assert client.messages.calls[0]["max_tokens"] == 333
     assert client.messages.calls[0]["thinking"]["effort"] == "low"
+
+
+def test_claude_transport_updates_runtime_trace(caplog):
+    message = SimpleNamespace(
+        id="msg-trace",
+        model="claude-sonnet-4-5",
+        role="assistant",
+        type="message",
+        stop_reason="end_turn",
+        usage=SimpleNamespace(input_tokens=22, output_tokens=11),
+        content=[SimpleNamespace(type="text", text="ok", citations=None)],
+    )
+    trace = AIRuntimeTraceSession(enabled=True, request_id="req-trace", conversation_id="conv-trace")
+    AIRuntimeTraceRegistry.register(trace)
+    transport = ClaudeTransport(
+        _claude_config(),
+        client=FakeAnthropicClient(FakeRawResponse(message, request_id="anthropic-trace")),
+    )
+
+    with caplog.at_level("INFO"):
+        transport.invoke(
+            {
+                "model": "claude-sonnet-4-5",
+                "messages": [{"role": "user", "content": "Hello"}],
+                "adapter_metadata": {"ai_runtime_trace_id": trace.trace_id},
+            }
+        )
+        trace.emit()
+    AIRuntimeTraceRegistry.unregister(trace.trace_id)
+
+    trace_record = next(
+        record for record in caplog.records if record.message.startswith("ai_runtime_trace ")
+    )
+    payload = loads(trace_record.message.removeprefix("ai_runtime_trace "))
+    assert payload["provider_transport"]["transport_selected"] == "ClaudeTransport"
+    assert payload["provider_transport"]["http_response_received"] is True
+    assert payload["provider_transport"]["token_usage"]["input_tokens"] == 22
 
 
 def test_claude_transport_maps_sdk_status_errors():

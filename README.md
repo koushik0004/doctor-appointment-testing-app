@@ -79,6 +79,7 @@ Settings are loaded from `backend/.env` because both backend config loaders read
 | `LLM_ALLOW_STREAMING` | No | Allows streaming only if the selected provider also supports it. | `false` |
 | `LLM_ALLOW_TOOL_CALLING` | No | Allows tool-calling only if the selected provider also supports it. | `false` |
 | `LLM_ALLOW_REASONING` | No | Allows reasoning output only if the selected provider also supports it. | `false` |
+| `AI_RUNTIME_TRACE` | No | Enables backend-only structured AI runtime trace logging for each chat request. | `true` |
 | `LLM_TIMEOUT_SECONDS` | No | Global timeout fallback for provider config. | `30` |
 | `LLM_MAX_RETRIES` | No | Global retry fallback for provider config. | `2` |
 | `LLM_RETRY_BACKOFF_SECONDS` | No | Global retry backoff fallback for provider config. | `0.5` |
@@ -248,6 +249,62 @@ How to verify:
 - Send a normal chat request to `POST /api/chat`.
 - Confirm the visible response does not change when shadow mode is attempted.
 - In tests, inspect the returned facade snapshot and shadow diagnostics.
+
+### 7. AI Runtime Trace Mode
+
+What it does:
+
+- `AI_RUNTIME_TRACE=true` enables a backend-only structured trace for each chat request.
+- The trace captures the request path across `ConversationManager`, workflow detection, Vector-less RAG, execution policy, runtime facade, prompt building, LLM integration, adapter selection, provider transport, and final response ownership.
+- If the request never reaches the transport layer, the trace explicitly marks `llm_not_invoked=true` and records the exact stop component and reason.
+- The trace redacts common patient PII patterns from the logged user message and never logs API keys or authorization headers.
+
+How to enable:
+
+```bash
+echo "AI_RUNTIME_TRACE=true" >> backend/.env
+make backend-restart
+```
+
+How to disable:
+
+```bash
+perl -0pi -e 's/AI_RUNTIME_TRACE=true/AI_RUNTIME_TRACE=false/' backend/.env
+make backend-restart
+```
+
+Sample trace:
+
+```json
+{
+  "trace_name": "AI Runtime Trace",
+  "request_id": "8f6d...",
+  "conversation_id": "conv-123",
+  "user_message": "My name is [REDACTED_NAME] and my email is [REDACTED_EMAIL]",
+  "execution_policy": {
+    "selected_provider": "claude",
+    "generation_available": true,
+    "decision": "SHADOW"
+  },
+  "provider_transport": {
+    "transport_selected": "ClaudeTransport",
+    "http_request_started": true,
+    "http_response_received": true,
+    "status_code": 200
+  },
+  "final_response": {
+    "routed_to": "DETERMINISTIC_ENGINE",
+    "response_source": "deterministic_engine"
+  }
+}
+```
+
+How to diagnose routing problems:
+
+- If `runtime_facade.skipped=true`, read `runtime_facade.reason` first; this usually means shadow mode or generation availability was blocked before prompt building.
+- If `llm_not_invoked=true`, use `stop_component` and `stop_reason` to find the exact stage where execution stopped.
+- If `prompt_builder.executed=true` but `provider_transport.http_request_started=false`, inspect `llm_integration`, `provider_adapter`, and provider registration/transport readiness.
+- If `provider_transport.http_request_started=true` and the visible response is still deterministic, that is expected for shadow mode because generated output is discarded after diagnostics.
 
 #### Conversation Manager
 
@@ -466,6 +523,8 @@ What to look for:
 | Validation failure | Controlled generation returns a failed validation result. | The orchestration result is missing canonical fields or structured output is malformed. | Fix the provider mapping or use the deterministic fallback path. |
 | Eligibility rejection | Controlled generation is skipped after validation. | The request is not a low-risk conversational scenario or the policy did not approve visibility. | Keep the visible response deterministic for workflow-owned or non-approved requests. |
 | Runtime fallback | The app returns deterministic or knowledge-backed chat instead of AI-generated output. | The default runtime has no active transport, or activation/policy rejected generation. | This is expected in the current repo unless you inject a real transport factory in a custom harness. |
+| No AI trace logs | No `ai_runtime_trace` log entries appear during chat requests. | `AI_RUNTIME_TRACE` is false or the backend was not restarted after changing `backend/.env`. | Set `AI_RUNTIME_TRACE=true` in `backend/.env` and restart the backend. |
+| `LLM NOT INVOKED` in trace | Trace shows `llm_not_invoked=true` with a stop component. | Routing or provider readiness stopped the request before the provider transport. | Use `stop_component`, `stop_reason`, and the stage sections in the trace payload to identify the blocking seam. |
 
 ## Codex skill related
 

@@ -81,7 +81,9 @@
 - `backend/app/llm/composition.py`
   - Runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams; Phase 8 now defaults it to `ProductionLLMProviderTransportFactory`, which composes Claude transport when Claude is enabled.
 - `backend/app/llm/transport.py`
-  - Production transport layer for provider SDK/network execution; currently owns the Anthropic-backed `ClaudeTransport`, normalized transport errors, transport activation diagnostics, request-id/response-id extraction, usage extraction, and structured transport logging.
+  - Production transport layer for provider SDK/network execution; currently owns the Anthropic-backed `ClaudeTransport`, normalized transport errors, transport activation diagnostics, request-id/response-id extraction, usage extraction, structured transport logging, and AI runtime trace capture for transport selection, HTTP start/finish, latency, and token usage.
+- `backend/app/llm/runtime_trace.py`
+  - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, and records explicit `llm_not_invoked` stop components/reasons whenever execution halts before provider transport.
 - `backend/app/llm/facade.py`
   - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, and final-response composition gates that reuse the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
 - `backend/app/llm/post_processor.py`
@@ -117,7 +119,7 @@
 - `backend/app/services/appointment_search_service.py`
   - Appointment search behavior across patient and doctor joins.
 - `backend/app/services/chat_service.py`
-  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching, the knowledge-backed fallback composer, and the cached runtime-facade wiring used by `ConversationManager`.
+  - Deterministic execution engine for the AI assistant and structured chat responses, including doctor-details matching, the knowledge-backed fallback composer, the cached runtime-facade wiring used by `ConversationManager`, and loading of the `AI_RUNTIME_TRACE` backend debug flag through core settings.
 - `backend/app/services/chat_intent_detector.py`
   - Intent classification entry point for chat behavior, including doctor-profile/detail query routing.
 - `backend/app/services/chat_entity_extractor.py`

@@ -55,6 +55,7 @@ from app.llm.validation import (
     LLMRuntimeResponseValidationResult,
     LLMRuntimeResponseValidator,
 )
+from app.llm.runtime_trace import AIRuntimeTraceSession
 
 
 class LLMRuntimeFacadeSnapshot(BaseModel):
@@ -256,6 +257,7 @@ class LLMRuntimeFacade:
         request: LLMShadowModeRequest,
         *,
         asynchronous: bool = True,
+        runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> LLMShadowModeDispatchResult:
         decision = self._evaluate_shadow_decision(request)
         if not decision.should_execute_shadow:
@@ -269,14 +271,22 @@ class LLMRuntimeFacade:
 
         if asynchronous:
             self._shadow_execution_runner.submit(
-                lambda: self._execute_shadow_mode(request=request, decision=decision)
+                lambda: self._execute_shadow_mode(
+                    request=request,
+                    decision=decision,
+                    runtime_trace=runtime_trace,
+                )
             )
             return LLMShadowModeDispatchResult(
                 decision=decision,
                 scheduled=True,
             )
 
-        diagnostic = self._execute_shadow_mode(request=request, decision=decision)
+        diagnostic = self._execute_shadow_mode(
+            request=request,
+            decision=decision,
+            runtime_trace=runtime_trace,
+        )
         return LLMShadowModeDispatchResult(
             decision=decision,
             scheduled=False,
@@ -544,6 +554,7 @@ class LLMRuntimeFacade:
         *,
         request: LLMShadowModeRequest,
         decision: AIExecutionDecision,
+        runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> LLMShadowModeDiagnostic:
         composition = self.compose()
         trace = LLMTraceContext(
@@ -572,7 +583,10 @@ class LLMRuntimeFacade:
                 request=request,
                 provider_name=request.provider_name or decision.selected_provider_name,
             )
-            orchestration_result = composition.orchestrator.generate(orchestration_request)
+            orchestration_result = composition.orchestrator.generate(
+                orchestration_request,
+                runtime_trace=runtime_trace,
+            )
             completed_at = datetime.now(timezone.utc)
             duration_ms = (perf_counter() - started_perf) * 1000
             token_accounting = self._build_token_accounting(
@@ -612,6 +626,11 @@ class LLMRuntimeFacade:
                 model_name=orchestration_result.model_name,
             )
         except Exception as exc:
+            if runtime_trace is not None:
+                runtime_trace.mark_llm_not_invoked(
+                    "runtime_facade",
+                    f"Shadow execution stopped with {type(exc).__name__}: {exc}",
+                )
             completed_at = datetime.now(timezone.utc)
             duration_ms = (perf_counter() - started_perf) * 1000
             diagnostic = LLMShadowModeDiagnostic(

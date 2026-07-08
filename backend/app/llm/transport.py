@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping
 
 from app.llm.config import LLMProviderConfiguration, LLMProviderName
 from app.llm.providers import ProviderPayload
+from app.llm.runtime_trace import get_runtime_trace_from_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +72,32 @@ class ClaudeTransport:
         request_id: str | None = None
         response_id: str | None = None
         status_code: int | None = None
+        runtime_trace = get_runtime_trace_from_metadata(
+            request.get("adapter_metadata") if isinstance(request, dict) else None
+        )
 
         try:
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "provider_transport",
+                    {
+                        "transport_selected": self.__class__.__name__,
+                        "sdk_initialized": False,
+                        "http_request_started": False,
+                    },
+                )
             client = self._get_client()
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "provider_transport",
+                    {"sdk_initialized": True},
+                )
             create_params = self._build_create_params(request)
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "provider_transport",
+                    {"http_request_started": True},
+                )
             raw_response = self._invoke_messages_create(client, create_params)
             message = raw_response["message"]
             request_id = raw_response["request_id"]
@@ -96,6 +119,16 @@ class ClaudeTransport:
                 status_code=status_code,
                 latency_ms=self._compute_latency_ms(start),
             )
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "provider_transport",
+                    {
+                        "http_response_received": True,
+                        "status_code": status_code,
+                        "latency": self._compute_latency_ms(start),
+                        "token_usage": payload.get("usage"),
+                    },
+                )
             return payload
         except Exception as exc:
             normalized = self._map_error(
@@ -113,6 +146,20 @@ class ClaudeTransport:
                 latency_ms=self._compute_latency_ms(start),
                 error=normalized,
             )
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "provider_transport",
+                    {
+                        "http_response_received": False,
+                        "status_code": normalized.status_code,
+                        "latency": self._compute_latency_ms(start),
+                        "token_usage": None,
+                    },
+                )
+                runtime_trace.mark_llm_not_invoked(
+                    "provider_transport",
+                    f"{normalized.error_code}: {normalized}",
+                )
             raise normalized from exc
 
     def get_activation_snapshot(self) -> LLMTransportActivationSnapshot:

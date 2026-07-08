@@ -31,6 +31,7 @@ from app.services.prompt_builder import (
     PromptBuildResult,
     PromptBuilderService,
 )
+from app.llm.runtime_trace import AIRuntimeTraceSession
 
 
 class LLMGenerationOrchestrationRequest(BaseModel):
@@ -93,12 +94,43 @@ class LLMGenerationOrchestrator:
     def generate(
         self,
         request: LLMGenerationOrchestrationRequest,
+        runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> LLMGenerationOrchestrationResult:
         prompt_result = self._prompt_builder.build(self._build_prompt_request(request))
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "prompt_builder",
+                {
+                    "executed": True,
+                    "prompt_generated": bool(prompt_result.prompt),
+                    "prompt_length": len(prompt_result.prompt),
+                    "token_estimate": max(1, len(prompt_result.prompt) // 4),
+                },
+            )
         llm_request = self.build_llm_request(request, prompt_result=prompt_result)
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "llm_integration",
+                {
+                    "provider": request.provider_name,
+                    "model": llm_request.model_name,
+                    "generation_profile": (
+                        llm_request.generation_budget.profile_name.value
+                        if llm_request.generation_budget is not None
+                        and llm_request.generation_budget.profile_name is not None
+                        else None
+                    ),
+                    "generation_budget": (
+                        llm_request.generation_budget.model_dump(mode="json")
+                        if llm_request.generation_budget is not None
+                        else None
+                    ),
+                },
+            )
         llm_response = self._llm_integration_service.generate(
             llm_request,
             provider_name=request.provider_name,
+            runtime_trace=runtime_trace,
         )
         return self._normalize_result(prompt_result=prompt_result, response=llm_response)
 

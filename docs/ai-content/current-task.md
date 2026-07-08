@@ -3,10 +3,21 @@
 ## Active Work
 
 - Status: completed
-- Task: implement Phase 08 production transport framework with Anthropic-backed Claude transport
-- Completed on: 2026-07-07
+- Task: implement production-safe AI runtime trace mode for end-to-end LLM call debugging
+- Completed on: 2026-07-08
 
 ## Outcome
+
+- Added `backend/app/llm/runtime_trace.py` plus `AI_RUNTIME_TRACE` loading in `backend/app/core/config.py` so chat requests can emit a structured backend-only runtime trace with negligible disabled-path overhead.
+- Wired `ConversationManager`, `LLMRuntimeFacade`, `LLMGenerationOrchestrator`, `LLMIntegrationService`, the shared adapter pipeline, and `ClaudeTransport` to record routing, prompt, provider, transport, and stop-point diagnostics without changing business logic or visible chat routing.
+- Ensured the trace redacts common patient PII patterns, never logs secrets, and explicitly emits `llm_not_invoked` with the exact stop component and reason whenever execution stops before the transport layer.
+- Added focused tests for trace emission and provider-transport trace capture, and updated README plus the compact AI context files so later sessions can use the new debugging seam directly.
+
+## Prior Work
+
+- Status: completed
+- Task: implement Phase 08 production transport framework with Anthropic-backed Claude transport
+- Completed on: 2026-07-07
 
 - Added `backend/app/llm/transport.py` with a production `ClaudeTransport`, normalized `LLMTransportError`, and activation-ready transport diagnostics while keeping the provider-neutral adapter/orchestrator/facade architecture intact.
 - Switched the default `LLMRuntimeCompositionRoot` transport factory to `ProductionLLMProviderTransportFactory`, which now composes Claude transport only when Claude is enabled and leaves other providers inactive until their transport implementations exist.

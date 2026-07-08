@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from app.knowledge.documents import (
@@ -61,7 +62,8 @@ class StubRuntimeFacade:
         self.should_raise = should_raise
         self.calls: list[object] = []
 
-    def run_shadow_mode(self, request) -> LLMShadowModeDispatchResult:
+    def run_shadow_mode(self, request, *, asynchronous=True, runtime_trace=None) -> LLMShadowModeDispatchResult:
+        del asynchronous, runtime_trace
         self.calls.append(request)
         if self.should_raise:
             raise RuntimeError("shadow execution failed")
@@ -266,3 +268,32 @@ def test_conversation_manager_ignores_shadow_mode_failures():
     response = manager.handle(ChatRequest(message="Hello"))
 
     assert response.message == "fallback"
+
+
+def test_conversation_manager_emits_runtime_trace_when_enabled(caplog):
+    deterministic = StubDeterministicEngine(
+        ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
+    )
+    manager = ConversationManager(
+        session=None,
+        deterministic_engine=deterministic,
+        knowledge_retrieval_service=StubKnowledgeService(match=None, calls=[]),
+        llm_runtime_facade=None,
+        runtime_trace_enabled=True,
+    )
+    manager._workflow_engine = StubWorkflowEngine(response=None)
+
+    with caplog.at_level("INFO"):
+        response = manager.handle(
+            ChatRequest(message="My name is Ava Thompson and my email is ava@example.com")
+        )
+
+    assert response.message == "fallback"
+    trace_record = next(
+        record for record in caplog.records if record.message.startswith("ai_runtime_trace ")
+    )
+    payload = json.loads(trace_record.message.removeprefix("ai_runtime_trace "))
+    assert payload["user_message"] == "My name is [REDACTED_NAME] and my email is [REDACTED_EMAIL]"
+    assert payload["llm_not_invoked"] is True
+    assert payload["stop_component"] == "runtime_facade"
+    assert payload["final_response"]["response_source"] == "deterministic_engine"

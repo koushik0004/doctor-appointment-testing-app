@@ -19,6 +19,7 @@ from app.llm.models import (
     LLMTokenUsage,
     LLMToolCall,
 )
+from app.llm.runtime_trace import get_runtime_trace_from_metadata
 ProviderPayload = dict[str, Any]
 
 
@@ -67,6 +68,14 @@ class ConfigurableLLMProviderAdapter(
 
     def invoke_provider(self, request: ProviderPayload) -> ProviderPayload:
         if self._transport is None:
+            runtime_trace = get_runtime_trace_from_metadata(
+                request.get("adapter_metadata") if isinstance(request, dict) else None
+            )
+            if runtime_trace is not None:
+                runtime_trace.mark_llm_not_invoked(
+                    "provider_adapter",
+                    f"{self.provider_name.value} adapter has no configured provider transport.",
+                )
             raise RuntimeError(
                 f"{self.provider_name.value} adapter is inactive: no provider transport is configured."
             )

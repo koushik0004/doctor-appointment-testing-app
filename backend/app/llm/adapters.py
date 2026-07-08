@@ -5,13 +5,29 @@ from typing import Generic
 
 from app.llm.interfaces import ProviderRequestT, ProviderResponseT
 from app.llm.models import LLMGenerationRequest, LLMGenerationResponse
+from app.llm.runtime_trace import get_runtime_trace_from_metadata
 
 
 class BaseLLMProviderAdapter(ABC, Generic[ProviderRequestT, ProviderResponseT]):
     """Shared translation pipeline for future provider-specific adapters."""
 
     def generate(self, request: LLMGenerationRequest) -> LLMGenerationResponse:
+        runtime_trace = get_runtime_trace_from_metadata(request.metadata)
+        if runtime_trace is not None:
+            descriptor = self.describe()
+            runtime_trace.update_stage(
+                "provider_adapter",
+                {
+                    "adapter_selected": descriptor.provider_name,
+                    "request_translated": False,
+                },
+            )
         provider_request = self.translate_request(request)
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "provider_adapter",
+                {"request_translated": True},
+            )
         provider_response = self.invoke_provider(provider_request)
         canonical_response = self.translate_response(
             provider_response,

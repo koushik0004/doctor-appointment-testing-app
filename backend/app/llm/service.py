@@ -8,6 +8,7 @@ from app.llm.models import (
     LLMGenerationResponse,
     LLMProviderDescriptor,
 )
+from app.llm.runtime_trace import AIRuntimeTraceSession
 
 
 class LLMIntegrationStatus(BaseModel):
@@ -55,6 +56,7 @@ class LLMIntegrationService:
         request: LLMGenerationRequest,
         *,
         provider_name: str | None = None,
+        runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> LLMGenerationResponse:
         resolved_provider_name = (
             provider_name
@@ -62,14 +64,25 @@ class LLMIntegrationService:
             or self._provider_registry.get_default_provider_name()
         )
         if not resolved_provider_name:
+            if runtime_trace is not None:
+                runtime_trace.mark_llm_not_invoked(
+                    "llm_integration",
+                    "No provider name was resolved for generation.",
+                )
             raise RuntimeError(
                 "LLM integration is inactive: no provider name was resolved."
             )
 
         provider = self._provider_registry.get_provider(resolved_provider_name)
         if provider is None:
+            if runtime_trace is not None:
+                runtime_trace.mark_llm_not_invoked(
+                    "llm_integration",
+                    f"Provider '{resolved_provider_name}' is not registered.",
+                )
             raise RuntimeError(
                 f"LLM integration is inactive: provider '{resolved_provider_name}' is not registered."
             )
 
+        request.metadata.setdefault("ai_runtime_trace_id", runtime_trace.trace_id if runtime_trace is not None else "")
         return provider.generate(request)

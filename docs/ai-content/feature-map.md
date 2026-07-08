@@ -119,6 +119,7 @@
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
   - Triggers the inactive Phase 7.2 LLM runtime facade in hidden shadow mode after the official response is chosen, captures diagnostics only, and discards all LLM output without changing any frontend-visible chat behavior.
+  - When `AI_RUNTIME_TRACE=true`, emits a structured backend-only end-to-end trace for each chat request, including routing decisions, prompt/orchestration progress, provider transport activity, and explicit `llm_not_invoked` stop reasons when the request never reaches a live provider call.
   - Phase 7.3 ensures every hidden shadow execution reaches the full Prompt Builder -> Prompt Renderer -> Orchestrator path, including canonical workflow context in the rendered prompt sent to provider adapters.
   - Phase 7.4 adds policy-gated controlled runtime generation through the existing facade, with generation only occurring when runtime activation and execution policy explicitly allow an LLM-capable mode.
   - Phase 7.5 adds a provider-neutral runtime-response validation gate on the facade so controlled generation is validated before any future visible LLM response and safely falls back on empty, malformed, or otherwise invalid canonical output.
