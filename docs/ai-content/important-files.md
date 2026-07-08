@@ -85,7 +85,9 @@
 - `backend/app/llm/runtime_trace.py`
   - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, and records explicit `llm_not_invoked` stop components/reasons whenever execution halts before provider transport or controlled generation is skipped.
 - `backend/app/llm/facade.py`
-  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, composition, and post-processing gates that reuse the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
+  - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, composition, post-processing, and non-success diagnostic emission that reuses the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
+- `backend/app/llm/runtime_trace.py`
+  - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, and now supports snapshotting the in-flight trace so controlled-generation skips and failures can emit a final structured summary before completion.
 - `backend/app/llm/post_processor.py`
   - Provider-neutral runtime-response post processor that normalizes presentation, sanitizes presentation-only metadata, and emits deterministic post-processing diagnostics before the final response is returned.
 - `backend/app/llm/config.py`
@@ -185,7 +187,7 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_llm_composition.py`
   - Covers the inactive runtime composition seam: one-time configuration loading, enabled-provider-only assembly, transport injection, activation-status assembly, execution-policy assembly, operational-readiness assembly, explicit dependency-graph construction, and preserved inactive behavior without transports.
 - `backend/tests/test_llm_facade.py`
-  - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, Prompt Builder backed shadow prompt delivery, policy-gated controlled generation, runtime-response validation fallback, runtime-response eligibility fallback, deterministic-only composition, hybrid final-response composition, deterministic fallback behavior, and deterministic serialization of the facade view.
+  - Covers the runtime facade seam: composition caching, save-ready boundary snapshots, successful/skipped/failed shadow execution, Prompt Builder backed shadow prompt delivery, policy-gated controlled generation, runtime-response validation fallback, runtime-response eligibility fallback, deterministic-only composition, hybrid final-response composition, controlled-generation diagnostic emission for SKIPPED/FAILED runs, deterministic fallback behavior, and deterministic serialization of the facade view.
 - `backend/tests/test_llm_post_processor.py`
   - Covers the runtime-response post processor seam: whitespace normalization, duplicate newline removal, markdown normalization, metadata sanitization, deterministic business preservation, runtime-mode compatibility, and serialization determinism.
 - `backend/tests/test_llm_composer.py`

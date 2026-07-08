@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This report captures the routing change that makes controlled generation reachable from the live chat path.
+This report captures the routing change that makes controlled generation reachable from the live chat path and the follow-up instrumentation that guarantees a structured diagnostic when controlled generation does not succeed.
 
 It is both an implementation report and a runtime trace summary for the same request class:
 
@@ -10,6 +10,7 @@ It is both an implementation report and a runtime trace summary for the same req
 
 ## Files Modified
 
+- `backend/app/llm/runtime_trace.py`
 - `backend/app/llm/facade.py`
 - `backend/app/services/conversation_manager.py`
 - `backend/tests/test_llm_facade.py`
@@ -20,6 +21,8 @@ It is both an implementation report and a runtime trace summary for the same req
 Before this change, `ConversationManager` always finished the visible response and then attempted hidden shadow execution. That shadow path stopped early in `LLMRuntimeFacade.run_shadow_mode()` whenever `should_execute_shadow` was false, so Prompt Builder, Orchestrator, Provider Registry, Claude Adapter, Claude Transport, Validator, Eligibility, Composer, and Post Processor were never reached.
 
 After this change, `ConversationManager` routes eligible low-risk chat requests into `LLMRuntimeFacade.run_controlled_generation()` instead of shadow mode. Workflow-owned requests still stay deterministic, doctor search and availability remain deterministic, and active workflows still block LLM participation. The visible response is replaced only when controlled generation succeeds.
+
+The follow-up diagnostics change keeps that routing intact and adds a final controlled-generation summary to the runtime trace whenever the facade returns `SKIPPED` or `FAILED`. The new summary is additive and does not change chat behavior, fallback behavior, or response shapes.
 
 ## Routing Changes
 
@@ -93,7 +96,36 @@ The trace now records:
 - `post_processor`
 - `final_response`
 
+The visible trace now also records a final controlled-generation summary with:
+
+- execution mode
+- generation availability
+- provider readiness
+- selected provider
+- orchestration started
+- prompt builder executed
+- provider adapter executed
+- transport invoked
+- HTTP request sent
+- HTTP response received
+- validation result
+- eligibility result
+- composition result
+- post processor result
+- stop stage
+- fallback reason
+- exception type
+- exception message
+
 The visible trace still emits `llm_not_invoked` when the facade is missing, policy blocks the request, or controlled generation fails safely before provider execution.
+
+## Stabilization Summary
+
+- Issue: non-success controlled-generation runs could finish without a single final diagnostic record that explained where execution stopped.
+- Root Cause: the facade already tracked stage progress, but the end-of-call summary was only implicit and some skip/failure branches returned before a structured diagnostic was emitted.
+- Implementation: added `AIRuntimeTraceSession.snapshot()` and a final controlled-generation diagnostic emitter in `LLMRuntimeFacade.run_controlled_generation()` so every `SKIPPED` or `FAILED` result logs the stage summary, fallback reason, and exception details before completion.
+- Files Changed: `backend/app/llm/runtime_trace.py`, `backend/app/llm/facade.py`, `backend/tests/test_llm_facade.py`
+- Backward Compatibility: routing and fallback behavior are unchanged; the new diagnostic is additive and only appears when `AI_RUNTIME_TRACE` is enabled.
 
 ## Manual Validation
 
@@ -111,6 +143,7 @@ Additional direct verification covered the two intended behavior classes:
 
 - general low-risk text now reaches controlled generation
 - workflow-owned requests stay deterministic and do not call the facade
+- non-success controlled-generation runs now emit a final structured diagnostic before the trace is logged
 
 ## Practical Interpretation
 

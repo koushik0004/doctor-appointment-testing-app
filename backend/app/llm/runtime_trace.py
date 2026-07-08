@@ -77,6 +77,12 @@ class AIRuntimeTraceSession:
             else:
                 self._payload[stage] = deepcopy(values)
 
+    def snapshot(self) -> dict[str, Any]:
+        if not self.enabled:
+            return {}
+        with self._lock:
+            return deepcopy(self._payload)
+
     def mark_llm_not_invoked(self, component: str, reason: str) -> None:
         if not self.enabled:
             return

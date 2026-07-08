@@ -300,6 +300,7 @@ class LLMRuntimeFacade:
         runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> LLMControlledGenerationResult:
         decision = self._evaluate_controlled_generation_decision(request.policy_request)
+        pipeline_stage = "orchestration"
         if runtime_trace is not None:
             runtime_trace.update_stage(
                 "controlled_generation",
@@ -336,19 +337,7 @@ class LLMRuntimeFacade:
             )
         if decision.execution_mode is AIExecutionMode.DETERMINISTIC_ONLY:
             if request.deterministic_response is None:
-                if runtime_trace is not None:
-                    runtime_trace.update_stage(
-                        "controlled_generation",
-                        {
-                            "entered": True,
-                            "status": LLMControlledGenerationStatus.SKIPPED.value,
-                            "reason": (
-                                "Deterministic-only controlled generation had no business "
-                                "response to preserve."
-                            ),
-                        },
-                    )
-                return LLMControlledGenerationResult(
+                result = LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
                     decision=decision,
@@ -358,6 +347,13 @@ class LLMRuntimeFacade:
                         "response to preserve."
                     ),
                 )
+                if runtime_trace is not None:
+                    self._emit_controlled_generation_diagnostic(
+                        runtime_trace=runtime_trace,
+                        result=result,
+                        stop_stage="deterministic_response",
+                    )
+                return result
 
             composition_result = self._runtime_response_composer.compose(
                 LLMRuntimeResponseComposerRequest(
@@ -418,30 +414,30 @@ class LLMRuntimeFacade:
             )
 
         if not self._can_execute_controlled_generation(decision):
-            if runtime_trace is not None:
-                runtime_trace.update_stage(
-                    "controlled_generation",
-                    {
-                        "entered": True,
-                        "status": LLMControlledGenerationStatus.SKIPPED.value,
-                        "reason": decision.fallback_reason or decision.routing_reason,
-                    },
-                )
-            return LLMControlledGenerationResult(
+            result = LLMControlledGenerationResult(
                 request_id=request.request_id,
                 correlation_id=request.correlation_id,
                 decision=decision,
                 status=LLMControlledGenerationStatus.SKIPPED,
                 fallback_reason=decision.fallback_reason or decision.routing_reason,
             )
+            if runtime_trace is not None:
+                self._emit_controlled_generation_diagnostic(
+                    runtime_trace=runtime_trace,
+                    result=result,
+                    stop_stage="execution_policy",
+                )
+            return result
 
         eligibility_result: LLMRuntimeResponseEligibilityResult | None = None
         post_processing_result: LLMRuntimeResponsePostProcessingResult | None = None
         try:
+            pipeline_stage = "orchestration"
             generated_result = self.compose().orchestrator.generate(
                 request.orchestration_request,
                 runtime_trace=runtime_trace,
             )
+            pipeline_stage = "validation"
             validation_result = self._runtime_response_validator.validate(
                 LLMRuntimeResponseValidationRequest(
                     request_id=request.request_id,
@@ -497,7 +493,7 @@ class LLMRuntimeFacade:
                             ),
                         },
                     )
-                return LLMControlledGenerationResult(
+                result = LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
                     decision=decision,
@@ -508,6 +504,14 @@ class LLMRuntimeFacade:
                         "preserved the existing deterministic response."
                     ),
                 )
+                if runtime_trace is not None:
+                    self._emit_controlled_generation_diagnostic(
+                        runtime_trace=runtime_trace,
+                        result=result,
+                        stop_stage="validation",
+                    )
+                return result
+            pipeline_stage = "eligibility"
             eligibility_result = self._runtime_response_eligibility_evaluator.evaluate(
                 LLMRuntimeResponseEligibilityRequest(
                     request_id=request.request_id,
@@ -569,7 +573,7 @@ class LLMRuntimeFacade:
                                 "status": post_processing_result.status.value,
                             },
                         )
-                return LLMControlledGenerationResult(
+                result = LLMControlledGenerationResult(
                     request_id=request.request_id,
                     correlation_id=request.correlation_id,
                     decision=decision,
@@ -581,6 +585,14 @@ class LLMRuntimeFacade:
                     final_response=final_response,
                     fallback_reason=eligibility_result.fallback_reason,
                 )
+                if runtime_trace is not None:
+                    self._emit_controlled_generation_diagnostic(
+                        runtime_trace=runtime_trace,
+                        result=result,
+                        stop_stage="eligibility",
+                    )
+                return result
+            pipeline_stage = "composition"
             composition_result = self._runtime_response_composer.compose(
                 LLMRuntimeResponseComposerRequest(
                     request_id=request.request_id,
@@ -618,20 +630,7 @@ class LLMRuntimeFacade:
                     },
                 )
         except Exception as exc:
-            if runtime_trace is not None:
-                runtime_trace.update_stage(
-                    "controlled_generation",
-                    {
-                        "entered": True,
-                        "status": LLMControlledGenerationStatus.FAILED.value,
-                        "reason": (
-                            "Controlled runtime generation failed safely and preserved the "
-                            "existing deterministic response."
-                        ),
-                        "error_type": type(exc).__name__,
-                    },
-                )
-            return LLMControlledGenerationResult(
+            result = LLMControlledGenerationResult(
                 request_id=request.request_id,
                 correlation_id=request.correlation_id,
                 decision=decision,
@@ -643,17 +642,15 @@ class LLMRuntimeFacade:
                 error_message=str(exc),
                 error_type=type(exc).__name__,
             )
+            if runtime_trace is not None:
+                self._emit_controlled_generation_diagnostic(
+                    runtime_trace=runtime_trace,
+                    result=result,
+                    stop_stage=pipeline_stage,
+                )
+            return result
 
-        if runtime_trace is not None:
-            runtime_trace.update_stage(
-                "controlled_generation",
-                {
-                    "entered": True,
-                    "status": LLMControlledGenerationStatus.SUCCEEDED.value,
-                    "reason": "Controlled runtime generation completed successfully.",
-                },
-            )
-        return LLMControlledGenerationResult(
+        result = LLMControlledGenerationResult(
             request_id=request.request_id,
             correlation_id=request.correlation_id,
             decision=decision,
@@ -665,6 +662,16 @@ class LLMRuntimeFacade:
             post_processing_result=post_processing_result,
             final_response=post_processing_result.final_response,
         )
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "controlled_generation",
+                {
+                    "entered": True,
+                    "status": LLMControlledGenerationStatus.SUCCEEDED.value,
+                    "reason": "Controlled runtime generation completed successfully.",
+                },
+            )
+        return result
 
     def list_shadow_diagnostics(self) -> list[LLMShadowModeDiagnostic]:
         with self._shadow_history_lock:
@@ -706,6 +713,152 @@ class LLMRuntimeFacade:
             AIExecutionMode.LLM_ONLY,
             AIExecutionMode.HYBRID,
         }
+
+    def _emit_controlled_generation_diagnostic(
+        self,
+        *,
+        runtime_trace: AIRuntimeTraceSession,
+        result: LLMControlledGenerationResult,
+        stop_stage: str,
+    ) -> None:
+        snapshot = runtime_trace.snapshot()
+        provider_transport = snapshot.get("provider_transport") or {}
+        provider_adapter = snapshot.get("provider_adapter") or {}
+        prompt_builder = snapshot.get("prompt_builder") or {}
+        llm_integration = snapshot.get("llm_integration") or {}
+        runtime_validator = snapshot.get("runtime_validator") or {}
+        eligibility = snapshot.get("eligibility") or {}
+        composer = snapshot.get("composer") or {}
+        post_processor = snapshot.get("post_processor") or {}
+
+        transport_invoked = bool(provider_transport.get("http_request_started"))
+        stage_name = self._infer_controlled_generation_stop_stage(
+            stop_stage=stop_stage,
+            prompt_builder=prompt_builder,
+            llm_integration=llm_integration,
+            provider_adapter=provider_adapter,
+            provider_transport=provider_transport,
+        )
+        diagnostic_reason = result.fallback_reason or result.decision.fallback_reason or result.decision.routing_reason
+        runtime_trace.update_stage(
+            "controlled_generation",
+            {
+                "entered": True,
+                "status": result.status.value,
+                "execution_mode": result.decision.execution_mode.value,
+                "execution_owner": result.decision.official_response_owner.value,
+                "generation_available": result.decision.activation.generation_available,
+                "provider_readiness": result.decision.activation.provider_readiness,
+                "provider_selected": result.decision.selected_provider_name,
+                "orchestration_started": bool(
+                    prompt_builder or llm_integration or provider_adapter or provider_transport
+                ),
+                "prompt_builder_executed": bool(prompt_builder.get("executed")),
+                "provider_adapter_executed": bool(provider_adapter.get("request_translated")),
+                "transport_invoked": transport_invoked,
+                "http_request_sent": provider_transport.get("http_request_started", False),
+                "http_response_received": provider_transport.get("http_response_received", False),
+                "validation_result": {
+                    "executed": runtime_validator.get("executed", False),
+                    "passed": runtime_validator.get("passed"),
+                    "issue_count": runtime_validator.get("issue_count"),
+                    "status": (
+                        result.validation_result.status.value
+                        if result.validation_result is not None
+                        else None
+                    ),
+                    "issue_codes": (
+                        [issue.code for issue in result.validation_result.issues]
+                        if result.validation_result is not None
+                        else []
+                    ),
+                },
+                "eligibility_result": {
+                    "executed": eligibility.get("executed", False),
+                    "passed": eligibility.get("passed"),
+                    "issue_count": eligibility.get("issue_count"),
+                    "status": (
+                        result.eligibility_result.status.value
+                        if result.eligibility_result is not None
+                        else None
+                    ),
+                    "issue_codes": (
+                        [issue.code for issue in result.eligibility_result.issues]
+                        if result.eligibility_result is not None
+                        else []
+                    ),
+                },
+                "composition_result": {
+                    "executed": composer.get("executed", False),
+                    "composition_mode": composer.get("composition_mode"),
+                    "augmentation_applied": composer.get("augmentation_applied"),
+                    "status": (
+                        result.composition_result.status.value
+                        if result.composition_result is not None
+                        else None
+                    ),
+                    "fallback_reason": (
+                        result.composition_result.fallback_reason
+                        if result.composition_result is not None
+                        else None
+                    ),
+                },
+                "post_processor_result": {
+                    "executed": post_processor.get("executed", False),
+                    "status": (
+                        result.post_processing_result.status.value
+                        if result.post_processing_result is not None
+                        else post_processor.get("status")
+                    ),
+                    "message_changed": (
+                        result.post_processing_result.message_changed
+                        if result.post_processing_result is not None
+                        else None
+                    ),
+                    "metadata_changed": (
+                        result.post_processing_result.metadata_changed
+                        if result.post_processing_result is not None
+                        else None
+                    ),
+                },
+                "stop_stage": stage_name,
+                "fallback_reason": diagnostic_reason,
+                "exception_type": result.error_type,
+                "exception_message": result.error_message,
+            },
+        )
+        if not transport_invoked:
+            runtime_trace.mark_llm_not_invoked("controlled_generation", diagnostic_reason)
+        runtime_trace.emit()
+
+    def _infer_controlled_generation_stop_stage(
+        self,
+        *,
+        stop_stage: str,
+        prompt_builder: dict[str, Any],
+        llm_integration: dict[str, Any],
+        provider_adapter: dict[str, Any],
+        provider_transport: dict[str, Any],
+    ) -> str:
+        if stop_stage != "orchestration":
+            return stop_stage
+
+        if (
+            not prompt_builder.get("executed")
+            and not llm_integration
+            and not provider_adapter
+            and not provider_transport
+        ):
+            return "prompt_builder"
+        if provider_transport.get("http_response_received") is False and provider_transport.get("http_request_started"):
+            return "provider_transport"
+        if provider_adapter.get("request_translated") is False and provider_adapter.get("adapter_selected"):
+            return "provider_adapter"
+        if prompt_builder.get("executed") and not llm_integration:
+            return "prompt_builder"
+        if llm_integration:
+            return "llm_integration"
+        return stop_stage
 
     def _post_process_runtime_response(
         self,
