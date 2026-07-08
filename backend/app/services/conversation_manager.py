@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 from uuid import uuid4
+from time import perf_counter
 
 from sqlalchemy.orm import Session
 
@@ -280,10 +281,16 @@ class ConversationManager:
             return ChatRoutingTarget.WORKFLOW_ENGINE
         return ChatRoutingTarget.FUTURE_AI_LAYER
 
-    def _retrieve_knowledge_match(self, message: str, base_context: ChatConversationContext) -> KnowledgeRetrievalMatch | None:
+    def _retrieve_knowledge_match(
+        self,
+        message: str,
+        base_context: ChatConversationContext,
+        *,
+        runtime_trace: AIRuntimeTraceSession | None = None,
+    ) -> KnowledgeRetrievalMatch | None:
         if self._knowledge_retrieval_service is None or _has_active_workflow(base_context.current_workflow):
             return None
-        return self._knowledge_retrieval_service.retrieve_top_match(message)
+        return self._knowledge_retrieval_service.retrieve_top_match(message, runtime_trace=runtime_trace)
 
     def _run_shadow_mode(
         self,
@@ -371,7 +378,8 @@ class ConversationManager:
                     "execution_policy",
                     dispatch.decision.fallback_reason or dispatch.decision.routing_reason,
                 )
-        except Exception:
+        except Exception as exc:
+            runtime_trace.record_exception("runtime_facade", exc, converted_to_fallback=True)
             runtime_trace.update_stage(
                 "runtime_facade",
                 {"entered": True, "skipped": True, "reason": "Shadow mode raised an exception."},
@@ -464,7 +472,11 @@ class ConversationManager:
             knowledge_eligible=knowledge_route,
             knowledge_match_available=knowledge_match is not None,
         )
-        provider_name = self._llm_runtime_facade.compose().activation_status.selected_provider_name
+        composition = self._llm_runtime_facade.compose()
+        provider_name = composition.activation_status.selected_provider_name
+        runtime_trace.set_root("selected_provider", provider_name)
+        runtime_trace.set_root("execution_mode", policy_request.preferred_mode.value)
+        runtime_trace.set_root("activation_status", composition.activation_status.model_dump(mode="json"))
         try:
             result = self._llm_runtime_facade.run_controlled_generation(
                 LLMControlledGenerationRequest(
@@ -486,7 +498,8 @@ class ConversationManager:
                 ),
                 runtime_trace=runtime_trace,
             )
-        except Exception:
+        except Exception as exc:
+            runtime_trace.record_exception("runtime_facade", exc, converted_to_fallback=True)
             runtime_trace.update_stage(
                 "controlled_generation",
                 {
@@ -534,11 +547,14 @@ class ConversationManager:
             conversation_id=base_context.conversation_id,
         )
         AIRuntimeTraceRegistry.register(runtime_trace)
+        started_at = perf_counter()
         try:
             runtime_trace.attach_user_message(request.message)
             runtime_trace.update_stage(
                 "conversation_manager",
                 {
+                    "entered": True,
+                    "completed": False,
                     "conversation_loaded": request.conversation is not None,
                     "history_size": len(request.conversation.history) if request.conversation else 0,
                     "conversation_state": {
@@ -552,6 +568,7 @@ class ConversationManager:
             current_filters = extract_chat_search_filters(request.message)
             resolved_filters = _merge_search_filters(base_context.active_filters, current_filters)
             intent_match = detect_chat_intent(request.message)
+            runtime_trace.set_root("intent", intent_match.intent.value)
             runtime_trace.update_stage(
                 "conversation_manager",
                 {
@@ -562,7 +579,11 @@ class ConversationManager:
                     },
                 },
             )
-            knowledge_match = self._retrieve_knowledge_match(request.message, base_context)
+            knowledge_match = self._retrieve_knowledge_match(
+                request.message,
+                base_context,
+                runtime_trace=runtime_trace,
+            )
             runtime_trace.update_stage(
                 "vectorless_rag",
                 {
@@ -578,6 +599,7 @@ class ConversationManager:
                 request.message,
                 conversation_context=base_context,
                 search_filters=resolved_filters,
+                runtime_trace=runtime_trace,
             )
             runtime_trace.update_stage(
                 "workflow_engine",
@@ -589,9 +611,7 @@ class ConversationManager:
                         else None
                     ),
                     "business_intent": (
-                        response.intent.value
-                        if response is not None
-                        else intent_match.intent.value
+                        response.intent.value if response is not None else intent_match.intent.value
                     ),
                 },
             )
@@ -632,7 +652,9 @@ class ConversationManager:
                 base_context.selected_doctor_id,
                 base_context.selected_doctor_name,
             )
-            history_turn_count = _count_user_turns(request.conversation.history) if request.conversation else 0
+            history_turn_count = (
+                _count_user_turns(request.conversation.history) if request.conversation else 0
+            )
             next_turn_count = history_turn_count if history_turn_count > 0 else base_context.turn_count + 1
             next_workflow = _next_workflow_state(response, base_context)
 
@@ -641,13 +663,28 @@ class ConversationManager:
                 status=ChatConversationStatus.ACTIVE,
                 turn_count=next_turn_count,
                 last_intent=response.intent,
-                active_filters=resolved_filters if _has_filter_values(resolved_filters) else base_context.active_filters,
+                active_filters=(
+                    resolved_filters if _has_filter_values(resolved_filters) else base_context.active_filters
+                ),
                 selected_doctor_id=selected_doctor_id,
                 selected_doctor_name=selected_doctor_name,
                 last_user_message=request.message,
                 last_assistant_message=response.message,
                 routed_to=routed_to,
                 current_workflow=next_workflow,
+            )
+            final_response_source = (
+                "workflow_engine"
+                if response.workflow is not None
+                else "controlled_generation"
+                if controlled_generation_used
+                else "vectorless_rag"
+                if response.knowledge_source is not None
+                else "deterministic_engine"
+            )
+            runtime_trace.set_final_response(
+                source=final_response_source,
+                preview=response.message[:240] if response.message else None,
             )
             if not controlled_generation_used:
                 runtime_trace.update_stage(
@@ -678,7 +715,11 @@ class ConversationManager:
                 runtime_trace.update_stage(
                     "composer",
                     {
-                        "deterministic": response.knowledge_source is None and response.workflow is None and not controlled_generation_used,
+                        "deterministic": (
+                            response.knowledge_source is None
+                            and response.workflow is None
+                            and not controlled_generation_used
+                        ),
                         "llm": controlled_generation_used and response.knowledge_source is None,
                         "hybrid": controlled_generation_used and response.knowledge_source is not None,
                         "reason": "Visible response was finalized through controlled generation.",
@@ -704,18 +745,31 @@ class ConversationManager:
                         if response.knowledge_source is not None
                         else "DETERMINISTIC"
                     ),
-                    "response_source": (
-                        "workflow_engine"
-                        if response.workflow is not None
-                        else "controlled_generation"
-                        if controlled_generation_used
-                        else "vectorless_rag"
-                        if response.knowledge_source is not None
-                        else "deterministic_engine"
-                    ),
+                    "response_source": final_response_source,
                 },
             )
-            runtime_trace.emit()
+            runtime_trace.update_stage(
+                "conversation_manager",
+                {
+                    "entered": True,
+                    "completed": True,
+                    "duration_ms": round((perf_counter() - started_at) * 1000, 3),
+                    "exit": True,
+                },
+            )
             return response
+        except Exception as exc:
+            runtime_trace.record_exception("conversation_manager", exc)
+            runtime_trace.update_stage(
+                "conversation_manager",
+                {
+                    "entered": True,
+                    "completed": False,
+                    "duration_ms": round((perf_counter() - started_at) * 1000, 3),
+                    "exit": True,
+                },
+            )
+            raise
         finally:
+            runtime_trace.emit()
             AIRuntimeTraceRegistry.unregister(runtime_trace.trace_id)

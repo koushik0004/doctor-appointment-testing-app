@@ -3,15 +3,16 @@
 ## Active Work
 
 - Status: completed
-- Task: instrument controlled generation pipeline diagnostics
+- Task: fix Claude 400 Bad Request caused by provider request serialization
 - Completed on: 2026-07-08
 
 ## Outcome
 
-- Added a guaranteed structured diagnostic emission path inside `LLMRuntimeFacade.run_controlled_generation()` for every SKIPPED or FAILED controlled-generation outcome while keeping return values and fallback behavior unchanged.
-- Extended the runtime trace payload with a final controlled-generation summary that records execution mode, generation availability, provider readiness, provider selection, orchestration start, prompt-builder execution, provider-adapter execution, transport invocation, HTTP request/response status, validation, eligibility, composition, post-processing, fallback reason, and exception details.
-- Added `AIRuntimeTraceSession.snapshot()` so the facade can summarize the in-flight trace state before emitting the final non-success diagnostic record.
-- Added focused backend tests covering policy skips, deterministic-only skips, eligibility skips, validation failure, and provider-transport failure emission.
+- Fixed the Anthropic request serialization bug in `backend/app/llm/transport.py` so Claude request building now whitelists only provider-supported outbound fields instead of forwarding arbitrary internal runtime metadata.
+- Stopped forwarding application diagnostics such as `routed_to`, execution metadata, and trace metadata into Anthropic `messages.create(...).metadata`; only supported `user_id` is serialized when present.
+- Tightened Claude thinking serialization to emit only supported Anthropic thinking shapes and to omit unsupported provider payload fragments rather than risking request-time 400 responses before inference.
+- Kept internal runtime metadata intact inside the application, including `AIRuntimeTraceSession` payloads and `logs/ai-runtime-trace.log`, so observability remains unchanged while provider payloads are sanitized.
+- Added focused transport regression coverage proving unsupported metadata is stripped from the outbound Anthropic payload and the broader facade/runtime-trace chat path still passes.
 
 ## Prior Work
 

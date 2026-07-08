@@ -62,7 +62,7 @@ class StubKnowledgeService:
     match: KnowledgeRetrievalMatch | None
     calls: list[str]
 
-    def retrieve_top_match(self, query: str) -> KnowledgeRetrievalMatch | None:
+    def retrieve_top_match(self, query: str, **_: object) -> KnowledgeRetrievalMatch | None:
         self.calls.append(query)
         return self.match
 
@@ -75,7 +75,10 @@ class StubRuntimeFacade:
 
     def compose(self):
         return SimpleNamespace(
-            activation_status=SimpleNamespace(selected_provider_name="openai")
+            activation_status=SimpleNamespace(
+                selected_provider_name="openai",
+                model_dump=lambda mode="json": {"selected_provider_name": "openai"},
+            )
         )
 
     def run_shadow_mode(self, request, *, asynchronous=True, runtime_trace=None) -> LLMShadowModeDispatchResult:
@@ -344,7 +347,7 @@ def test_conversation_manager_ignores_shadow_mode_failures():
     assert len(manager._llm_runtime_facade.controlled_calls) == 1
 
 
-def test_conversation_manager_emits_runtime_trace_when_enabled(caplog):
+def test_conversation_manager_emits_runtime_trace_when_enabled(runtime_trace_log):
     deterministic = StubDeterministicEngine(
         ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
     )
@@ -357,16 +360,12 @@ def test_conversation_manager_emits_runtime_trace_when_enabled(caplog):
     )
     manager._workflow_engine = StubWorkflowEngine(response=None)
 
-    with caplog.at_level("INFO"):
-        response = manager.handle(
-            ChatRequest(message="My name is Ava Thompson and my email is ava@example.com")
-        )
+    response = manager.handle(
+        ChatRequest(message="My name is Ava Thompson and my email is ava@example.com")
+    )
 
     assert response.message == "fallback"
-    trace_record = next(
-        record for record in caplog.records if record.message.startswith("ai_runtime_trace ")
-    )
-    payload = json.loads(trace_record.message.removeprefix("ai_runtime_trace "))
+    payload = json.loads(runtime_trace_log.read_text(encoding="utf-8").splitlines()[0])
     assert payload["user_message"] == "My name is [REDACTED_NAME] and my email is [REDACTED_EMAIL]"
     assert payload["llm_not_invoked"] is True
     assert payload["stop_component"] == "runtime_facade"

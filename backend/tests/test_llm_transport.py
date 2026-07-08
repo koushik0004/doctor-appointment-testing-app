@@ -147,7 +147,11 @@ def test_claude_transport_invokes_anthropic_client_and_normalizes_response():
             ],
             "tool_choice": {"mode": "required"},
             "adapter_metadata": {
-                "metadata": {"request_id": "control-1"},
+                "metadata": {
+                    "request_id": "control-1",
+                    "routed_to": "future_ai_layer",
+                    "execution_mode": "HYBRID",
+                },
             },
         }
     )
@@ -162,6 +166,8 @@ def test_claude_transport_invokes_anthropic_client_and_normalizes_response():
     assert payload["tool_calls"][0]["tool_name"] == "lookup_policy"
     assert payload["thinking_summary"] == "Reviewed the policy knowledge first."
     assert payload["metadata"]["citations"][0]["label"] == "Clinic Policy"
+    assert "metadata" not in transport._client.messages.calls[0]
+    assert "thinking" not in transport._client.messages.calls[0]
 
 
 def test_claude_transport_uses_generation_budget_when_max_tokens_missing():
@@ -192,10 +198,43 @@ def test_claude_transport_uses_generation_budget_when_max_tokens_missing():
     )
 
     assert client.messages.calls[0]["max_tokens"] == 333
-    assert client.messages.calls[0]["thinking"]["effort"] == "low"
+    assert "thinking" not in client.messages.calls[0]
 
 
-def test_claude_transport_updates_runtime_trace(caplog):
+def test_claude_transport_whitelists_supported_metadata_only():
+    client = FakeAnthropicClient(
+        FakeRawResponse(
+            SimpleNamespace(
+                id="msg-metadata",
+                model="claude-sonnet-4-5",
+                role="assistant",
+                type="message",
+                stop_reason="end_turn",
+                usage=SimpleNamespace(input_tokens=9, output_tokens=4),
+                content=[SimpleNamespace(type="text", text="ok", citations=None)],
+            )
+        )
+    )
+    transport = ClaudeTransport(_claude_config(), client=client)
+
+    transport.invoke(
+        {
+            "model": "claude-sonnet-4-5",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "adapter_metadata": {
+                "metadata": {
+                    "user_id": "user-123",
+                    "routed_to": "future_ai_layer",
+                    "execution_owner": "knowledge",
+                }
+            },
+        }
+    )
+
+    assert client.messages.calls[0]["metadata"] == {"user_id": "user-123"}
+
+
+def test_claude_transport_updates_runtime_trace(runtime_trace_log):
     message = SimpleNamespace(
         id="msg-trace",
         model="claude-sonnet-4-5",
@@ -212,21 +251,17 @@ def test_claude_transport_updates_runtime_trace(caplog):
         client=FakeAnthropicClient(FakeRawResponse(message, request_id="anthropic-trace")),
     )
 
-    with caplog.at_level("INFO"):
-        transport.invoke(
-            {
-                "model": "claude-sonnet-4-5",
-                "messages": [{"role": "user", "content": "Hello"}],
-                "adapter_metadata": {"ai_runtime_trace_id": trace.trace_id},
-            }
-        )
-        trace.emit()
+    transport.invoke(
+        {
+            "model": "claude-sonnet-4-5",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "adapter_metadata": {"ai_runtime_trace_id": trace.trace_id},
+        }
+    )
+    trace.emit()
     AIRuntimeTraceRegistry.unregister(trace.trace_id)
 
-    trace_record = next(
-        record for record in caplog.records if record.message.startswith("ai_runtime_trace ")
-    )
-    payload = loads(trace_record.message.removeprefix("ai_runtime_trace "))
+    payload = loads(runtime_trace_log.read_text(encoding="utf-8").splitlines()[0])
     assert payload["provider_transport"]["transport_selected"] == "ClaudeTransport"
     assert payload["provider_transport"]["http_response_received"] is True
     assert payload["provider_transport"]["token_usage"]["input_tokens"] == 22

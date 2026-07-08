@@ -51,3 +51,4 @@
 
 # Make file related
 .run/*
+logs/*.log

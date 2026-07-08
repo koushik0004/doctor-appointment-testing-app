@@ -156,6 +156,7 @@ class ClaudeTransport:
                         "token_usage": None,
                     },
                 )
+                runtime_trace.record_exception("provider_transport", exc, converted_to_fallback=True)
                 runtime_trace.mark_llm_not_invoked(
                     "provider_transport",
                     f"{normalized.error_code}: {normalized}",
@@ -262,8 +263,10 @@ class ClaudeTransport:
             "model": str(request["model"]),
             "messages": self._build_messages(request.get("messages")),
             "max_tokens": self._resolve_max_tokens(request, generation_budget),
-            "metadata": self._build_metadata(request),
         }
+        metadata = self._build_metadata(request)
+        if metadata:
+            params["metadata"] = metadata
 
         if isinstance(request.get("system"), str) and request["system"].strip():
             params["system"] = request["system"]
@@ -309,11 +312,15 @@ class ClaudeTransport:
             if isinstance(request.get("adapter_metadata"), dict)
             else {}
         )
-        return {
-            str(key): str(value)
-            for key, value in metadata.items()
-            if value is not None
-        }
+        user_id = metadata.get("user_id")
+        if user_id is None:
+            return {}
+
+        resolved_user_id = str(user_id).strip()
+        if not resolved_user_id:
+            return {}
+
+        return {"user_id": resolved_user_id}
 
     def _build_thinking(
         self,
@@ -336,10 +343,22 @@ class ClaudeTransport:
             return None
 
         resolved: dict[str, Any] = {}
-        if isinstance(payload.get("effort"), str):
-            resolved["effort"] = payload["effort"]
-        if payload.get("include_summary") is not None:
-            resolved["include_summary"] = bool(payload["include_summary"])
+        thinking_type = payload.get("type")
+        if isinstance(thinking_type, str):
+            normalized_type = thinking_type.strip().lower()
+            if normalized_type in {"adaptive", "disabled"}:
+                resolved["type"] = normalized_type
+            elif normalized_type == "enabled":
+                budget_tokens = payload.get("budget_tokens")
+                if isinstance(budget_tokens, int) and budget_tokens > 0:
+                    resolved["type"] = "enabled"
+                    resolved["budget_tokens"] = budget_tokens
+
+        display = payload.get("display")
+        if isinstance(display, str):
+            normalized_display = display.strip().lower()
+            if normalized_display in {"summarized", "omitted"}:
+                resolved["display"] = normalized_display
         return resolved or None
 
     def _build_messages(self, raw_messages: Any) -> list[dict[str, Any]]:

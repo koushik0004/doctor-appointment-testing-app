@@ -63,13 +63,13 @@
 - `backend/app/api/chat.py`
   - Chat endpoints for `/api/chat` and `/api/v1/chat`; expected workflow/business errors should pass through while only unexpected chat failures become HTTP 500 responses.
 - `backend/app/services/conversation_manager.py`
-  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns, and now routes eligible low-risk requests through controlled generation while keeping workflow, doctor search, and availability ownership deterministic.
+  - Single orchestration entry point for chat requests; maintains conversation context, merges extracted entities, preserves workflow-first execution, uses knowledge retrieval before deterministic fallback for FAQ-style non-workflow turns, now routes eligible low-risk requests through controlled generation while keeping workflow, doctor search, and availability ownership deterministic, and emits the single final runtime trace in its `finally` block.
 - `backend/app/services/workflow_engine.py`
-  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file.
+  - Request-scoped workflow executor for booking, cancellation, confirmation lookup, missing-field validation, and multi-turn booking draft continuation; direct doctor-reference booking entry and draft-merging regressions are validated against this file, and runtime tracing now records enter/completion/duration plus exception capture around the workflow boundary.
 - `backend/app/services/prompt_builder.py`
   - Inactive standalone prompt-construction module with a canonical provider-agnostic `PromptContext` model, internal deterministic Conversation, Workflow, and Knowledge Context Collectors, a deterministic System Instruction Builder, a deterministic validation gate, a deterministic Prompt Assembly Pipeline for ordered section construction, and a dedicated deterministic PromptRenderer for final prompt rendering and truncation; Phase 7.3 now renders workflow context into the final prompt used by shadow LLM execution while keeping retrieval, routing, workflow execution, API calls, database access, and AI reasoning out of this module.
 - `backend/app/llm/__init__.py`
-  - Inactive provider-neutral LLM integration package entry point that re-exports the future adapter contracts, runtime activation, execution-policy, operational-readiness, validation, eligibility, composition, response-composition, and facade entrypoints for shadow execution plus policy-gated controlled generation.
+  - Inactive provider-neutral LLM integration package entry point that lazily re-exports the future adapter contracts, runtime activation, execution-policy, operational-readiness, validation, eligibility, composition, response-composition, and facade entrypoints for shadow execution plus policy-gated controlled generation without triggering the orchestrator/prompt-builder import chain during package initialization.
 - `backend/app/llm/activation.py`
   - Inactive runtime activation seam that evaluates top-level feature flags plus provider readiness, emits canonical diagnostics, and safely reports invalid configuration or dependency-assembly failures without changing routing.
 - `backend/app/llm/execution_policy.py`
@@ -81,13 +81,11 @@
 - `backend/app/llm/composition.py`
   - Runtime composition root that loads LLM configuration once, creates provider transports separately, instantiates enabled adapters, builds the registry, resolves the default provider, composes `LLMIntegrationService` plus `LLMGenerationOrchestrator`, attaches a deterministic activation-status snapshot, and assembles the execution-policy and operational-readiness seams; Phase 8 now defaults it to `ProductionLLMProviderTransportFactory`, which composes Claude transport when Claude is enabled.
 - `backend/app/llm/transport.py`
-  - Production transport layer for provider SDK/network execution; currently owns the Anthropic-backed `ClaudeTransport`, normalized transport errors, transport activation diagnostics, request-id/response-id extraction, usage extraction, structured transport logging, and AI runtime trace capture for transport selection, HTTP start/finish, latency, and token usage.
+  - Production transport layer for provider SDK/network execution; currently owns the Anthropic-backed `ClaudeTransport`, normalized transport errors, transport activation diagnostics, request-id/response-id extraction, usage extraction, structured transport logging, AI runtime trace capture for transport selection, HTTP start/finish, latency, and token usage, plus the provider-specific outbound serializer that now strips unsupported internal metadata before Anthropic `messages.create(...)`.
 - `backend/app/llm/runtime_trace.py`
-  - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, and records explicit `llm_not_invoked` stop components/reasons whenever execution halts before provider transport or controlled generation is skipped.
+  - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, owns the independent `ai.runtime.trace` rotating file logger for `logs/ai-runtime-trace.log`, records explicit `llm_not_invoked` stop components/reasons, normalizes every required stage to deterministic `entered`/`completed`/`duration_ms`/`status` fields, and supports final snapshotting plus exception recording before controlled-generation skips and failures are emitted.
 - `backend/app/llm/facade.py`
   - Runtime facade that wraps the composed LLM graph, exposes a deterministic save-ready snapshot of the integration boundary, owns hidden shadow-mode execution plus provider-neutral diagnostics while discarding all generated LLM output, and now also exposes policy-gated controlled generation with provider-neutral runtime-response validation, eligibility, composition, post-processing, and non-success diagnostic emission that reuses the existing execution policy, Prompt Builder, orchestrator, and deterministic response envelope without changing default behavior.
-- `backend/app/llm/runtime_trace.py`
-  - Request-scoped AI runtime trace recorder and registry that emits structured backend-only diagnostics for chat requests when `AI_RUNTIME_TRACE=true`, redacts common patient PII patterns, and now supports snapshotting the in-flight trace so controlled-generation skips and failures can emit a final structured summary before completion.
 - `backend/app/llm/post_processor.py`
   - Provider-neutral runtime-response post processor that normalizes presentation, sanitizes presentation-only metadata, and emits deterministic post-processing diagnostics before the final response is returned.
 - `backend/app/llm/config.py`
@@ -95,11 +93,11 @@
 - `backend/app/llm/providers.py`
   - Inactive concrete provider adapters for OpenAI, Claude, Gemini, OpenRouter, and Ollama; keeps provider-private request/response and generation-budget translation inside adapter classes, requires explicit transport injection, and includes a config-backed adapter factory for adapter creation only.
 - `backend/app/llm/adapters.py`
-  - Shared inactive base adapter pipeline for future provider-specific request/response translation and private provider invocation.
+  - Shared inactive base adapter pipeline for future provider-specific request/response translation and private provider invocation; now records adapter enter/completion and transport-invocation boundaries in the runtime trace.
 - `backend/app/llm/models.py`
   - Internal LLM integration request/response, capabilities, and usage models; now also carries provider-neutral structured-output, tool-calling, reasoning, streaming, citation, and multimodal-intent metadata without wiring any SDK or API schema.
 - `backend/app/llm/orchestrator.py`
-  - Inactive thin coordinator that accepts already-collected generation input, invokes `PromptBuilderService`, converts `PromptBuildResult` into canonical `LLMGenerationRequest`, delegates to `LLMIntegrationService`, and normalizes the canonical response into a simple provider-neutral result; Phase 7.3 and Phase 7.4 keep it as the only path from runtime shadow or controlled-generation inputs into the final rendered prompt and provider request.
+  - Inactive thin coordinator that accepts already-collected generation input, invokes `PromptBuilderService`, converts `PromptBuildResult` into canonical `LLMGenerationRequest`, delegates to `LLMIntegrationService`, and normalizes the canonical response into a simple provider-neutral result; Phase 7.3 and Phase 7.4 keep it as the only path from runtime shadow or controlled-generation inputs into the final rendered prompt and provider request, and the runtime trace now stamps prompt-builder and integration durations here.
 - `backend/app/llm/validation.py`
   - Provider-neutral runtime-response validation seam that inspects canonical orchestration results for empty or whitespace content, malformed structured output, invalid finish reasons, and invalid canonical metadata before controlled generation can become visible.
 - `backend/app/llm/eligibility.py`
@@ -111,7 +109,7 @@
 - `backend/app/llm/registry.py`
   - Inactive explicit in-memory provider registry with deterministic listing, lookup, duplicate protection, and optional default-provider resolution.
 - `backend/app/llm/service.py`
-  - Inactive `LLMIntegrationService` facade that reports disconnected status from the explicit registry state and delegates generation only through constructor-injected provider registries, honoring an optional registry default provider when present.
+  - Inactive `LLMIntegrationService` facade that reports disconnected status from the explicit registry state and delegates generation only through constructor-injected provider registries, honoring an optional registry default provider when present, while now recording registry lookup, adapter resolution, request creation, and response receipt boundaries in the runtime trace.
 - `backend/app/services/doctor_service.py`
   - Doctor-domain response shaping and filter delegation.
 - `backend/app/services/availability_service.py`
@@ -135,7 +133,7 @@
 - `backend/app/knowledge/repository.py`
   - In-memory cache for loaded knowledge documents with exact ID/domain/tag accessors only.
 - `backend/app/knowledge/retrieval.py`
-  - Deterministic Vector-less RAG retrieval service that scores title, alias, keyword, synonym, category, and body-text matches separately, filters overly broad tokens, and returns one top document.
+  - Deterministic Vector-less RAG retrieval service that scores title, alias, keyword, synonym, category, and body-text matches separately, filters overly broad tokens, returns one top document, and now records retrieval start, match, score, matched terms, completion, and duration in the runtime trace.
 - `backend/app/knowledge/sources/`
   - Curated passive Markdown/JSON knowledge sources for future prompt/context work, including booking, cancellation, consultation-hours, telemedicine, appointment-preparation, payment-methods, insurance, and parking FAQs.
 - `backend/pyproject.toml`
@@ -203,7 +201,9 @@ These files define the persistence and API contracts. Any API change should be c
 - `backend/tests/test_llm_provider_adapters.py`
   - Covers the inactive concrete adapter layer: provider-private request translation, canonical response normalization, composition-compatible adapter creation, and inactive transport enforcement.
 - `backend/tests/test_llm_transport.py`
-  - Covers the production transport layer: mocked Anthropic invocation, normalized response/error mapping, generation-budget token fallback, activation diagnostics, production-factory behavior, default Claude composition, and the optional live Claude integration probe.
+  - Covers the production transport layer: mocked Anthropic invocation, normalized response/error mapping, outbound metadata sanitization, generation-budget token fallback, activation diagnostics, production-factory behavior, default Claude composition, and the optional live Claude integration probe.
+- `backend/tests/test_runtime_trace.py`
+  - Covers the dedicated runtime-trace sink: independent file creation, exact-once JSON emission, final payload persistence, and failed-stage preservation for provider-transport stop paths.
 
 ## High-Value Docs
 

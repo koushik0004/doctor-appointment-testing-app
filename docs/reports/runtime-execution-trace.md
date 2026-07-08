@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This report captures the routing change that makes controlled generation reachable from the live chat path and the follow-up instrumentation that guarantees a structured diagnostic when controlled generation does not succeed.
+This report captures the routing change that makes controlled generation reachable from the live chat path and the follow-up observability work that guarantees a durable structured trace when controlled generation does not succeed.
 
 It is both an implementation report and a runtime trace summary for the same request class:
 
@@ -12,9 +12,17 @@ It is both an implementation report and a runtime trace summary for the same req
 
 - `backend/app/llm/runtime_trace.py`
 - `backend/app/llm/facade.py`
+- `backend/app/llm/service.py`
+- `backend/app/llm/orchestrator.py`
+- `backend/app/llm/adapters.py`
+- `backend/app/llm/transport.py`
 - `backend/app/services/conversation_manager.py`
+- `backend/app/services/workflow_engine.py`
+- `backend/app/knowledge/retrieval.py`
 - `backend/tests/test_llm_facade.py`
 - `backend/tests/test_conversation_manager.py`
+- `backend/tests/test_llm_orchestrator.py`
+- `backend/tests/test_llm_transport.py`
 
 ## What Changed
 
@@ -22,7 +30,7 @@ Before this change, `ConversationManager` always finished the visible response a
 
 After this change, `ConversationManager` routes eligible low-risk chat requests into `LLMRuntimeFacade.run_controlled_generation()` instead of shadow mode. Workflow-owned requests still stay deterministic, doctor search and availability remain deterministic, and active workflows still block LLM participation. The visible response is replaced only when controlled generation succeeds.
 
-The follow-up diagnostics change keeps that routing intact and adds a final controlled-generation summary to the runtime trace whenever the facade returns `SKIPPED` or `FAILED`. The new summary is additive and does not change chat behavior, fallback behavior, or response shapes.
+The follow-up observability change keeps that routing intact and adds a final controlled-generation summary to the runtime trace whenever the facade returns `SKIPPED` or `FAILED`, while also wiring the broader request path into a single rotating JSON trace file. The new summary is additive and does not change chat behavior, fallback behavior, or response shapes.
 
 ## Routing Changes
 
@@ -119,31 +127,39 @@ The visible trace now also records a final controlled-generation summary with:
 
 The visible trace still emits `llm_not_invoked` when the facade is missing, policy blocks the request, or controlled generation fails safely before provider execution.
 
+## Observability Layer
+
+- `AIRuntimeTraceSession.emit()` now writes one raw JSON object per request to `logs/ai-runtime-trace.log` through a dedicated rotating file handler, and falls back to the application logger if the file write fails.
+- `ConversationManager.handle()` now emits only inside its `finally` block so the trace includes final response ownership, preview, stop reason, and any recorded exception context.
+- `WorkflowEngine`, Vector-less RAG retrieval, LLM integration, provider adapters, and provider transport now stamp enter/completed/duration fields, plus exception component/type/message/stack-trace records when a failure is converted into fallback or re-raised.
+- The runtime trace payload now captures `trace_id`, `timestamp`, `conversation_id`, `request_id`, `intent`, `selected_provider`, `activation_status`, `stop_component`, `stop_reason`, `llm_not_invoked`, `final_response_source`, `final_response_preview`, and `latency_ms` in addition to the existing per-stage dictionaries.
+
 ## Stabilization Summary
 
 - Issue: non-success controlled-generation runs could finish without a single final diagnostic record that explained where execution stopped.
 - Root Cause: the facade already tracked stage progress, but the end-of-call summary was only implicit and some skip/failure branches returned before a structured diagnostic was emitted.
-- Implementation: added `AIRuntimeTraceSession.snapshot()` and a final controlled-generation diagnostic emitter in `LLMRuntimeFacade.run_controlled_generation()` so every `SKIPPED` or `FAILED` result logs the stage summary, fallback reason, and exception details before completion.
-- Files Changed: `backend/app/llm/runtime_trace.py`, `backend/app/llm/facade.py`, `backend/tests/test_llm_facade.py`
-- Backward Compatibility: routing and fallback behavior are unchanged; the new diagnostic is additive and only appears when `AI_RUNTIME_TRACE` is enabled.
+- Implementation: added a dedicated rotating runtime-trace logger, request-scoped exception recording, `AIRuntimeTraceSession.snapshot()`, and a final controlled-generation diagnostic summary so every `SKIPPED` or `FAILED` result logs the stage summary, fallback reason, and exception details before completion.
+- Files Changed: `backend/app/llm/runtime_trace.py`, `backend/app/llm/facade.py`, `backend/app/llm/service.py`, `backend/app/llm/orchestrator.py`, `backend/app/llm/adapters.py`, `backend/app/llm/transport.py`, `backend/app/services/conversation_manager.py`, `backend/app/services/workflow_engine.py`, `backend/app/knowledge/retrieval.py`, `backend/tests/test_llm_facade.py`, `backend/tests/test_conversation_manager.py`, `backend/tests/test_llm_orchestrator.py`, `backend/tests/test_llm_transport.py`
+- Backward Compatibility: routing and fallback behavior are unchanged; the new diagnostic and trace file are additive and only appear when `AI_RUNTIME_TRACE` is enabled.
 
 ## Manual Validation
 
 Validated with targeted backend tests:
 
 ```bash
-./backend/.venv/bin/python -m pytest backend/tests/test_conversation_manager.py backend/tests/test_llm_facade.py -q
+./backend/.venv/bin/python -m pytest backend/tests/test_llm_*.py backend/tests/test_conversation_manager.py backend/tests/test_knowledge_repository.py -q
 ```
 
 Result:
 
-- `21 passed`
+- `133 passed, 1 skipped`
 
-Additional direct verification covered the two intended behavior classes:
+Additional direct verification covered the intended behavior classes:
 
 - general low-risk text now reaches controlled generation
 - workflow-owned requests stay deterministic and do not call the facade
 - non-success controlled-generation runs now emit a final structured diagnostic before the trace is logged
+- every request emits exactly one raw JSON trace in `logs/ai-runtime-trace.log`
 
 ## Practical Interpretation
 

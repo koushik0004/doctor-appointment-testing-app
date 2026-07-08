@@ -50,7 +50,8 @@ class RecordingLLMIntegrationService:
         self.response = response
         self.calls = []
 
-    def generate(self, request, *, provider_name=None):
+    def generate(self, request, *, provider_name=None, runtime_trace=None):
+        del runtime_trace
         self.calls.append(
             {
                 "request": deepcopy(request),

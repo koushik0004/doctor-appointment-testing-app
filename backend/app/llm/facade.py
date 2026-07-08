@@ -335,6 +335,9 @@ class LLMRuntimeFacade:
                     "reason": decision.fallback_reason or decision.routing_reason,
                 },
             )
+            runtime_trace.set_root("selected_provider", decision.selected_provider_name)
+            runtime_trace.set_root("execution_mode", decision.execution_mode.value)
+            runtime_trace.set_root("activation_status", decision.activation.model_dump(mode="json"))
         if decision.execution_mode is AIExecutionMode.DETERMINISTIC_ONLY:
             if request.deterministic_response is None:
                 result = LLMControlledGenerationResult(
@@ -643,6 +646,7 @@ class LLMRuntimeFacade:
                 error_type=type(exc).__name__,
             )
             if runtime_trace is not None:
+                runtime_trace.record_exception("runtime_facade", exc, converted_to_fallback=True)
                 self._emit_controlled_generation_diagnostic(
                     runtime_trace=runtime_trace,
                     result=result,
@@ -827,9 +831,15 @@ class LLMRuntimeFacade:
                 "exception_message": result.error_message,
             },
         )
+        runtime_trace.set_root("execution_mode", result.decision.execution_mode.value)
+        runtime_trace.set_root("selected_provider", result.decision.selected_provider_name)
+        runtime_trace.set_root("activation_status", result.decision.activation.model_dump(mode="json"))
+        runtime_trace.set_final_response(
+            source="controlled_generation" if result.final_response is not None else None,
+            preview=result.final_response.message[:240] if result.final_response is not None else None,
+        )
         if not transport_invoked:
             runtime_trace.mark_llm_not_invoked("controlled_generation", diagnostic_reason)
-        runtime_trace.emit()
 
     def _infer_controlled_generation_stop_stage(
         self,

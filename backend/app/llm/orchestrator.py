@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from time import perf_counter
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -96,23 +97,54 @@ class LLMGenerationOrchestrator:
         request: LLMGenerationOrchestrationRequest,
         runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> LLMGenerationOrchestrationResult:
-        prompt_result = self._prompt_builder.build(self._build_prompt_request(request))
+        prompt_started_at = perf_counter()
         if runtime_trace is not None:
             runtime_trace.update_stage(
                 "prompt_builder",
                 {
-                    "executed": True,
-                    "prompt_generated": bool(prompt_result.prompt),
-                    "prompt_length": len(prompt_result.prompt),
-                    "token_estimate": max(1, len(prompt_result.prompt) // 4),
+                    "entered": True,
+                    "completed": False,
                 },
             )
+        try:
+            prompt_result = self._prompt_builder.build(self._build_prompt_request(request))
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "prompt_builder",
+                    {
+                        "executed": True,
+                        "completed": True,
+                        "status": "SUCCEEDED",
+                        "prompt_generated": bool(prompt_result.prompt),
+                        "prompt_length": len(prompt_result.prompt),
+                        "token_estimate": max(1, len(prompt_result.prompt) // 4),
+                        "duration_ms": round((perf_counter() - prompt_started_at) * 1000, 3),
+                    },
+                )
+        except Exception as exc:
+            if runtime_trace is not None:
+                runtime_trace.record_exception("prompt_builder", exc)
+                runtime_trace.update_stage(
+                    "prompt_builder",
+                    {
+                        "completed": False,
+                        "status": "FAILED",
+                        "duration_ms": round((perf_counter() - prompt_started_at) * 1000, 3),
+                    },
+                )
+            raise
+
         llm_request = self.build_llm_request(request, prompt_result=prompt_result)
         if runtime_trace is not None:
             runtime_trace.update_stage(
                 "llm_integration",
                 {
-                    "provider": request.provider_name,
+                    "entered": True,
+                    "provider_selected": request.provider_name,
+                    "provider_registry_lookup": True,
+                    "adapter_resolved": request.provider_name is not None,
+                    "generation_request_created": True,
+                    "response_received": False,
                     "model": llm_request.model_name,
                     "generation_profile": (
                         llm_request.generation_budget.profile_name.value
@@ -127,11 +159,35 @@ class LLMGenerationOrchestrator:
                     ),
                 },
             )
-        llm_response = self._llm_integration_service.generate(
-            llm_request,
-            provider_name=request.provider_name,
-            runtime_trace=runtime_trace,
-        )
+        llm_started_at = perf_counter()
+        try:
+            llm_response = self._llm_integration_service.generate(
+                llm_request,
+                provider_name=request.provider_name,
+                runtime_trace=runtime_trace,
+            )
+        except Exception as exc:
+            if runtime_trace is not None:
+                runtime_trace.record_exception("llm_integration", exc)
+                runtime_trace.update_stage(
+                    "llm_integration",
+                    {
+                        "completed": False,
+                        "status": "FAILED",
+                        "duration_ms": round((perf_counter() - llm_started_at) * 1000, 3),
+                    },
+                )
+            raise
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "llm_integration",
+                {
+                    "response_received": True,
+                    "completed": True,
+                    "status": "SUCCEEDED",
+                    "duration_ms": round((perf_counter() - llm_started_at) * 1000, 3),
+                },
+            )
         return self._normalize_result(prompt_result=prompt_result, response=llm_response)
 
     def build_llm_request(
