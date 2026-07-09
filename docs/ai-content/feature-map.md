@@ -172,6 +172,12 @@
 - Current capability:
   - Documents the same current implementation as a low-level design covering folder and package structure, module and class responsibilities, interfaces, data models, internal request and response flow, configuration, API contracts, runtime state flow, Mermaid diagrams, and code-backed extension seams.
 
+### Whole-platform master architecture
+
+- `docs/architecture/architecture.md`
+- Current capability:
+  - Consolidates the current implementation into a single system-architecture reference focused on architectural vision, layered boundaries, AI runtime structure, conversation and workflow control, knowledge and prompt architecture, provider-neutral LLM design, controlled generation, observability, deployment shape, extension strategy, and enterprise considerations without dropping to code-level detail.
+
 ### AI architecture reference documentation
 
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`

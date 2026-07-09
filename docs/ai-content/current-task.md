@@ -3,6 +3,18 @@
 ## Active Work
 
 - Status: completed
+- Task: generate master architecture document for the current AI-enabled platform
+- Completed on: 2026-07-09
+
+## Outcome
+
+- Read the master architecture prompt and used the current reverse-engineering, HLD, and LLD architecture set as the source of truth.
+- Added `docs/architecture/architecture.md`, a system-level architecture document describing the platform vision, layered structure, AI runtime, workflows, knowledge, prompt and LLM architecture, controlled generation, observability, deployment, extension strategy, and enterprise considerations without dropping to code explanation.
+- Refreshed the compact AI context files so future sessions can discover the new master architecture reference directly from the task log, feature map, important files, and session context.
+
+## Prior Work
+
+- Status: completed
 - Task: generate low level design report for the current repository implementation
 - Completed on: 2026-07-09
 

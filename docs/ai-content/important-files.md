@@ -207,6 +207,7 @@ These files define the persistence and API contracts. Any API change should be c
 
 ## High-Value Docs
 
+- `docs/architecture/architecture.md`
 - `docs/architecture.md`
 - `docs/reports/architecture/HLD.md`
 - `docs/reports/architecture/LLD.md`
