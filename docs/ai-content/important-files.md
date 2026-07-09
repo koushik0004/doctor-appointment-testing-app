@@ -207,6 +207,7 @@ These files define the persistence and API contracts. Any API change should be c
 
 ## High-Value Docs
 
+- `docs/reports/architecture/AI-Assistant-Source-Code-Architecture.md`
 - `docs/reports/architecture/AI-Assistant-API-Design.md`
 - `docs/reports/architecture/AI-Runtime-Sequence-Diagrams.md`
 - `docs/reports/architecture/architecture.md`

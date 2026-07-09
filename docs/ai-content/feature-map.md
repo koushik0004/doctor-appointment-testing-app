@@ -190,6 +190,12 @@
 - Current capability:
   - Documents the implemented AI-only REST endpoints, conversation contracts, workflow/knowledge/prompt/LLM runtime APIs, routing decision matrix, internal DTOs, sequence mappings, error handling, and production-facing runtime behavior without including non-AI application APIs.
 
+### AI Assistant source-code architecture reference
+
+- `docs/reports/architecture/AI-Assistant-Source-Code-Architecture.md`
+- Current capability:
+  - Documents the implemented AI Assistant backend and Chat Widget source-code structure, including repository tree, backend and frontend AI folder responsibilities, startup and runtime entry points, important file responsibilities, configuration surfaces, and folder-to-runtime mapping without covering unrelated appointment-domain modules.
+
 ### AI architecture reference documentation
 
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`

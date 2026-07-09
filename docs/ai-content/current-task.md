@@ -3,6 +3,18 @@
 ## Active Work
 
 - Status: completed
+- Task: generate AI Assistant source code architecture document for the current repository implementation
+- Completed on: 2026-07-09
+
+## Outcome
+
+- Read the AI Assistant source-code architecture prompt and verified the scoped implementation across backend chat routes, chat schemas, conversation orchestration, workflow execution, knowledge loading and retrieval, prompt builder, provider-neutral LLM runtime, runtime tracing, frontend widget runtime, proxy layer, mirrored chat contracts, and focused test coverage.
+- Added `docs/reports/architecture/AI-Assistant-Source-Code-Architecture.md`, documenting the actual repository tree, backend and frontend AI folder structure, entry points, folder and file responsibilities, runtime flow mapping, configuration surfaces, and test-backed subsystem boundaries for the AI Assistant backend and Chat Widget only.
+- Refreshed the compact AI context files so future sessions can discover the new source-code architecture reference directly from the task log, feature map, important files, session context, and report index.
+
+## Prior Work
+
+- Status: completed
 - Task: generate AI Assistant API design document for the current repository implementation
 - Completed on: 2026-07-09
 
