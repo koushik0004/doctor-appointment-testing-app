@@ -3,13 +3,25 @@
 ## Active Work
 
 - Status: completed
+- Task: generate AI runtime sequence diagram report for the current repository implementation
+- Completed on: 2026-07-09
+
+## Outcome
+
+- Read the AI runtime sequence-diagram prompt and verified the runtime flow against the current chat API, conversation manager, workflow engine, prompt builder, provider-neutral LLM facade, adapter, transport, and runtime trace implementation.
+- Added `docs/reports/architecture/AI-Runtime-Sequence-Diagrams.md`, documenting the implemented runtime as Mermaid sequence diagrams for greeting, deterministic conversation, workflow ownership, knowledge retrieval, controlled generation, prompt building, provider execution, validation, post-processing, tracing, fallback, provider failure, and the full end-to-end path.
+- Corrected AI context references that previously pointed to a non-existent `docs/architecture/architecture.md` path so future sessions resolve the generated master architecture document correctly.
+
+## Prior Work
+
+- Status: completed
 - Task: generate master architecture document for the current AI-enabled platform
 - Completed on: 2026-07-09
 
 ## Outcome
 
 - Read the master architecture prompt and used the current reverse-engineering, HLD, and LLD architecture set as the source of truth.
-- Added `docs/architecture/architecture.md`, a system-level architecture document describing the platform vision, layered structure, AI runtime, workflows, knowledge, prompt and LLM architecture, controlled generation, observability, deployment, extension strategy, and enterprise considerations without dropping to code explanation.
+- Added `docs/reports/architecture/architecture.md`, a system-level architecture document describing the platform vision, layered structure, AI runtime, workflows, knowledge, prompt and LLM architecture, controlled generation, observability, deployment, extension strategy, and enterprise considerations without dropping to code explanation.
 - Refreshed the compact AI context files so future sessions can discover the new master architecture reference directly from the task log, feature map, important files, and session context.
 
 ## Prior Work

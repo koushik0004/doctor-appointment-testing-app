@@ -26,7 +26,8 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - The frontend AI widget now surfaces optional `knowledge_source` metadata on assistant text replies with a minimal source footer while leaving structured workflow cards unchanged.
 - Phase 4.7 added a dedicated manual test checklist for the Vector-less RAG prototype covering positive, negative, edge, regression, workflow, and existing chatbot scenarios.
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
-- Whole-platform master architecture reference: `docs/architecture/architecture.md`.
+- Whole-platform master architecture reference: `docs/reports/architecture/architecture.md`.
+- AI runtime sequence diagram reference: `docs/reports/architecture/AI-Runtime-Sequence-Diagrams.md`.
 - Whole-repository reverse-engineering reference: `docs/reports/architecture/reverse-engineering-report.md`.
 - Whole-repository high-level design reference: `docs/reports/architecture/HLD.md`.
 - Whole-repository low-level design reference: `docs/reports/architecture/LLD.md`.

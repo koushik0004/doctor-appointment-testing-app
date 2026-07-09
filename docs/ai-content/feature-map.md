@@ -174,9 +174,15 @@
 
 ### Whole-platform master architecture
 
-- `docs/architecture/architecture.md`
+- `docs/reports/architecture/architecture.md`
 - Current capability:
   - Consolidates the current implementation into a single system-architecture reference focused on architectural vision, layered boundaries, AI runtime structure, conversation and workflow control, knowledge and prompt architecture, provider-neutral LLM design, controlled generation, observability, deployment shape, extension strategy, and enterprise considerations without dropping to code-level detail.
+
+### AI runtime sequence diagram reference
+
+- `docs/reports/architecture/AI-Runtime-Sequence-Diagrams.md`
+- Current capability:
+  - Documents the implemented AI runtime as scenario-specific Mermaid sequence diagrams covering greeting flow, deterministic routing, workflow ownership, vector-less knowledge retrieval, controlled generation, prompt building, provider execution, validation, post-processing, runtime tracing, provider failure, fallback, and the complete end-to-end path.
 
 ### AI architecture reference documentation
 
