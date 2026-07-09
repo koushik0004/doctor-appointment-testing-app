@@ -160,6 +160,12 @@
 - Current capability:
   - Documents the implemented repository architecture end to end across frontend, backend, database, deterministic AI chat, knowledge retrieval, prompt builder, provider-neutral LLM runtime, Claude transport, tracing, configuration, and tests.
 
+### Whole-repository high level design
+
+- `docs/reports/architecture/HLD.md`
+- Current capability:
+  - Documents the same current implementation as an enterprise-oriented HLD covering business scope, architectural layers, deployment, runtime lifecycle, AI and LLM boundaries, security, observability, risks, assumptions, and extension points.
+
 ### AI architecture reference documentation
 
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
