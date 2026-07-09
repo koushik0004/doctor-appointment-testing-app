@@ -3,6 +3,18 @@
 ## Active Work
 
 - Status: completed
+- Task: generate reverse engineering architecture report for the current repository implementation
+- Completed on: 2026-07-09
+
+## Outcome
+
+- Read the requested reverse-engineering prompt and analyzed the current frontend, backend, knowledge, workflow, and LLM runtime implementation as the source of truth.
+- Added `docs/reports/architecture/reverse-engineering-report.md`, documenting the current repository architecture, runtime request flow, business modules, AI modules, provider abstraction, prompt pipeline, workflow execution, Vector-less RAG path, validation, post-processing, tracing, configuration, and testing infrastructure.
+- Refreshed the compact AI context files so future sessions can discover the new architecture report directly from `current-task.md`, `important-files.md`, `feature-map.md`, `session-context.md`, and `report-index.md`.
+
+## Prior Work
+
+- Status: completed
 - Task: fix Claude 400 Bad Request caused by provider request serialization
 - Completed on: 2026-07-08
 

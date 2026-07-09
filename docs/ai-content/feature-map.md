@@ -154,6 +154,12 @@
 
 - `frontend/app/api/[...path]/route.ts` forwards all frontend API requests to FastAPI.
 
+### Whole-repository architecture reverse engineering
+
+- `docs/reports/architecture/reverse-engineering-report.md`
+- Current capability:
+  - Documents the implemented repository architecture end to end across frontend, backend, database, deterministic AI chat, knowledge retrieval, prompt builder, provider-neutral LLM runtime, Claude transport, tracing, configuration, and tests.
+
 ### AI architecture reference documentation
 
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
