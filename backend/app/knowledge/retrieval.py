@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 
 from app.knowledge.documents import KnowledgeDocument
 from app.knowledge.repository import InMemoryKnowledgeRepository
+from app.llm.runtime_trace import AIRuntimeTraceSession
 
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
@@ -78,24 +80,64 @@ class KnowledgeRetrievalService:
             return None
         return match.document
 
-    def retrieve_top_match(self, query: str) -> KnowledgeRetrievalMatch | None:
-        query_terms = _tokenize(query)
-        normalized_query = _normalize_free_text(query)
-        if not query_terms and not normalized_query:
-            return None
+    def retrieve_top_match(
+        self,
+        query: str,
+        *,
+        runtime_trace: AIRuntimeTraceSession | None = None,
+    ) -> KnowledgeRetrievalMatch | None:
+        started_at = perf_counter()
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "vectorless_rag",
+                {
+                    "retrieval_started": True,
+                    "retrieval_completed": False,
+                },
+            )
 
-        matches = [
-            match
-            for document in self._repository.all()
-            if (match := self._score_document(document, query_terms, normalized_query)) is not None
-        ]
-        if not matches:
-            return None
+        try:
+            query_terms = _tokenize(query)
+            normalized_query = _normalize_free_text(query)
+            if not query_terms and not normalized_query:
+                return None
 
-        return sorted(
-            matches,
-            key=lambda match: (-match.score, -match.document.priority, match.document.id),
-        )[0]
+            matches = [
+                match
+                for document in self._repository.all()
+                if (match := self._score_document(document, query_terms, normalized_query)) is not None
+            ]
+            if not matches:
+                return None
+
+            match = sorted(
+                matches,
+                key=lambda match: (-match.score, -match.document.priority, match.document.id),
+            )[0]
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "vectorless_rag",
+                    {
+                        "matched_document": match.document.id,
+                        "matched_title": match.document.title,
+                        "score": match.score,
+                        "matched_terms": list(match.matched_terms),
+                    },
+                )
+            return match
+        except Exception as exc:
+            if runtime_trace is not None:
+                runtime_trace.record_exception("vectorless_rag", exc)
+            raise
+        finally:
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "vectorless_rag",
+                    {
+                        "retrieval_completed": True,
+                        "duration_ms": round((perf_counter() - started_at) * 1000, 3),
+                    },
+                )
 
     def _score_document(
         self,

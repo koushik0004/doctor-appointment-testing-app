@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from app.knowledge.documents import (
     KnowledgeDocument,
@@ -10,7 +12,16 @@ from app.knowledge.documents import (
     KnowledgeDocumentStatus,
 )
 from app.knowledge.retrieval import KnowledgeRetrievalMatch
-from app.llm import LLMShadowModeDispatchResult
+from app.llm import (
+    AIExecutionActivationSnapshot,
+    AIExecutionDecision,
+    AIExecutionMode,
+    AIExecutionOwner,
+    LLMControlledGenerationResult,
+    LLMControlledGenerationStatus,
+    LLMShadowModeDispatchResult,
+    LLMRuntimeResponse,
+)
 from app.schemas.chat import (
     ChatConversationRequest,
     ChatConversationContext,
@@ -51,7 +62,7 @@ class StubKnowledgeService:
     match: KnowledgeRetrievalMatch | None
     calls: list[str]
 
-    def retrieve_top_match(self, query: str) -> KnowledgeRetrievalMatch | None:
+    def retrieve_top_match(self, query: str, **_: object) -> KnowledgeRetrievalMatch | None:
         self.calls.append(query)
         return self.match
 
@@ -59,10 +70,20 @@ class StubKnowledgeService:
 class StubRuntimeFacade:
     def __init__(self, *, should_raise: bool = False) -> None:
         self.should_raise = should_raise
-        self.calls: list[object] = []
+        self.shadow_calls: list[object] = []
+        self.controlled_calls: list[object] = []
 
-    def run_shadow_mode(self, request) -> LLMShadowModeDispatchResult:
-        self.calls.append(request)
+    def compose(self):
+        return SimpleNamespace(
+            activation_status=SimpleNamespace(
+                selected_provider_name="openai",
+                model_dump=lambda mode="json": {"selected_provider_name": "openai"},
+            )
+        )
+
+    def run_shadow_mode(self, request, *, asynchronous=True, runtime_trace=None) -> LLMShadowModeDispatchResult:
+        del asynchronous, runtime_trace
+        self.shadow_calls.append(request)
         if self.should_raise:
             raise RuntimeError("shadow execution failed")
         return LLMShadowModeDispatchResult(
@@ -86,6 +107,45 @@ class StubRuntimeFacade:
                 "should_execute_shadow": True,
                 "should_execute_llm": True,
             }
+        )
+
+    def run_controlled_generation(self, request, *, runtime_trace=None) -> LLMControlledGenerationResult:
+        del runtime_trace
+        self.controlled_calls.append(request)
+        if self.should_raise:
+            raise RuntimeError("controlled generation failed")
+        execution_mode = request.policy_request.preferred_mode
+        owner = (
+            AIExecutionOwner.KNOWLEDGE
+            if execution_mode.value == "HYBRID" and request.policy_request.knowledge_eligible
+            else AIExecutionOwner.LLM
+        )
+        return LLMControlledGenerationResult(
+            request_id=request.request_id,
+            correlation_id=request.correlation_id,
+            decision=AIExecutionDecision(
+                requested_mode=request.policy_request.preferred_mode,
+                execution_mode=execution_mode,
+                primary_owner=owner,
+                official_response_owner=owner,
+                activation=AIExecutionActivationSnapshot(
+                    llm_enabled=True,
+                    shadow_mode=False,
+                    generation_allowed=True,
+                    generation_available=True,
+                    provider_readiness=True,
+                    selected_provider_name="openai",
+                    selected_provider_enabled=True,
+                    selected_provider_healthy=True,
+                    status_reason="generation enabled",
+                ),
+                should_execute_llm=True,
+                routing_reason="test",
+            ),
+            status=LLMControlledGenerationStatus.SUCCEEDED,
+            final_response=LLMRuntimeResponse(
+                message="Claude guidance: seek a neurologist first.",
+            ),
         )
 
 
@@ -115,10 +175,12 @@ def test_conversation_manager_returns_knowledge_before_deterministic_fallback():
         )
     )
     knowledge_service = StubKnowledgeService(match=_knowledge_match(), calls=[])
+    facade = StubRuntimeFacade()
     manager = ConversationManager(
         session=None,
         deterministic_engine=deterministic,
         knowledge_retrieval_service=knowledge_service,
+        llm_runtime_facade=facade,
     )
     manager._workflow_engine = StubWorkflowEngine(response=None)
 
@@ -126,8 +188,12 @@ def test_conversation_manager_returns_knowledge_before_deterministic_fallback():
 
     assert knowledge_service.calls == ["What is telemedicine?"]
     assert deterministic.calls == []
+    assert len(facade.controlled_calls) == 1
+    controlled_request = facade.controlled_calls[0]
+    assert controlled_request.policy_request.preferred_mode.value == "HYBRID"
     assert response.knowledge_source is not None
     assert response.knowledge_source.document_id == "faq.telemedicine.general"
+    assert response.message == "Claude guidance: seek a neurologist first."
     assert response.conversation is not None
     assert response.conversation.routed_to == ChatRoutingTarget.FUTURE_AI_LAYER
 
@@ -140,10 +206,12 @@ def test_conversation_manager_falls_back_when_knowledge_is_missing():
         )
     )
     knowledge_service = StubKnowledgeService(match=None, calls=[])
+    facade = StubRuntimeFacade()
     manager = ConversationManager(
         session=None,
         deterministic_engine=deterministic,
         knowledge_retrieval_service=knowledge_service,
+        llm_runtime_facade=facade,
     )
     manager._workflow_engine = StubWorkflowEngine(response=None)
 
@@ -151,9 +219,11 @@ def test_conversation_manager_falls_back_when_knowledge_is_missing():
 
     assert knowledge_service.calls == ["Do you support pharmacy refills?"]
     assert deterministic.calls == ["Do you support pharmacy refills?"]
+    assert len(facade.controlled_calls) == 1
     assert response.knowledge_source is None
+    assert response.message == "Claude guidance: seek a neurologist first."
     assert response.conversation is not None
-    assert response.conversation.routed_to == ChatRoutingTarget.DETERMINISTIC_ENGINE
+    assert response.conversation.routed_to == ChatRoutingTarget.FUTURE_AI_LAYER
 
 
 def test_conversation_manager_keeps_workflow_responses_first():
@@ -161,10 +231,12 @@ def test_conversation_manager_keeps_workflow_responses_first():
         ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
     )
     knowledge_service = StubKnowledgeService(match=_knowledge_match(), calls=[])
+    facade = StubRuntimeFacade()
     manager = ConversationManager(
         session=None,
         deterministic_engine=deterministic,
         knowledge_retrieval_service=knowledge_service,
+        llm_runtime_facade=facade,
     )
     manager._workflow_engine = StubWorkflowEngine(
         response=ChatResponse(
@@ -186,6 +258,7 @@ def test_conversation_manager_keeps_workflow_responses_first():
 
     assert knowledge_service.calls == ["Book an appointment with Dr. Sarah Jenkins tomorrow"]
     assert deterministic.calls == []
+    assert len(facade.controlled_calls) == 0
     assert response.workflow is not None
     assert response.knowledge_source is None
     assert response.conversation is not None
@@ -197,10 +270,12 @@ def test_conversation_manager_skips_knowledge_lookup_for_active_workflows():
         ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
     )
     knowledge_service = StubKnowledgeService(match=_knowledge_match(), calls=[])
+    facade = StubRuntimeFacade()
     manager = ConversationManager(
         session=None,
         deterministic_engine=deterministic,
         knowledge_retrieval_service=knowledge_service,
+        llm_runtime_facade=facade,
     )
     manager._workflow_engine = StubWorkflowEngine(response=None)
 
@@ -224,11 +299,12 @@ def test_conversation_manager_skips_knowledge_lookup_for_active_workflows():
 
     assert knowledge_service.calls == []
     assert deterministic.calls == ["My name is Ava Thompson"]
+    assert len(facade.controlled_calls) == 0
     assert response.conversation is not None
     assert response.conversation.routed_to == ChatRoutingTarget.DETERMINISTIC_ENGINE
 
 
-def test_conversation_manager_triggers_shadow_mode_without_changing_response():
+def test_conversation_manager_uses_controlled_generation_for_low_risk_chat():
     deterministic = StubDeterministicEngine(
         ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
     )
@@ -243,12 +319,14 @@ def test_conversation_manager_triggers_shadow_mode_without_changing_response():
 
     response = manager.handle(ChatRequest(message="Do you support pharmacy refills?"))
 
-    assert response.message == "fallback"
-    assert len(facade.calls) == 1
-    shadow_request = facade.calls[0]
-    assert shadow_request.user_message == "Do you support pharmacy refills?"
-    assert shadow_request.official_response_owner.value == "DETERMINISTIC"
-    assert shadow_request.correlation_id == response.conversation.conversation_id
+    assert response.message == "Claude guidance: seek a neurologist first."
+    assert len(facade.controlled_calls) == 1
+    controlled_request = facade.controlled_calls[0]
+    assert controlled_request.orchestration_request.user_message == "Do you support pharmacy refills?"
+    assert controlled_request.policy_request.preferred_mode.value == "LLM_ONLY"
+    assert controlled_request.correlation_id == response.conversation.conversation_id
+    assert response.conversation is not None
+    assert response.conversation.routed_to == ChatRoutingTarget.FUTURE_AI_LAYER
 
 
 def test_conversation_manager_ignores_shadow_mode_failures():
@@ -266,3 +344,29 @@ def test_conversation_manager_ignores_shadow_mode_failures():
     response = manager.handle(ChatRequest(message="Hello"))
 
     assert response.message == "fallback"
+    assert len(manager._llm_runtime_facade.controlled_calls) == 1
+
+
+def test_conversation_manager_emits_runtime_trace_when_enabled(runtime_trace_log):
+    deterministic = StubDeterministicEngine(
+        ChatResponse(intent=ChatIntent.UNKNOWN, message="fallback")
+    )
+    manager = ConversationManager(
+        session=None,
+        deterministic_engine=deterministic,
+        knowledge_retrieval_service=StubKnowledgeService(match=None, calls=[]),
+        llm_runtime_facade=None,
+        runtime_trace_enabled=True,
+    )
+    manager._workflow_engine = StubWorkflowEngine(response=None)
+
+    response = manager.handle(
+        ChatRequest(message="My name is Ava Thompson and my email is ava@example.com")
+    )
+
+    assert response.message == "fallback"
+    payload = json.loads(runtime_trace_log.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["user_message"] == "My name is [REDACTED_NAME] and my email is [REDACTED_EMAIL]"
+    assert payload["llm_not_invoked"] is True
+    assert payload["stop_component"] == "runtime_facade"
+    assert payload["final_response"]["response_source"] == "deterministic_engine"

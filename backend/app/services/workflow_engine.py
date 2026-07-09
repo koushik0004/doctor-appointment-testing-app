@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from time import perf_counter
 
 from fastapi import HTTPException, status
 from pydantic import ValidationError
@@ -28,6 +29,7 @@ from app.services.appointment_service import (
 )
 from app.services.chat_entity_extractor import extract_target_date, normalize_text
 from app.services.doctor_service import list_doctors
+from app.llm.runtime_trace import AIRuntimeTraceSession
 
 HELP_KEYWORDS = ("help", "how do i", "how to", "steps")
 BOOKING_ACTION_KEYWORDS = ("book", "booking", "schedule", "reserve")
@@ -494,85 +496,124 @@ class WorkflowEngine:
         *,
         conversation_context: ChatConversationContext,
         search_filters: ChatSearchFilters | None = None,
+        runtime_trace: AIRuntimeTraceSession | None = None,
     ) -> ChatResponse | None:
-        workflow_type = _resolve_workflow_type(
-            message,
-            conversation_context.current_workflow,
-            conversation_context,
-        )
-        if workflow_type is None:
-            return None
-
-        doctors = self._list_all_doctors()
-        draft = _build_draft(
-            message,
-            current_workflow=conversation_context.current_workflow,
-            conversation_context=conversation_context,
-            search_filters=search_filters,
-            doctors=doctors,
-        )
-        missing_fields = _missing_fields_for_workflow(workflow_type, draft)
-        if missing_fields:
-            workflow = ChatWorkflowResult(
-                workflow_type=workflow_type,
-                status=ChatWorkflowStatus.INPUT_REQUIRED,
-                missing_fields=missing_fields,
-                draft=draft,
+        started_at = perf_counter()
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "workflow_engine",
+                {
+                    "entered": True,
+                    "completed": False,
+                },
             )
-            return ChatResponse(
-                intent=_workflow_intent(workflow_type),
-                message=_input_required_message(workflow_type, missing_fields),
-                workflow=workflow,
+
+        try:
+            workflow_type = _resolve_workflow_type(
+                message,
+                conversation_context.current_workflow,
+                conversation_context,
+            )
+            if workflow_type is None:
+                return None
+
+            doctors = self._list_all_doctors()
+            draft = _build_draft(
+                message,
+                current_workflow=conversation_context.current_workflow,
+                conversation_context=conversation_context,
                 search_filters=search_filters,
+                doctors=doctors,
             )
-
-        if workflow_type == ChatWorkflowType.BOOK_APPOINTMENT:
-            try:
-                created = create_appointment_booking(
-                    self._session,
-                    AppointmentCreateRequest(
-                        doctor_id=draft.doctor_id,
-                        appointment_date=draft.appointment_date,
-                        start_time=draft.start_time,
-                        appointment_type=AppointmentType(draft.appointment_type or AppointmentType.IN_PERSON.value),
-                        patient=PatientInput(
-                            full_name=draft.patient_full_name or "",
-                            email=draft.patient_email or "",
-                            phone=draft.patient_phone,
-                        ),
-                        health_description=draft.health_description,
-                    ),
-                )
-            except (HTTPException, ValidationError) as exc:
-                response = _booking_validation_failure_response(
+            missing_fields = _missing_fields_for_workflow(workflow_type, draft)
+            if missing_fields:
+                workflow = ChatWorkflowResult(
+                    workflow_type=workflow_type,
+                    status=ChatWorkflowStatus.INPUT_REQUIRED,
+                    missing_fields=missing_fields,
                     draft=draft,
-                    search_filters=search_filters,
-                    exc=exc,
                 )
-                if response is not None:
-                    return response
-                raise
-            confirmation = get_appointment_confirmation_by_reference(self._session, appointment_id=created.id)
-            summary = _build_appointment_summary(confirmation)
-            workflow = ChatWorkflowResult(
-                workflow_type=workflow_type,
-                status=ChatWorkflowStatus.COMPLETED,
-                draft=draft,
-                appointment=summary,
-            )
-            return ChatResponse(
-                intent=ChatIntent.BOOK_APPOINTMENT,
-                message=(
-                    f"Appointment booked for {summary.doctor_name} on "
-                    f"{summary.appointment_date.isoformat()} at {summary.start_time}. "
-                    f"Confirmation code: {summary.confirmation_code}."
-                ),
-                workflow=workflow,
-                search_filters=search_filters,
-            )
+                return ChatResponse(
+                    intent=_workflow_intent(workflow_type),
+                    message=_input_required_message(workflow_type, missing_fields),
+                    workflow=workflow,
+                    search_filters=search_filters,
+                )
 
-        if workflow_type == ChatWorkflowType.CANCEL_APPOINTMENT:
-            confirmation = cancel_appointment_booking(
+            if workflow_type == ChatWorkflowType.BOOK_APPOINTMENT:
+                try:
+                    created = create_appointment_booking(
+                        self._session,
+                        AppointmentCreateRequest(
+                            doctor_id=draft.doctor_id,
+                            appointment_date=draft.appointment_date,
+                            start_time=draft.start_time,
+                            appointment_type=AppointmentType(
+                                draft.appointment_type or AppointmentType.IN_PERSON.value
+                            ),
+                            patient=PatientInput(
+                                full_name=draft.patient_full_name or "",
+                                email=draft.patient_email or "",
+                                phone=draft.patient_phone,
+                            ),
+                            health_description=draft.health_description,
+                        ),
+                    )
+                except (HTTPException, ValidationError) as exc:
+                    response = _booking_validation_failure_response(
+                        draft=draft,
+                        search_filters=search_filters,
+                        exc=exc,
+                    )
+                    if response is not None:
+                        return response
+                    raise
+                confirmation = get_appointment_confirmation_by_reference(
+                    self._session,
+                    appointment_id=created.id,
+                )
+                summary = _build_appointment_summary(confirmation)
+                workflow = ChatWorkflowResult(
+                    workflow_type=workflow_type,
+                    status=ChatWorkflowStatus.COMPLETED,
+                    draft=draft,
+                    appointment=summary,
+                )
+                return ChatResponse(
+                    intent=ChatIntent.BOOK_APPOINTMENT,
+                    message=(
+                        f"Appointment booked for {summary.doctor_name} on "
+                        f"{summary.appointment_date.isoformat()} at {summary.start_time}. "
+                        f"Confirmation code: {summary.confirmation_code}."
+                    ),
+                    workflow=workflow,
+                    search_filters=search_filters,
+                )
+
+            if workflow_type == ChatWorkflowType.CANCEL_APPOINTMENT:
+                confirmation = cancel_appointment_booking(
+                    self._session,
+                    appointment_id=draft.appointment_id,
+                    confirmation_code=draft.confirmation_code,
+                )
+                summary = _build_appointment_summary(confirmation)
+                workflow = ChatWorkflowResult(
+                    workflow_type=workflow_type,
+                    status=ChatWorkflowStatus.COMPLETED,
+                    draft=draft,
+                    appointment=summary,
+                )
+                return ChatResponse(
+                    intent=ChatIntent.CANCEL_APPOINTMENT,
+                    message=(
+                        f"Appointment {summary.confirmation_code} for {summary.doctor_name} on "
+                        f"{summary.appointment_date.isoformat()} at {summary.start_time} has been cancelled."
+                    ),
+                    workflow=workflow,
+                    search_filters=search_filters,
+                )
+
+            confirmation = get_appointment_confirmation_by_reference(
                 self._session,
                 appointment_id=draft.appointment_id,
                 confirmation_code=draft.confirmation_code,
@@ -584,35 +625,26 @@ class WorkflowEngine:
                 draft=draft,
                 appointment=summary,
             )
+            status_label = summary.status.lower()
             return ChatResponse(
-                intent=ChatIntent.CANCEL_APPOINTMENT,
+                intent=ChatIntent.APPOINTMENT_CONFIRMATION,
                 message=(
-                    f"Appointment {summary.confirmation_code} for {summary.doctor_name} on "
-                    f"{summary.appointment_date.isoformat()} at {summary.start_time} has been cancelled."
+                    f"Appointment {summary.confirmation_code} is {status_label} for "
+                    f"{summary.doctor_name} on {summary.appointment_date.isoformat()} at {summary.start_time}."
                 ),
                 workflow=workflow,
                 search_filters=search_filters,
             )
-
-        confirmation = get_appointment_confirmation_by_reference(
-            self._session,
-            appointment_id=draft.appointment_id,
-            confirmation_code=draft.confirmation_code,
-        )
-        summary = _build_appointment_summary(confirmation)
-        workflow = ChatWorkflowResult(
-            workflow_type=workflow_type,
-            status=ChatWorkflowStatus.COMPLETED,
-            draft=draft,
-            appointment=summary,
-        )
-        status_label = summary.status.lower()
-        return ChatResponse(
-            intent=ChatIntent.APPOINTMENT_CONFIRMATION,
-            message=(
-                f"Appointment {summary.confirmation_code} is {status_label} for "
-                f"{summary.doctor_name} on {summary.appointment_date.isoformat()} at {summary.start_time}."
-            ),
-            workflow=workflow,
-            search_filters=search_filters,
-        )
+        except Exception as exc:
+            if runtime_trace is not None:
+                runtime_trace.record_exception("workflow_engine", exc)
+            raise
+        finally:
+            if runtime_trace is not None:
+                runtime_trace.update_stage(
+                    "workflow_engine",
+                    {
+                        "completed": True,
+                        "duration_ms": round((perf_counter() - started_at) * 1000, 3),
+                    },
+                )

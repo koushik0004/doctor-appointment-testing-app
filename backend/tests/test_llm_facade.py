@@ -1,3 +1,5 @@
+import json
+
 from app.llm import (
     AIExecutionOwner,
     AIExecutionMode,
@@ -23,6 +25,7 @@ from app.llm import (
     LLMShadowModeRequest,
     LLMShadowModeStatus,
 )
+from app.llm.runtime_trace import AIRuntimeTraceRegistry, AIRuntimeTraceSession
 from app.services.prompt_builder import PromptBuildRequest, PromptBuilderService
 
 
@@ -49,6 +52,29 @@ class StaticTransport:
 class FailingTransport:
     def invoke(self, request: dict[str, object]) -> dict[str, object]:
         del request
+        raise RuntimeError("transport failure")
+
+
+class TracingFailingTransport:
+    def invoke(self, request: dict[str, object]) -> dict[str, object]:
+        runtime_trace = None
+        if isinstance(request, dict):
+            adapter_metadata = request.get("adapter_metadata")
+            if isinstance(adapter_metadata, dict):
+                metadata = adapter_metadata.get("metadata")
+                if isinstance(metadata, dict):
+                    trace_id = metadata.get("ai_runtime_trace_id")
+                    runtime_trace = AIRuntimeTraceRegistry.get(trace_id)
+        if runtime_trace is not None:
+            runtime_trace.update_stage(
+                "provider_transport",
+                {
+                    "transport_selected": self.__class__.__name__,
+                    "sdk_initialized": True,
+                    "http_request_started": True,
+                    "http_response_received": False,
+                },
+            )
         raise RuntimeError("transport failure")
 
 
@@ -225,7 +251,7 @@ def test_runtime_facade_runs_controlled_generation_when_policy_and_activation_al
     assert "[Workflow State]" in prompt_payload
 
 
-def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled():
+def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled(runtime_trace_log):
     transport = StaticTransport(
         {
             "content": "Generated runtime answer",
@@ -234,6 +260,7 @@ def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled(
         }
     )
     prompt_builder = RecordingPromptBuilder()
+    runtime_trace = AIRuntimeTraceSession(enabled=True)
     facade = LLMRuntimeFacade(
         composition_root=LLMRuntimeCompositionRoot(
             prompt_builder=prompt_builder,
@@ -252,8 +279,10 @@ def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled(
                 conversation_state={"conversation_id": "conv-control-2"},
                 provider_name="openai",
             ),
-        )
+        ),
+        runtime_trace=runtime_trace,
     )
+    runtime_trace.emit()
 
     assert result.status is LLMControlledGenerationStatus.SKIPPED
     assert result.generated_result is None
@@ -261,9 +290,15 @@ def test_runtime_facade_skips_controlled_generation_when_generation_is_disabled(
     assert result.final_response is None
     assert len(prompt_builder.calls) == 0
     assert len(transport.calls) == 0
+    payload = json.loads(runtime_trace_log.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["controlled_generation"]["status"] == "SKIPPED"
+    assert payload["controlled_generation"]["stop_stage"] == "deterministic_response"
+    assert payload["controlled_generation"]["transport_invoked"] is False
+    assert payload["llm_not_invoked"] is True
+    assert payload["stop_component"] == "controlled_generation"
 
 
-def test_runtime_facade_skips_controlled_generation_when_runtime_response_is_not_low_risk():
+def test_runtime_facade_skips_controlled_generation_when_runtime_response_is_not_low_risk(runtime_trace_log):
     transport = StaticTransport(
         {
             "content": "Generated runtime answer",
@@ -272,6 +307,7 @@ def test_runtime_facade_skips_controlled_generation_when_runtime_response_is_not
         }
     )
     prompt_builder = RecordingPromptBuilder()
+    runtime_trace = AIRuntimeTraceSession(enabled=True)
     facade = LLMRuntimeFacade(
         composition_root=LLMRuntimeCompositionRoot(
             prompt_builder=prompt_builder,
@@ -290,18 +326,24 @@ def test_runtime_facade_skips_controlled_generation_when_runtime_response_is_not
     )
     facade.compose = lambda: composition  # type: ignore[assignment]
 
-    result = facade.run_controlled_generation(
-        LLMControlledGenerationRequest(
-            policy_request=AIExecutionPolicyRequest(
-                preferred_mode=AIExecutionMode.LLM_ONLY,
+    AIRuntimeTraceRegistry.register(runtime_trace)
+    try:
+        result = facade.run_controlled_generation(
+            LLMControlledGenerationRequest(
+                policy_request=AIExecutionPolicyRequest(
+                    preferred_mode=AIExecutionMode.LLM_ONLY,
+                ),
+                orchestration_request=LLMGenerationOrchestrationRequest(
+                    user_message="Generate a runtime answer.",
+                    active_intent="BOOK_APPOINTMENT",
+                    provider_name="openai",
+                ),
             ),
-            orchestration_request=LLMGenerationOrchestrationRequest(
-                user_message="Generate a runtime answer.",
-                active_intent="BOOK_APPOINTMENT",
-                provider_name="openai",
-            ),
+            runtime_trace=runtime_trace,
         )
-    )
+        runtime_trace.emit()
+    finally:
+        AIRuntimeTraceRegistry.unregister(runtime_trace.trace_id)
 
     assert result.status is LLMControlledGenerationStatus.SKIPPED
     assert result.generated_result is None
@@ -318,37 +360,56 @@ def test_runtime_facade_skips_controlled_generation_when_runtime_response_is_not
     assert result.fallback_reason is not None
     assert len(prompt_builder.calls) == 1
     assert len(transport.calls) == 1
+    payload = json.loads(runtime_trace_log.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["controlled_generation"]["status"] == "SKIPPED"
+    assert payload["controlled_generation"]["stop_stage"] == "eligibility"
+    assert payload["controlled_generation"]["prompt_builder_executed"] is True
+    assert payload["controlled_generation"]["provider_adapter_executed"] is True
 
 
-def test_runtime_facade_falls_back_when_controlled_generation_fails():
+def test_runtime_facade_falls_back_when_controlled_generation_fails(runtime_trace_log):
     facade = LLMRuntimeFacade(
         composition_root=LLMRuntimeCompositionRoot(
             prompt_builder=PromptBuilderService(),
             configuration_settings=_base_settings(allow_generation=True),
-            transport_factory=StaticTransportFactory({"openai": FailingTransport()}),
+            transport_factory=StaticTransportFactory({"openai": TracingFailingTransport()}),
         )
     )
-
-    result = facade.run_controlled_generation(
-        LLMControlledGenerationRequest(
-            policy_request=AIExecutionPolicyRequest(
-                preferred_mode=AIExecutionMode.LLM_ONLY,
+    runtime_trace = AIRuntimeTraceSession(enabled=True)
+    AIRuntimeTraceRegistry.register(runtime_trace)
+    try:
+        result = facade.run_controlled_generation(
+            LLMControlledGenerationRequest(
+                policy_request=AIExecutionPolicyRequest(
+                    preferred_mode=AIExecutionMode.LLM_ONLY,
+                ),
+                orchestration_request=LLMGenerationOrchestrationRequest(
+                    user_message="Generate a runtime answer.",
+                    provider_name="openai",
+                ),
             ),
-            orchestration_request=LLMGenerationOrchestrationRequest(
-                user_message="Generate a runtime answer.",
-                provider_name="openai",
-            ),
+            runtime_trace=runtime_trace,
         )
-    )
+        runtime_trace.emit()
+    finally:
+        AIRuntimeTraceRegistry.unregister(runtime_trace.trace_id)
 
     assert result.status is LLMControlledGenerationStatus.FAILED
     assert result.generated_result is None
     assert result.error_message is not None
     assert result.error_type == "RuntimeError"
     assert result.final_response is None
+    payload = json.loads(runtime_trace_log.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["controlled_generation"]["status"] == "FAILED"
+    assert payload["controlled_generation"]["stop_stage"] == "provider_transport"
+    assert payload["controlled_generation"]["transport_invoked"] is True
+    assert payload["controlled_generation"]["http_request_sent"] is True
+    assert payload["controlled_generation"]["http_response_received"] is False
+    assert payload["controlled_generation"]["exception_type"] == "RuntimeError"
+    assert payload["controlled_generation"]["exception_message"] == "transport failure"
 
 
-def test_runtime_facade_falls_back_when_controlled_generation_validation_fails():
+def test_runtime_facade_falls_back_when_controlled_generation_validation_fails(runtime_trace_log):
     transport = StaticTransport(
         {
             "content": "Generated runtime answer",
@@ -363,6 +424,7 @@ def test_runtime_facade_falls_back_when_controlled_generation_validation_fails()
             transport_factory=StaticTransportFactory({"openai": transport}),
         )
     )
+    runtime_trace = AIRuntimeTraceSession(enabled=True)
     composition = facade.compose()
     invalid_result = LLMGenerationOrchestrationResult.model_construct(
         prompt="Rendered prompt",
@@ -378,7 +440,7 @@ def test_runtime_facade_falls_back_when_controlled_generation_validation_fails()
         model_metadata={},
         metadata={},
     )
-    composition.orchestrator.generate = lambda request: invalid_result  # type: ignore[assignment]
+    composition.orchestrator.generate = lambda request, runtime_trace=None: invalid_result  # type: ignore[assignment]
     facade.compose = lambda: composition  # type: ignore[assignment]
 
     result = facade.run_controlled_generation(
@@ -390,8 +452,10 @@ def test_runtime_facade_falls_back_when_controlled_generation_validation_fails()
                 user_message="Generate a runtime answer.",
                 provider_name="openai",
             ),
-        )
+        ),
+        runtime_trace=runtime_trace,
     )
+    runtime_trace.emit()
 
     assert result.status is LLMControlledGenerationStatus.FAILED
     assert result.generated_result is None
@@ -404,6 +468,11 @@ def test_runtime_facade_falls_back_when_controlled_generation_validation_fails()
     assert result.eligibility_result is None
     assert result.final_response is None
     assert result.fallback_reason is not None
+    payload = json.loads(runtime_trace_log.read_text(encoding="utf-8").splitlines()[0])
+    assert payload["controlled_generation"]["status"] == "FAILED"
+    assert payload["controlled_generation"]["stop_stage"] == "validation"
+    assert payload["controlled_generation"]["validation_result"]["executed"] is True
+    assert payload["controlled_generation"]["validation_result"]["passed"] is False
 
 
 def test_runtime_facade_keeps_deterministic_compatibility_for_non_llm_policies():

@@ -16,6 +16,8 @@ from app.knowledge import (
     KnowledgeRetrievalService,
 )
 from app.llm import LLMRuntimeCompositionRoot, LLMRuntimeFacade
+from app.llm.runtime_trace import AIRuntimeTraceSession
+from app.core.config import get_settings
 from app.schemas.chat import (
     ChatAvailabilityCard,
     ChatConversationContext,
@@ -674,5 +676,6 @@ def create_chat_response(
         deterministic_engine=chat_responder,
         knowledge_retrieval_service=_knowledge_retrieval_service(),
         llm_runtime_facade=_llm_runtime_facade(),
+        runtime_trace_enabled=get_settings().ai_runtime_trace,
     )
     return manager.handle(request)

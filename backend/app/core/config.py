@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     database_url: str = "sqlite:///./doctor_appointment.db"
     cors_origins: str = "http://localhost:4002,http://127.0.0.1:4002"
+    ai_runtime_trace: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

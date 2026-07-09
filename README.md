@@ -44,14 +44,15 @@ make restart
 
 ### 1. Overview
 
-The current AI assistant stack is implementation-complete for configuration, prompt construction, provider abstraction, runtime routing, validation, eligibility, composition, and post-processing, but the default runtime is still transport-inactive.
+The current AI assistant stack is implementation-complete for configuration, prompt construction, provider abstraction, runtime routing, validation, eligibility, composition, post-processing, and the first production transport path for Claude.
 
 What that means in practice:
 
 - The backend can load AI configuration from `.env`.
 - The prompt pipeline can build canonical prompts from conversation, workflow, and knowledge context.
 - The LLM seam can build provider-neutral requests, validate responses, decide eligibility, compose final runtime output, and normalize presentation.
-- The live app does not ship a real provider transport factory yet, so a real API key alone does not make the current runtime call OpenAI, Claude, Gemini, OpenRouter, or Ollama.
+- The default production composition path now builds a real Anthropic-backed Claude transport when Claude is enabled and selected.
+- OpenAI, Gemini, OpenRouter, and Ollama still remain transport-inactive until their production transport implementations are added.
 - The current visible chat flow remains deterministic and knowledge-backed; hidden shadow execution is still best-effort and falls back safely when generation is unavailable.
 
 ### 2. Required Environment Variables
@@ -71,13 +72,14 @@ Settings are loaded from `backend/.env` because both backend config loaders read
 
 | Variable name | Required? | Description | Example value |
 |---|---:|---|---|
-| `LLM_PROVIDER` | Yes for runtime activation | Selected provider name. Must match one of the supported provider enums. | `openai` |
+| `LLM_PROVIDER` | Yes for runtime activation | Selected provider name. Must match one of the supported provider enums. | `claude` |
 | `LLM_ENABLED` | Yes for runtime activation | Top-level runtime activation flag. | `true` |
 | `LLM_ALLOW_GENERATION` | Yes for runtime activation | Allows generation-capable execution paths. | `true` |
 | `LLM_SHADOW_MODE` | No | Enables shadow-mode execution decisions when generation is otherwise available. | `true` |
 | `LLM_ALLOW_STREAMING` | No | Allows streaming only if the selected provider also supports it. | `false` |
 | `LLM_ALLOW_TOOL_CALLING` | No | Allows tool-calling only if the selected provider also supports it. | `false` |
 | `LLM_ALLOW_REASONING` | No | Allows reasoning output only if the selected provider also supports it. | `false` |
+| `AI_RUNTIME_TRACE` | No | Enables backend-only structured AI runtime trace logging for each chat request. | `true` |
 | `LLM_TIMEOUT_SECONDS` | No | Global timeout fallback for provider config. | `30` |
 | `LLM_MAX_RETRIES` | No | Global retry fallback for provider config. | `2` |
 | `LLM_RETRY_BACKOFF_SECONDS` | No | Global retry backoff fallback for provider config. | `0.5` |
@@ -101,8 +103,8 @@ The same nested pattern exists for each supported provider name:
 | Variable name | Required? | Description | Example value |
 |---|---:|---|---|
 | `LLM_<PROVIDER>__ENABLED` | Yes for that provider | Enables the provider in the configuration model and registry. | `true` |
-| `LLM_<PROVIDER>__DEFAULT_MODEL_NAME` | Yes for that provider if enabled | Canonical model name used when a request does not supply one. | `gpt-4.1-mini` |
-| `LLM_<PROVIDER>__API_KEY` | Yes for non-Ollama providers if enabled | Provider API key. | `sk-<provider-key>` |
+| `LLM_<PROVIDER>__DEFAULT_MODEL_NAME` | Yes for that provider if enabled | Canonical model name used when a request does not supply one. | `claude-sonnet-4-5` |
+| `LLM_<PROVIDER>__API_KEY` | Yes for non-Ollama providers if enabled | Provider API key. | `sk-ant-...` |
 | `LLM_OLLAMA__BASE_URL` | Yes for Ollama if enabled | Ollama base URL used as the required authentication/connection setting. | `http://localhost:11434` |
 | `LLM_<PROVIDER>__BASE_URL` | No for non-Ollama providers | Optional provider base URL override. | `https://api.openai.com/v1` |
 | `LLM_<PROVIDER>__TIMEOUT_SECONDS` | No | Provider-specific timeout override. | `45` |
@@ -165,8 +167,14 @@ How to change the model:
 
 Current runtime limitation:
 
-- The composed runtime still uses `InactiveLLMProviderTransportFactory` by default.
-- That means a valid API key changes configuration and activation snapshots, but it does not produce a live provider call unless you inject a real transport factory in a custom harness or test.
+- The composed runtime now uses `ProductionLLMProviderTransportFactory` by default.
+- Today only Claude has a production transport implementation, so OpenAI, Gemini, OpenRouter, and Ollama still require future transport work before a valid API key can produce a live provider call.
+
+Current production transport behavior:
+
+- `backend/app/llm/transport.py` owns Claude HTTP communication through the official Anthropic SDK.
+- `ClaudeTransport` normalizes retries, timeout handling, request-id extraction, response-id extraction, usage extraction, structured transport logging, and provider error mapping.
+- `backend/app/llm/composition.py` injects Claude transport only when Claude is enabled in configuration.
 
 ### 4. Backend Startup
 
@@ -241,6 +249,62 @@ How to verify:
 - Send a normal chat request to `POST /api/chat`.
 - Confirm the visible response does not change when shadow mode is attempted.
 - In tests, inspect the returned facade snapshot and shadow diagnostics.
+
+### 7. AI Runtime Trace Mode
+
+What it does:
+
+- `AI_RUNTIME_TRACE=true` enables a backend-only structured trace for each chat request.
+- The trace captures the request path across `ConversationManager`, workflow detection, Vector-less RAG, execution policy, runtime facade, prompt building, LLM integration, adapter selection, provider transport, and final response ownership.
+- If the request never reaches the transport layer, the trace explicitly marks `llm_not_invoked=true` and records the exact stop component and reason.
+- The trace redacts common patient PII patterns from the logged user message and never logs API keys or authorization headers.
+
+How to enable:
+
+```bash
+echo "AI_RUNTIME_TRACE=true" >> backend/.env
+make backend-restart
+```
+
+How to disable:
+
+```bash
+perl -0pi -e 's/AI_RUNTIME_TRACE=true/AI_RUNTIME_TRACE=false/' backend/.env
+make backend-restart
+```
+
+Sample trace:
+
+```json
+{
+  "trace_name": "AI Runtime Trace",
+  "request_id": "8f6d...",
+  "conversation_id": "conv-123",
+  "user_message": "My name is [REDACTED_NAME] and my email is [REDACTED_EMAIL]",
+  "execution_policy": {
+    "selected_provider": "claude",
+    "generation_available": true,
+    "decision": "SHADOW"
+  },
+  "provider_transport": {
+    "transport_selected": "ClaudeTransport",
+    "http_request_started": true,
+    "http_response_received": true,
+    "status_code": 200
+  },
+  "final_response": {
+    "routed_to": "DETERMINISTIC_ENGINE",
+    "response_source": "deterministic_engine"
+  }
+}
+```
+
+How to diagnose routing problems:
+
+- If `runtime_facade.skipped=true`, read `runtime_facade.reason` first; this usually means shadow mode or generation availability was blocked before prompt building.
+- If `llm_not_invoked=true`, use `stop_component` and `stop_reason` to find the exact stage where execution stopped.
+- If `prompt_builder.executed=true` but `provider_transport.http_request_started=false`, inspect `llm_integration`, `provider_adapter`, and provider registration/transport readiness.
+- If `provider_transport.http_request_started=true` and the visible response is still deterministic, that is expected for shadow mode because generated output is discarded after diagnostics.
 
 #### Conversation Manager
 
@@ -459,6 +523,8 @@ What to look for:
 | Validation failure | Controlled generation returns a failed validation result. | The orchestration result is missing canonical fields or structured output is malformed. | Fix the provider mapping or use the deterministic fallback path. |
 | Eligibility rejection | Controlled generation is skipped after validation. | The request is not a low-risk conversational scenario or the policy did not approve visibility. | Keep the visible response deterministic for workflow-owned or non-approved requests. |
 | Runtime fallback | The app returns deterministic or knowledge-backed chat instead of AI-generated output. | The default runtime has no active transport, or activation/policy rejected generation. | This is expected in the current repo unless you inject a real transport factory in a custom harness. |
+| No AI trace logs | No `ai_runtime_trace` log entries appear during chat requests. | `AI_RUNTIME_TRACE` is false or the backend was not restarted after changing `backend/.env`. | Set `AI_RUNTIME_TRACE=true` in `backend/.env` and restart the backend. |
+| `LLM NOT INVOKED` in trace | Trace shows `llm_not_invoked=true` with a stop component. | Routing or provider readiness stopped the request before the provider transport. | Use `stop_component`, `stop_reason`, and the stage sections in the trace payload to identify the blocking seam. |
 
 ## Codex skill related
 

@@ -6,6 +6,7 @@ from typing import Any, Protocol
 from app.llm.adapters import BaseLLMProviderAdapter
 from app.llm.config import LLMProviderConfiguration, LLMProviderName
 from app.llm.models import (
+    LLMCitation,
     LLMFinishReason,
     LLMGenerationRequest,
     LLMGenerationResponse,
@@ -18,6 +19,7 @@ from app.llm.models import (
     LLMTokenUsage,
     LLMToolCall,
 )
+from app.llm.runtime_trace import get_runtime_trace_from_metadata
 ProviderPayload = dict[str, Any]
 
 
@@ -66,6 +68,14 @@ class ConfigurableLLMProviderAdapter(
 
     def invoke_provider(self, request: ProviderPayload) -> ProviderPayload:
         if self._transport is None:
+            runtime_trace = get_runtime_trace_from_metadata(
+                request.get("adapter_metadata") if isinstance(request, dict) else None
+            )
+            if runtime_trace is not None:
+                runtime_trace.mark_llm_not_invoked(
+                    "provider_adapter",
+                    f"{self.provider_name.value} adapter has no configured provider transport.",
+                )
             raise RuntimeError(
                 f"{self.provider_name.value} adapter is inactive: no provider transport is configured."
             )
@@ -486,6 +496,13 @@ class ClaudeProviderAdapter(ConfigurableLLMProviderAdapter):
                 output_tokens=usage_payload.get("output_tokens"),
             )
 
+        metadata_payload = (
+            dict(response.get("metadata"))
+            if isinstance(response.get("metadata"), dict)
+            else {}
+        )
+        citations = metadata_payload.get("citations")
+
         return LLMGenerationResponse(
             message=LLMMessage(
                 role=LLMMessageRole.ASSISTANT,
@@ -525,12 +542,34 @@ class ClaudeProviderAdapter(ConfigurableLLMProviderAdapter):
                 if isinstance(response.get("model_metadata"), dict)
                 else {}
             ),
-            metadata=(
-                dict(response.get("metadata"))
-                if isinstance(response.get("metadata"), dict)
-                else {}
-            ),
+            citations=self._translate_citations(citations),
+            metadata=metadata_payload,
         )
+
+    def _translate_citations(self, raw_citations: Any) -> list[LLMCitation]:
+        if not isinstance(raw_citations, list):
+            return []
+        citations: list[LLMCitation] = []
+        for raw_citation in raw_citations:
+            if not isinstance(raw_citation, dict):
+                continue
+            citations.append(
+                LLMCitation(
+                    label=str(raw_citation.get("label")) if raw_citation.get("label") else None,
+                    url=str(raw_citation.get("url")) if raw_citation.get("url") else None,
+                    excerpt=(
+                        str(raw_citation.get("excerpt"))
+                        if raw_citation.get("excerpt")
+                        else None
+                    ),
+                    metadata=(
+                        dict(raw_citation.get("metadata"))
+                        if isinstance(raw_citation.get("metadata"), dict)
+                        else {}
+                    ),
+                )
+            )
+        return citations
 
     def translate_generation_budget(self, budget) -> dict[str, Any]:
         payload: dict[str, Any] = {}

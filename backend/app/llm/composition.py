@@ -27,6 +27,7 @@ from app.llm.providers import (
     LLMProviderAdapterFactory,
     LLMProviderTransport,
 )
+from app.llm.transport import ClaudeTransport
 from app.llm.registry import InMemoryLLMProviderRegistry
 from app.llm.service import LLMIntegrationService
 from app.services.prompt_builder import PromptBuilderService
@@ -53,6 +54,22 @@ class InactiveLLMProviderTransportFactory:
         return {}
 
 
+class ProductionLLMProviderTransportFactory:
+    """Creates production transports only for supported enabled providers."""
+
+    def create_transports(
+        self,
+        configuration: LLMConfiguration,
+    ) -> Mapping[str, LLMProviderTransport]:
+        transports: dict[str, LLMProviderTransport] = {}
+        for provider_configuration in configuration.providers:
+            if not provider_configuration.enabled:
+                continue
+            if provider_configuration.provider_name.value == "claude":
+                transports["claude"] = ClaudeTransport(provider_configuration)
+        return transports
+
+
 @dataclass(frozen=True)
 class LLMRuntimeComposition:
     configuration: LLMConfiguration
@@ -71,7 +88,7 @@ class LLMRuntimeComposition:
 
 
 class LLMRuntimeCompositionRoot:
-    """Single composition root for the inactive LLM dependency graph."""
+    """Single composition root for the provider-neutral LLM dependency graph."""
 
     def __init__(
         self,
@@ -95,7 +112,7 @@ class LLMRuntimeCompositionRoot:
         self._transport_factory = (
             transport_factory
             if transport_factory is not None
-            else InactiveLLMProviderTransportFactory()
+            else ProductionLLMProviderTransportFactory()
         )
         self._adapter_factory = (
             adapter_factory if adapter_factory is not None else LLMProviderAdapterFactory()
