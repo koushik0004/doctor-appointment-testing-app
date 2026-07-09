@@ -3,6 +3,18 @@
 ## Active Work
 
 - Status: completed
+- Task: generate AI Assistant API design document for the current repository implementation
+- Completed on: 2026-07-09
+
+## Outcome
+
+- Read the AI assistance API design prompt and verified the actual AI-only API surface against the backend chat routes, chat schemas, conversation manager, workflow engine, deterministic knowledge retrieval path, prompt builder, provider-neutral runtime facade, execution policy, validator, eligibility, composer, post processor, provider adapters, Claude transport, runtime trace, tests, and architecture docs.
+- Added `docs/reports/architecture/AI-Assistant-API-Design.md`, documenting the implemented AI Assistant REST endpoints, conversation contracts, internal runtime APIs, workflow interactions, knowledge contracts, prompt-builder contracts, controlled-generation contracts, provider/runtime contracts, routing matrix, sequence mappings, and production considerations without inventing non-existent endpoints.
+- Refreshed the compact AI context files so future sessions can discover the AI Assistant API design document directly from the task log, feature map, important files, session context, and report index.
+
+## Prior Work
+
+- Status: completed
 - Task: generate AI runtime sequence diagram report for the current repository implementation
 - Completed on: 2026-07-09
 
