@@ -28,6 +28,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
 - Whole-repository reverse-engineering reference: `docs/reports/architecture/reverse-engineering-report.md`.
 - Whole-repository high-level design reference: `docs/reports/architecture/HLD.md`.
+- Whole-repository low-level design reference: `docs/reports/architecture/LLD.md`.
 - AI execution decision record: `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`.
 - Vector-less RAG reference: `docs/analysis/hybrid-ai-assistant-architecture/vectorless-rag-architecture.md`.
 - LLM integration seam reference: `docs/analysis/hybrid-ai-assistant-architecture/llm-integration-architecture.md`.

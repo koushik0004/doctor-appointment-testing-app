@@ -166,6 +166,12 @@
 - Current capability:
   - Documents the same current implementation as an enterprise-oriented HLD covering business scope, architectural layers, deployment, runtime lifecycle, AI and LLM boundaries, security, observability, risks, assumptions, and extension points.
 
+### Whole-repository low level design
+
+- `docs/reports/architecture/LLD.md`
+- Current capability:
+  - Documents the same current implementation as a low-level design covering folder and package structure, module and class responsibilities, interfaces, data models, internal request and response flow, configuration, API contracts, runtime state flow, Mermaid diagrams, and code-backed extension seams.
+
 ### AI architecture reference documentation
 
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`

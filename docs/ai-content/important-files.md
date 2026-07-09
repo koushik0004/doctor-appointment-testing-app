@@ -209,6 +209,7 @@ These files define the persistence and API contracts. Any API change should be c
 
 - `docs/architecture.md`
 - `docs/reports/architecture/HLD.md`
+- `docs/reports/architecture/LLD.md`
 - `docs/reports/architecture/reverse-engineering-report.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`
 - `docs/analysis/hybrid-ai-assistant-architecture/adr-001-deterministic-ai-engine-primary.md`
