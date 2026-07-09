@@ -28,6 +28,7 @@ Doctor appointment booking app with a Next.js frontend, FastAPI backend, and SQL
 - AI assistant master reference: `docs/analysis/hybrid-ai-assistant-architecture/hybrid-ai-assistant-master-architecture.md`.
 - Whole-platform master architecture reference: `docs/reports/architecture/architecture.md`.
 - AI Assistant API design reference: `docs/reports/architecture/AI-Assistant-API-Design.md`.
+- AI Assistant final implementation summary reference: `docs/reports/architecture/AI-Assistant-Final-Implementation-Summary.md`.
 - AI Assistant source-code architecture reference: `docs/reports/architecture/AI-Assistant-Source-Code-Architecture.md`.
 - AI runtime sequence diagram reference: `docs/reports/architecture/AI-Runtime-Sequence-Diagrams.md`.
 - Whole-repository reverse-engineering reference: `docs/reports/architecture/reverse-engineering-report.md`.

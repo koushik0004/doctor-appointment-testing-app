@@ -118,6 +118,17 @@
   - Understands specialization, gender, fee, location, date, and time preference cues.
   - Maintains request-scoped multi-turn conversation context through a single orchestration entry point.
   - Keeps the booking workflow active across incremental chat turns, merges collected draft fields, and auto-books through the existing backend appointment service once the mandatory booking fields are complete.
+
+## AI Assistant architecture references
+
+- `docs/reports/architecture/AI-Assistant-Final-Implementation-Summary.md`
+  - Final AI-only implementation summary covering the widget, conversation manager, workflow engine, vector-less RAG, controlled generation, prompt builder, provider-neutral LLM runtime, validation, eligibility, composition, post-processing, tracing, configuration, capabilities, reusability, and production readiness.
+- `docs/reports/architecture/AI-Assistant-Source-Code-Architecture.md`
+  - AI-only source-code architecture for the implemented backend assistant and chat widget, including scoped tree, folder responsibilities, important files, entry points, and runtime flow mapping.
+- `docs/reports/architecture/AI-Assistant-API-Design.md`
+  - AI-only API design covering chat endpoints, conversation contracts, internal runtime APIs, workflow interactions, knowledge contracts, controlled-generation contracts, provider/runtime contracts, and routing behavior.
+- `docs/reports/architecture/AI-Runtime-Sequence-Diagrams.md`
+  - AI-only runtime execution diagrams for greeting, deterministic chat, workflow ownership, vector-less retrieval, controlled generation, provider execution, validation, post-processing, tracing, fallback, and end-to-end request flow.
   - Routes eligible low-risk chat requests through the existing runtime facade's controlled-generation path after the official response is chosen, while preserving workflow ownership, doctor search, availability, and other business-owned paths as deterministic.
   - When `AI_RUNTIME_TRACE=true`, emits a structured backend-only end-to-end trace for each chat request through an independent `ai.runtime.trace` rotating file logger, including routing decisions, prompt/orchestration progress, provider transport activity, deterministic `entered`/`completed`/`duration_ms`/`status` stage markers, explicit `llm_not_invoked` stop reasons, and a final raw JSON request summary written exactly once to `logs/ai-runtime-trace.log` from the `ConversationManager` `finally` block.
   - Phase 7.3 ensures every hidden shadow execution reaches the full Prompt Builder -> Prompt Renderer -> Orchestrator path, including canonical workflow context in the rendered prompt sent to provider adapters.
